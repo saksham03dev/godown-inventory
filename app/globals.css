@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0f1117;
+  --foreground: #e4e4e7;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* html5-qrcode overrides for dark theme */
+#barcode-scanner-region video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+#barcode-scanner-region img {
+  display: none !important;
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #30363d transparent;
+  }
+}
