@@ -64,13 +64,28 @@ function LoginPageContent() {
     setSelectedUserId(null);
     setError(null);
     try {
-      const res = await fetch(`/api/auth/users?role=${role}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load users");
-      setUsers(data.users ?? []);
+      const res = await fetch(`/api/auth/users?role=${encodeURIComponent(role)}`, {
+        method: "GET",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : `Failed to load users (${res.status})`
+        );
+      }
+      const nextUsers = Array.isArray(data.users) ? data.users : [];
+      setUsers(nextUsers);
+      if (nextUsers.length === 0) {
+        console.warn("No portal users returned for role:", role, data.meta);
+      }
     } catch (err) {
       setUsers([]);
       setError(err instanceof Error ? err.message : "Failed to load users");
+      console.error("Login user load failed:", err);
     } finally {
       setLoadingUsers(false);
     }

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { listActiveUsersByRole } from "@/lib/services/portalUserService";
 import type { UserRole } from "@/lib/auth/roles";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,12 +15,17 @@ export async function GET(request: Request) {
     }
 
     const users = await listActiveUsersByRole(role);
-    return NextResponse.json({ users });
+    return NextResponse.json({
+      users,
+      meta: {
+        role,
+        count: users.length,
+        supabaseConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      },
+    });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load users.";
     console.error("List users error:", err);
-    return NextResponse.json(
-      { error: "Failed to load users." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
