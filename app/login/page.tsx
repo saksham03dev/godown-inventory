@@ -52,6 +52,13 @@ function LoginPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    console.log(
+      "Supabase URL Connected:",
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL
+    );
+  }, []);
+
   const loadUsers = useCallback(async (role: UserRole) => {
     setLoadingUsers(true);
     setSelectedUserId(null);
