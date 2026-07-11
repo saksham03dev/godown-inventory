@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { ROLE_LABELS, type UserRole } from "@/lib/auth/roles";
+import { getDefaultRouteForRole, ROLE_LABELS, type UserRole } from "@/lib/auth/roles";
 import { INACTIVITY_TIMEOUT_MINUTES } from "@/lib/auth/idle-timeout";
 import type { PortalUserPublic } from "@/lib/types/database";
 
@@ -95,7 +95,7 @@ function LoginPageContent() {
       return;
     }
 
-    router.push("/");
+    router.push(getDefaultRouteForRole(selectedRole));
     router.refresh();
   };
 

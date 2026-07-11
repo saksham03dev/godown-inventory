@@ -11,7 +11,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   manager:
     "Add & edit products (no price changes), stock in/out, labels, billing — no godown management",
   employee:
-    "Stock in/out, print labels, view bills — no product, godown, or price changes",
+    "Stock in and stock out via scan station only",
 };
 
 type Permission =
@@ -25,6 +25,7 @@ type Permission =
   | "godowns.manage"
   | "labels"
   | "scan"
+  | "scan.viewLabel"
   | "billing.view"
   | "billing.create"
   | "billing.editPrice"
@@ -42,6 +43,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "godowns.manage",
     "labels",
     "scan",
+    "scan.viewLabel",
     "billing.view",
     "billing.create",
     "billing.editPrice",
@@ -55,10 +57,11 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "godowns.view",
     "labels",
     "scan",
+    "scan.viewLabel",
     "billing.view",
     "billing.create",
   ],
-  employee: ["dashboard", "labels", "scan", "billing.view"],
+  employee: ["scan"],
 };
 
 export function hasPermission(
@@ -79,21 +82,36 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", permission: "dashboard" },
   { href: "/products", label: "Products", permission: "products.view" },
   { href: "/labels", label: "Labels", permission: "labels" },
-  { href: "/godowns", label: "Godowns", permission: "godowns.view" },
+  { href: "/godowns", label: "Godowns", permission: "godowns.manage" },
+  { href: "/inventory", label: "View Inventory", permission: "godowns.view" },
   { href: "/scan", label: "Scan Station", permission: "scan" },
   { href: "/billing", label: "Billing", permission: "billing.view" },
   { href: "/admin/users", label: "Users", permission: "users.manage" },
 ];
 
 export function getNavItemsForRole(role: UserRole | null | undefined) {
-  return ALL_NAV_ITEMS.filter((item) => hasPermission(role, item.permission));
+  const items = ALL_NAV_ITEMS.filter((item) =>
+    hasPermission(role, item.permission)
+  );
+  if (role === "employee") {
+    return items.filter((item) => item.href === "/scan");
+  }
+  return items;
+}
+
+export function getDefaultRouteForRole(
+  role: UserRole | null | undefined
+): string {
+  if (role === "employee") return "/scan";
+  return "/";
 }
 
 const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/": "dashboard",
   "/products": "products.view",
   "/labels": "labels",
-  "/godowns": "godowns.view",
+  "/godowns": "godowns.manage",
+  "/inventory": "godowns.view",
   "/scan": "scan",
   "/billing": "billing.view",
   "/admin/users": "users.manage",

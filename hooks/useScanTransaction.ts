@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { processScanTransaction } from "@/lib/services/unitScanService";
 import type {
   AlertState,
@@ -16,14 +16,14 @@ interface UseScanTransactionReturn {
   processing: boolean;
   alert: AlertState | null;
   lastResult: ScanTransactionResult | null;
-  quantity: number;
-  setQuantity: (qty: number) => void;
+  approveFlash: boolean;
   handleScan: (
     barcodeId: string,
     godownId: string,
     transactionType: TransactionType
   ) => Promise<ScanTransactionResult>;
   dismissAlert: () => void;
+  clearApproveFlash: () => void;
 }
 
 export function useScanTransaction(
@@ -34,14 +34,10 @@ export function useScanTransaction(
   const [lastResult, setLastResult] = useState<ScanTransactionResult | null>(
     null
   );
-  const [quantity, setQuantity] = useState(1);
-  const quantityRef = useRef(quantity);
-
-  useEffect(() => {
-    quantityRef.current = quantity;
-  }, [quantity]);
+  const [approveFlash, setApproveFlash] = useState(false);
 
   const dismissAlert = useCallback(() => setAlert(null), []);
+  const clearApproveFlash = useCallback(() => setApproveFlash(false), []);
 
   const handleScan = useCallback(
     async (
@@ -56,23 +52,26 @@ export function useScanTransaction(
         };
         setAlert({ type: "error", message: result.message });
         setLastResult(result);
+        setApproveFlash(false);
         return result;
       }
 
       setProcessing(true);
       setAlert(null);
+      setApproveFlash(false);
 
       try {
         const result = await processScanTransaction({
           barcodeId,
           godownId,
           transactionType,
-          quantity: quantityRef.current,
+          quantity: 1,
         });
 
         setLastResult(result);
 
         if (result.success) {
+          setApproveFlash(true);
           setAlert({ type: "success", message: result.message });
           options.onSuccess?.(result);
         } else {
@@ -86,6 +85,7 @@ export function useScanTransaction(
         const result: ScanTransactionResult = { success: false, message };
         setAlert({ type: "error", message });
         setLastResult(result);
+        setApproveFlash(false);
         return result;
       } finally {
         setProcessing(false);
@@ -98,9 +98,9 @@ export function useScanTransaction(
     processing,
     alert,
     lastResult,
-    quantity,
-    setQuantity,
+    approveFlash,
     handleScan,
     dismissAlert,
+    clearApproveFlash,
   };
 }

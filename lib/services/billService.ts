@@ -183,6 +183,7 @@ export async function addUnitToBill(
       | null
       | undefined;
     const source = unit.stock_batches?.source_name ?? null;
+    const batchQty = (unit.stock_batches as { quantity?: number } | null)?.quantity;
     const resolvedPrice =
       unitPrice > 0
         ? unitPrice
@@ -199,6 +200,8 @@ export async function addUnitToBill(
         product_code: product?.product_code ?? "",
         unit_barcode: unit.unit_barcode,
         source_name: source,
+        unit_number: unit.unit_number,
+        batch_quantity: batchQty ?? null,
         quantity: 1,
         unit_price: resolvedPrice,
         line_total,

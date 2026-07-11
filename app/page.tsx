@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Boxes, Package, RefreshCw, Warehouse } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -8,12 +9,21 @@ import { GodownDistributionCards } from "@/components/dashboard/GodownDistributi
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { AlertBanner } from "@/components/ui/AlertBanner";
+import { useAuth } from "@/contexts/AuthContext";
 import { useInventory } from "@/hooks/useInventory";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { role, loading: authLoading } = useAuth();
   const { metrics, loading, error, refreshMetrics } = useInventory();
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && role === "employee") {
+      router.replace("/scan");
+    }
+  }, [authLoading, role, router]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -25,6 +35,14 @@ export default function DashboardPage() {
     const interval = setInterval(refreshMetrics, 30_000);
     return () => clearInterval(interval);
   }, [refreshMetrics]);
+
+  if (authLoading || role === "employee") {
+    return (
+      <DashboardLayout title="Dashboard" subtitle="Overview">
+        <LoadingSpinner label="Redirecting…" />
+      </DashboardLayout>
+    );
+  }
 
   if (!isSupabaseConfigured()) {
     return (

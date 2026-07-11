@@ -1,4 +1,5 @@
 import type { BillWithItems } from "@/lib/types/database";
+import { formatUnitLabel } from "@/lib/utils/billItem";
 
 interface BillPrintViewProps {
   bill: BillWithItems;
@@ -43,6 +44,7 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
           <tr className="border-b border-black">
             <th className="py-2 text-left">#</th>
             <th className="py-2 text-left">Item</th>
+            <th className="py-2 text-left">Unit</th>
             <th className="py-2 text-left">Barcode</th>
             <th className="py-2 text-left">Source</th>
             <th className="py-2 text-right">Price</th>
@@ -50,13 +52,18 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
           </tr>
         </thead>
         <tbody>
-          {bill.bill_items.map((item, i) => (
+          {bill.bill_items.map((item, i) => {
+            const unitLabel = formatUnitLabel(item);
+            return (
             <tr key={item.id} className="border-b border-zinc-200">
               <td className="py-2">{i + 1}</td>
               <td className="py-2">
                 {item.product_name}
                 <br />
                 <span className="text-xs text-zinc-500">{item.product_code}</span>
+              </td>
+              <td className="py-2 font-mono text-xs">
+                {unitLabel ?? "—"}
               </td>
               <td className="py-2 font-mono text-xs">{item.unit_barcode}</td>
               <td className="py-2 text-xs">{item.source_name || "—"}</td>
@@ -67,7 +74,8 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
                 ₹{Number(item.line_total).toFixed(2)}
               </td>
             </tr>
-          ))}
+          );
+          })}
         </tbody>
       </table>
 

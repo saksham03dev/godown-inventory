@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { formatUnitLabel } from "@/lib/utils/billItem";
 import type { BillItem, BillWithItems } from "@/lib/types/database";
 
 interface BillItemsTableProps {
@@ -40,6 +41,9 @@ export function BillItemsTable({
                 Product
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Unit ID
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Barcode
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
@@ -59,50 +63,62 @@ export function BillItemsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border">
-            {bill.bill_items.map((item) => (
-              <tr key={item.id} className="hover:bg-white/[0.02]">
-                <td className="px-4 py-3">
-                  <p className="font-medium text-zinc-200">{item.product_name}</p>
-                  <p className="text-xs text-zinc-500">{item.product_code}</p>
-                </td>
-                <td className="px-4 py-3 font-mono text-xs text-zinc-400">
-                  {item.unit_barcode}
-                </td>
-                <td className="px-4 py-3 text-zinc-500">
-                  {item.source_name || "—"}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {priceEditable ? (
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={item.unit_price}
-                      onChange={(e) =>
-                        onEditPrice(item, Number(e.target.value))
-                      }
-                      className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1 text-right text-sm text-zinc-100 outline-none focus:border-accent"
-                    />
-                  ) : (
-                    <span>₹{Number(item.unit_price).toFixed(2)}</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right font-medium text-zinc-200">
-                  ₹{Number(item.line_total).toFixed(2)}
-                </td>
-                {!readonly && (
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => onRemove(item.id)}
-                      className="rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-danger"
-                      aria-label="Remove item"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+            {bill.bill_items.map((item) => {
+              const unitLabel = formatUnitLabel(item);
+              return (
+                <tr key={item.id} className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-zinc-200">{item.product_name}</p>
+                    <p className="text-xs text-zinc-500">{item.product_code}</p>
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="px-4 py-3">
+                    {unitLabel ? (
+                      <span className="rounded-md bg-accent/10 px-2 py-0.5 font-mono text-xs font-semibold text-accent">
+                        {unitLabel}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-400">
+                    {item.unit_barcode}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-500">
+                    {item.source_name || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {priceEditable ? (
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={item.unit_price}
+                        onChange={(e) =>
+                          onEditPrice(item, Number(e.target.value))
+                        }
+                        className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1 text-right text-sm text-zinc-100 outline-none focus:border-accent"
+                      />
+                    ) : (
+                      <span>₹{Number(item.unit_price).toFixed(2)}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-zinc-200">
+                    ₹{Number(item.line_total).toFixed(2)}
+                  </td>
+                  {!readonly && (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => onRemove(item.id)}
+                        className="rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-danger"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

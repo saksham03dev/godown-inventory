@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { canAccessRoute, type UserRole } from "@/lib/auth/roles";
+import { canAccessRoute, getDefaultRouteForRole, type UserRole } from "@/lib/auth/roles";
 import { SESSION_COOKIE, verifySessionToken, clearSessionCookie } from "@/lib/auth/session-edge";
 
 const PUBLIC_PATHS = ["/login"];
@@ -57,19 +57,26 @@ export const updateSession = async (request: NextRequest) => {
 
   if (session && pathname === "/login") {
     const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = "/";
+    homeUrl.pathname = getDefaultRouteForRole(session.role as UserRole);
     return NextResponse.redirect(homeUrl);
   }
 
   if (session && !isPublicPath(pathname)) {
     const role = session.role as UserRole;
+
+    if (role === "employee" && pathname === "/") {
+      const scanUrl = request.nextUrl.clone();
+      scanUrl.pathname = "/scan";
+      return NextResponse.redirect(scanUrl);
+    }
+
     if (!canAccessRoute(pathname, role)) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      const homeUrl = request.nextUrl.clone();
-      homeUrl.pathname = "/";
-      return NextResponse.redirect(homeUrl);
+      const fallbackUrl = request.nextUrl.clone();
+      fallbackUrl.pathname = getDefaultRouteForRole(role);
+      return NextResponse.redirect(fallbackUrl);
     }
   }
 

@@ -191,6 +191,8 @@ export interface BillItem {
   product_code: string;
   unit_barcode: string;
   source_name: string | null;
+  unit_number: number | null;
+  batch_quantity: number | null;
   quantity: number;
   unit_price: number;
   line_total: number;

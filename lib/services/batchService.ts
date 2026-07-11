@@ -136,8 +136,8 @@ export async function fetchStockUnitByBarcode(
     .select(
       `
       *,
-      products ( id, name, product_code, size, retail_selling_price ),
-      stock_batches ( id, batch_code, source_name ),
+      products ( id, name, product_code, size, retail_selling_price, barcode_id, special_note, category ),
+      stock_batches ( id, batch_code, source_name, quantity ),
       godowns ( id, location_name )
     `
     )

@@ -12,6 +12,7 @@ import {
   Tags,
   UserCog,
   Warehouse,
+  Boxes,
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +23,7 @@ const NAV_ICONS = {
   "/products": PackageSearch,
   "/labels": Tags,
   "/godowns": Warehouse,
+  "/inventory": Boxes,
   "/scan": ScanLine,
   "/billing": FileText,
   "/admin/users": UserCog,
