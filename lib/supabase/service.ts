@@ -16,7 +16,7 @@ export function createServiceClient(options?: {
   if (options?.requireServiceRole) {
     if (!url || !serviceKey) {
       throw new Error(
-        "SUPABASE_SERVICE_ROLE_KEY is required for stock mutations. Add it in Netlify → Site settings → Environment variables (and locally in .env.local)."
+        "SUPABASE_SERVICE_ROLE_KEY is required for stock mutations. Locally: add it to .env.local (Supabase → Project Settings → API → service_role), then restart `npm run dev`. On Netlify: Site settings → Environment variables."
       );
     }
     return createClient(url, serviceKey, {
