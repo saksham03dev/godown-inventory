@@ -61,7 +61,7 @@ export default function DashboardPage() {
   return (
     <DashboardLayout
       title="Dashboard"
-      subtitle="Real-time inventory overview across all godowns"
+      subtitle="Stocked-in unit counts across all godowns"
       actions={
         <button
           onClick={handleRefresh}

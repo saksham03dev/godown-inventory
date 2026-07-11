@@ -71,3 +71,7 @@ export function generateBillNumber(): string {
 export function isUnitBarcode(barcode: string): boolean {
   return barcode.trim().startsWith("87");
 }
+
+export function isProductBarcode(barcode: string): boolean {
+  return barcode.trim().startsWith("89");
+}

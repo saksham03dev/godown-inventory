@@ -1,87 +1,14 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { apiMutation } from "@/lib/api/clientMutation";
 import {
   generateBarcodeFromProductCode,
   normalizeProductCode,
 } from "@/lib/utils/barcode";
 import type { MutationResult, Product, ProductInput } from "@/lib/types/database";
 
-function formatProductError(error: { code?: string; message: string }): string {
-  if (
-    error.message.includes("product_code") &&
-    (error.message.includes("schema cache") ||
-      error.message.includes("column") ||
-      error.code === "PGRST204")
-  ) {
-    return (
-      "Database is missing the product_code column. Run supabase/migrations/002_product_godown_management.sql in the Supabase SQL Editor, then retry."
-    );
-  }
-  return error.message;
-}
-
 export async function createProduct(
   input: ProductInput
 ): Promise<MutationResult<Product>> {
-  try {
-    const name = input.name.trim();
-    const product_code = normalizeProductCode(input.product_code);
-
-    if (!name) {
-      return { success: false, message: "Product name is required." };
-    }
-    if (!product_code) {
-      return { success: false, message: "Product code is required." };
-    }
-
-    const total_stock = input.total_stock ?? 0;
-    if (total_stock < 0) {
-      return { success: false, message: "Quantity cannot be negative." };
-    }
-
-    const retail_selling_price = input.retail_selling_price ?? 0;
-    if (retail_selling_price < 0) {
-      return { success: false, message: "Selling price cannot be negative." };
-    }
-
-    const barcode_id = generateBarcodeFromProductCode(product_code);
-    const supabase = getSupabaseClient();
-
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        name,
-        product_code,
-        barcode_id,
-        total_stock,
-        size: input.size?.trim() || null,
-        special_note: input.special_note?.trim() || null,
-        category: input.category?.trim() || null,
-        retail_selling_price,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        return {
-          success: false,
-          message: "A product with this backend code already exists.",
-        };
-      }
-      throw new Error(formatProductError(error));
-    }
-
-    return {
-      success: true,
-      message: `Product "${name}" created with code ${product_code}.`,
-      data,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      message: err instanceof Error ? err.message : "Failed to create product.",
-    };
-  }
+  return apiMutation<Product>("/api/products", { body: input });
 }
 
 export async function updateProduct(
@@ -89,97 +16,14 @@ export async function updateProduct(
   input: ProductInput,
   options?: { preservePrice?: boolean; existingPrice?: number }
 ): Promise<MutationResult<Product>> {
-  try {
-    const name = input.name.trim();
-    const product_code = normalizeProductCode(input.product_code);
-
-    if (!name) {
-      return { success: false, message: "Product name is required." };
-    }
-    if (!product_code) {
-      return { success: false, message: "Product code is required." };
-    }
-
-    const total_stock = input.total_stock ?? 0;
-    if (total_stock < 0) {
-      return { success: false, message: "Quantity cannot be negative." };
-    }
-
-    const retail_selling_price = options?.preservePrice
-      ? (options.existingPrice ?? 0)
-      : (input.retail_selling_price ?? 0);
-    if (retail_selling_price < 0) {
-      return { success: false, message: "Selling price cannot be negative." };
-    }
-
-    const barcode_id = generateBarcodeFromProductCode(product_code);
-    const supabase = getSupabaseClient();
-
-    const { data, error } = await supabase
-      .from("products")
-      .update({
-        name,
-        product_code,
-        barcode_id,
-        total_stock,
-        size: input.size?.trim() || null,
-        special_note: input.special_note?.trim() || null,
-        category: input.category?.trim() || null,
-        retail_selling_price,
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        return {
-          success: false,
-          message: "Another product already uses this backend code.",
-        };
-      }
-      throw new Error(formatProductError(error));
-    }
-
-    return {
-      success: true,
-      message: `Product "${name}" updated successfully.`,
-      data,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      message: err instanceof Error ? err.message : "Failed to update product.",
-    };
-  }
+  return apiMutation<Product>(`/api/products/${id}`, {
+    method: "PATCH",
+    body: { ...input, options },
+  });
 }
 
 export async function deleteProduct(id: string): Promise<MutationResult> {
-  try {
-    const supabase = getSupabaseClient();
-
-    const { data: product, error: fetchError } = await supabase
-      .from("products")
-      .select("name")
-      .eq("id", id)
-      .single();
-
-    if (fetchError) throw new Error(fetchError.message);
-
-    const { error } = await supabase.from("products").delete().eq("id", id);
-
-    if (error) throw new Error(error.message);
-
-    return {
-      success: true,
-      message: `Product "${product.name}" deleted.`,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      message: err instanceof Error ? err.message : "Failed to delete product.",
-    };
-  }
+  return apiMutation(`/api/products/${id}`, { method: "DELETE" });
 }
 
 export function getBarcodePreview(productCode: string): string | null {

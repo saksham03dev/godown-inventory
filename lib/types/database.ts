@@ -109,7 +109,6 @@ export interface ScanTransactionInput {
   godownId: string;
   transactionType: TransactionType;
   quantity?: number;
-  handledBy?: string;
 }
 
 export interface ScanTransactionResult {

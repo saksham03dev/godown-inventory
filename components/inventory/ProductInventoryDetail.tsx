@@ -101,7 +101,7 @@ export function ProductInventoryDetail({
   const title = product?.product_name ?? "Product";
   const description =
     view.level === "sources"
-      ? `${godownName} · qty ${product?.quantity ?? 0} · by source`
+      ? `${godownName} · ${product?.quantity ?? 0} unit(s) · by source`
       : view.level === "skus"
         ? `${view.group.batch.source_name} · ${view.group.in_godown_count} SKU(s)`
         : view.level === "sku"
@@ -199,12 +199,10 @@ function SourcesView({
       <div className="rounded-xl border border-dashed border-surface-border bg-surface-overlay/40 p-8 text-center">
         <Package className="mx-auto h-8 w-8 text-zinc-600" />
         <p className="mt-3 text-sm text-zinc-400">
-          No labelled unit SKUs stocked in for this product.
+          No stocked-in unit SKUs in this godown for this product.
         </p>
         <p className="mt-1 text-xs text-zinc-600">
-          Ledger quantity is {product?.quantity ?? 0}. Bulk product-barcode
-          stock-ins won&apos;t appear here until units are labelled and scanned
-          in.
+          Stock quantities come from labelled units scanned in at Stock In.
         </p>
       </div>
     );
@@ -229,10 +227,7 @@ function SourcesView({
             <span className="font-semibold text-accent">
               {breakdown.total_units}
             </span>{" "}
-            labelled SKU(s) · ledger qty{" "}
-            <span className="font-medium text-zinc-200">
-              {product?.quantity ?? 0}
-            </span>
+            unit SKU(s) stocked in here
           </p>
         </div>
         <p className="font-mono text-xs text-zinc-500">

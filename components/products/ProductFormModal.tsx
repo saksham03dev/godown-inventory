@@ -155,25 +155,24 @@ export function ProductFormModal({
         {isEdit && (
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Quantity
+              In-warehouse qty
             </label>
             <input
-              type="number"
-              required
-              min={0}
-              value={form.total_stock ?? 0}
-              onChange={(e) => update("total_stock", Number(e.target.value))}
-              className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
+              type="text"
+              value={String(product?.total_stock ?? 0)}
+              disabled
+              className="w-full rounded-xl border border-surface-border bg-surface-overlay/50 px-4 py-3 text-sm text-zinc-400 outline-none"
             />
             <p className="mt-1.5 text-xs text-zinc-600">
-              Stock is normally updated via Scan Station. Edit here only for corrections.
+              Count of stocked-in unit labels — updated only by Scan Station.
             </p>
           </div>
         )}
 
         {!isEdit && (
           <p className="text-xs text-zinc-600">
-            New products start at 0 stock. Use Scan Station to stock in inventory.
+            New products start at 0 stock. Print labels, then Stock In at Scan
+            Station.
           </p>
         )}
 

@@ -9,8 +9,6 @@ import type {
   TransactionType,
 } from "@/lib/types/database";
 
-const DEFAULT_HANDLED_BY = "warehouse-operator";
-
 type ProductRelation = {
   id: string;
   name: string;
@@ -19,32 +17,9 @@ type ProductRelation = {
   category: string | null;
 };
 
-function normalizeProductRelation(
-  products: ProductRelation | ProductRelation[] | null
-): ProductRelation | null {
-  if (!products) return null;
-  return Array.isArray(products) ? (products[0] ?? null) : products;
-}
-
-async function getGodownStockForProduct(
-  productId: string,
-  godownId: string
-): Promise<number> {
-  const supabase = getSupabaseClient();
-
-  const { data, error } = await supabase
-    .from("inventory_logs")
-    .select("transaction_type, quantity")
-    .eq("product_id", productId)
-    .eq("godown_id", godownId);
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).reduce((total, log) => {
-    return log.transaction_type === "STOCK_IN"
-      ? total + log.quantity
-      : total - log.quantity;
-  }, 0);
+function normalizeRelation<T>(value: T | T[] | null): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function formatSchemaError(message: string): string {
@@ -95,24 +70,27 @@ export async function fetchProductByBarcode(
   return data;
 }
 
+/**
+ * In-godown stock from stock_units only (STOCKED_IN).
+ * inventory_logs are audit trail, not quantity source.
+ */
 export async function fetchGodownInventory(
   godownId: string
 ): Promise<GodownStockItem[]> {
   const supabase = getSupabaseClient();
 
-  const { data: logs, error: logsError } = await supabase
-    .from("inventory_logs")
+  const { data: units, error } = await supabase
+    .from("stock_units")
     .select(
       `
       product_id,
-      transaction_type,
-      quantity,
       products ( id, name, barcode_id, product_code, category )
     `
     )
-    .eq("godown_id", godownId);
+    .eq("godown_id", godownId)
+    .eq("status", "STOCKED_IN");
 
-  if (logsError) throw new Error(logsError.message);
+  if (error) throw new Error(error.message);
 
   const stockMap = new Map<
     string,
@@ -125,9 +103,9 @@ export async function fetchGodownInventory(
     }
   >();
 
-  for (const log of logs ?? []) {
-    const product = normalizeProductRelation(
-      log.products as ProductRelation | ProductRelation[] | null
+  for (const unit of units ?? []) {
+    const product = normalizeRelation(
+      unit.products as ProductRelation | ProductRelation[] | null
     );
     if (!product) continue;
 
@@ -138,14 +116,11 @@ export async function fetchGodownInventory(
       category: product.category,
       qty: 0,
     };
-
-    existing.qty +=
-      log.transaction_type === "STOCK_IN" ? log.quantity : -log.quantity;
+    existing.qty += 1;
     stockMap.set(product.id, existing);
   }
 
   return Array.from(stockMap.entries())
-    .filter(([, v]) => v.qty > 0)
     .map(([product_id, v]) => ({
       product_id,
       product_name: v.name,
@@ -157,10 +132,12 @@ export async function fetchGodownInventory(
     .sort((a, b) => a.product_name.localeCompare(b.product_name));
 }
 
+/** Recent audit activity only — always bounded. */
 export async function fetchRecentLogs(
   limit = 5
 ): Promise<InventoryLogWithRelations[]> {
   const supabase = getSupabaseClient();
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
   const { data, error } = await supabase
     .from("inventory_logs")
     .select(
@@ -171,49 +148,51 @@ export async function fetchRecentLogs(
     `
     )
     .order("timestamp", { ascending: false })
-    .limit(limit);
+    .limit(safeLimit);
 
   if (error) throw new Error(error.message);
   return (data ?? []) as InventoryLogWithRelations[];
 }
 
+/**
+ * Dashboard metrics from stock_units (STOCKED_IN).
+ * Does not load the full inventory_logs history.
+ */
 export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
   const supabase = getSupabaseClient();
 
-  const [productsResult, godownsResult, logsResult] = await Promise.all([
-    supabase.from("products").select("id, total_stock"),
+  const [godownsResult, unitsResult, recentLogs] = await Promise.all([
     supabase.from("godowns").select("id, location_name"),
     supabase
-      .from("inventory_logs")
-      .select("godown_id, transaction_type, quantity"),
+      .from("stock_units")
+      .select("godown_id, product_id")
+      .eq("status", "STOCKED_IN"),
+    fetchRecentLogs(5),
   ]);
 
-  if (productsResult.error) throw new Error(productsResult.error.message);
   if (godownsResult.error) throw new Error(godownsResult.error.message);
-  if (logsResult.error) throw new Error(logsResult.error.message);
+  if (unitsResult.error) throw new Error(unitsResult.error.message);
 
-  const products = productsResult.data ?? [];
   const godowns = godownsResult.data ?? [];
-  const logs = logsResult.data ?? [];
+  const units = unitsResult.data ?? [];
 
-  const totalActiveProducts = products.filter((p) => p.total_stock > 0).length;
-  const totalStockUnits = products.reduce((sum, p) => sum + p.total_stock, 0);
-
+  const productIds = new Set<string>();
   const godownTotals = new Map<string, number>();
   for (const godown of godowns) {
     godownTotals.set(godown.id, 0);
   }
 
-  for (const log of logs) {
-    const current = godownTotals.get(log.godown_id) ?? 0;
-    const delta = log.transaction_type === "STOCK_IN" ? log.quantity : -log.quantity;
-    godownTotals.set(log.godown_id, Math.max(0, current + delta));
+  for (const unit of units) {
+    if (unit.product_id) productIds.add(unit.product_id);
+    if (!unit.godown_id) continue;
+    godownTotals.set(
+      unit.godown_id,
+      (godownTotals.get(unit.godown_id) ?? 0) + 1
+    );
   }
 
-  const distributionSum = Array.from(godownTotals.values()).reduce(
-    (a, b) => a + b,
-    0
-  );
+  const totalStockUnits = units.length;
+  const distributionSum = totalStockUnits;
 
   const godownDistribution: GodownDistribution[] = godowns.map((g) => {
     const total_units = godownTotals.get(g.id) ?? 0;
@@ -228,12 +207,12 @@ export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
     };
   });
 
-  const recentLogs = await fetchRecentLogs(5);
-
   return {
-    totalActiveProducts,
+    totalActiveProducts: productIds.size,
     totalStockUnits,
-    godownDistribution,
+    godownDistribution: godownDistribution.sort((a, b) =>
+      a.location_name.localeCompare(b.location_name)
+    ),
     recentLogs,
   };
 }

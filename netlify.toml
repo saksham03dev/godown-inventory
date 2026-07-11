@@ -4,3 +4,13 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Required Netlify environment variables (Site settings → Environment variables):
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+#   SUPABASE_SERVICE_ROLE_KEY   ← required for stock scan + billing attach APIs
+#   AUTH_SECRET                 ← required for login sessions (32+ random chars)
+#
+# After deploy, apply DB migration 008 locally or via CI:
+#   npm run db:push
+# (needs SUPABASE_DB_PASSWORD — not needed on Netlify runtime)

@@ -17,7 +17,7 @@ export interface PortalUserInput {
 export async function listActiveUsersByRole(
   role: UserRole
 ): Promise<PortalUserPublic[]> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const { data, error } = await supabase
     .from("portal_users")
     .select("id, username, full_name, role")
@@ -30,7 +30,7 @@ export async function listActiveUsersByRole(
 }
 
 export async function listAllUsers(): Promise<PortalUser[]> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const { data, error } = await supabase
     .from("portal_users")
     .select("id, username, full_name, role, is_active, created_at, updated_at")
@@ -42,7 +42,7 @@ export async function listAllUsers(): Promise<PortalUser[]> {
 }
 
 export async function getUserById(id: string): Promise<PortalUser | null> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const { data, error } = await supabase
     .from("portal_users")
     .select("id, username, full_name, role, is_active, created_at, updated_at")
@@ -54,7 +54,7 @@ export async function getUserById(id: string): Promise<PortalUser | null> {
 }
 
 export async function getUserWithPassword(id: string) {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const { data, error } = await supabase
     .from("portal_users")
     .select("id, username, full_name, role, password_hash, is_active")
@@ -75,7 +75,7 @@ export async function getUserWithPassword(id: string) {
 export async function createPortalUser(
   input: PortalUserInput & { password: string }
 ): Promise<PortalUser> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const password_hash = await hashPassword(input.password);
 
   const { data, error } = await supabase
@@ -101,7 +101,7 @@ export async function updatePortalUser(
   const existing = await getUserById(id);
   if (!existing) return null;
 
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const { data, error } = await supabase
     .from("portal_users")
     .update({
@@ -123,7 +123,7 @@ export async function updatePortalUserPassword(
   id: string,
   password: string
 ): Promise<boolean> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const password_hash = await hashPassword(password);
   const { data, error } = await supabase
     .from("portal_users")
@@ -139,7 +139,7 @@ export async function updatePortalUserPassword(
 }
 
 export async function deletePortalUser(id: string): Promise<boolean> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient({ requireServiceRole: true });
   const { error } = await supabase.from("portal_users").delete().eq("id", id);
   if (error) throw new Error(error.message);
   return true;
