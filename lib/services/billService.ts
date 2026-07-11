@@ -9,6 +9,7 @@ import type {
   BillWithItems,
   MutationResult,
   Product,
+  StockUnit,
 } from "@/lib/types/database";
 
 function calcTotals(
@@ -36,6 +37,98 @@ export async function fetchBills(limit = 20): Promise<Bill[]> {
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/** Stocked-out units not yet linked to any bill (ready for cross-location billing). */
+export async function fetchUnbilledStockedOutUnits(
+  godownId?: string | null
+): Promise<StockUnit[]> {
+  const supabase = getSupabaseClient();
+  let query = supabase
+    .from("stock_units")
+    .select(
+      `
+      *,
+      products ( id, name, product_code, size, retail_selling_price ),
+      stock_batches ( id, batch_code, source_name, quantity ),
+      godowns ( id, location_name )
+    `
+    )
+    .eq("status", "STOCKED_OUT")
+    .is("bill_id", null)
+    .order("stocked_out_at", { ascending: false });
+
+  if (godownId) {
+    query = query.eq("godown_id", godownId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StockUnit[];
+}
+
+/**
+ * Add multiple stocked-out units to a draft bill by barcode (no rescan).
+ * Stops on first failure and returns partial progress message.
+ */
+export async function addUnitsToBill(
+  billId: string,
+  unitBarcodes: string[],
+  unitPrice = 0
+): Promise<MutationResult<BillWithItems>> {
+  if (unitBarcodes.length === 0) {
+    return { success: false, message: "Select at least one unit." };
+  }
+
+  let last: MutationResult<BillWithItems> | null = null;
+  let added = 0;
+
+  for (const barcode of unitBarcodes) {
+    last = await addUnitToBill(billId, barcode, unitPrice);
+    if (!last.success) {
+      return {
+        success: false,
+        message:
+          added > 0
+            ? `Added ${added} unit(s), then failed: ${last.message}`
+            : last.message,
+        data: last.data,
+      };
+    }
+    added += 1;
+  }
+
+  return {
+    success: true,
+    message: `Added ${added} unit(s) to bill.`,
+    data: last?.data,
+  };
+}
+
+/** Create a draft bill and attach the given unbilled units in one step. */
+export async function createBillWithUnits(
+  unitBarcodes: string[],
+  input: BillInput = { customer_name: "Walk-in Customer" }
+): Promise<MutationResult<BillWithItems>> {
+  const created = await createBill(input);
+  if (!created.success || !created.data) {
+    return { success: false, message: created.message };
+  }
+
+  const added = await addUnitsToBill(created.data.id, unitBarcodes);
+  if (!added.success) {
+    return {
+      success: false,
+      message: added.message,
+      data: added.data,
+    };
+  }
+
+  return {
+    success: true,
+    message: `Bill ${created.data.bill_number} created with ${unitBarcodes.length} unit(s).`,
+    data: added.data,
+  };
 }
 
 export async function fetchBillWithItems(
@@ -113,10 +206,19 @@ export async function updateBill(
       .from("bills")
       .update({
         customer_name: input.customer_name.trim() || bill.customer_name,
-        customer_phone: input.customer_phone?.trim() ?? bill.customer_phone,
+        customer_phone:
+          input.customer_phone !== undefined && input.customer_phone !== null
+            ? input.customer_phone.trim() || null
+            : bill.customer_phone,
         customer_address:
-          input.customer_address?.trim() ?? bill.customer_address,
-        notes: input.notes?.trim() ?? bill.notes,
+          input.customer_address !== undefined &&
+          input.customer_address !== null
+            ? input.customer_address.trim() || null
+            : bill.customer_address,
+        notes:
+          input.notes !== undefined && input.notes !== null
+            ? input.notes.trim() || null
+            : bill.notes,
         tax_percent,
         discount,
         ...totals,

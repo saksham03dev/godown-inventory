@@ -21,7 +21,7 @@ export function BillItemsTable({
 }: BillItemsTableProps) {
   if (bill.bill_items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-10 text-center">
+      <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-8 text-center sm:p-10">
         <p className="text-sm text-zinc-400">
           Scan stocked-out unit barcodes to add items to this bill
         </p>
@@ -32,8 +32,68 @@ export function BillItemsTable({
   const priceEditable = !readonly && canEditPrice;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised">
-      <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised [overflow-anchor:none]">
+      {/* Mobile card list */}
+      <ul className="divide-y divide-surface-border sm:hidden">
+        {bill.bill_items.map((item) => {
+          const unitLabel = formatUnitLabel(item);
+          return (
+            <li key={item.id} className="space-y-2 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-zinc-200">{item.product_name}</p>
+                  <p className="text-xs text-zinc-500">{item.product_code}</p>
+                  {unitLabel && (
+                    <p className="mt-1 font-mono text-xs text-accent">{unitLabel}</p>
+                  )}
+                  <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-600">
+                    {item.unit_barcode}
+                  </p>
+                  {item.source_name && (
+                    <p className="text-xs text-zinc-500">{item.source_name}</p>
+                  )}
+                </div>
+                {!readonly && (
+                  <button
+                    onClick={() => onRemove(item.id)}
+                    className="shrink-0 rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-danger"
+                    aria-label="Remove item"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                {priceEditable ? (
+                  <label className="flex items-center gap-2 text-xs text-zinc-500">
+                    Price
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      defaultValue={String(item.unit_price)}
+                      onBlur={(e) => {
+                        const n = Number(e.target.value);
+                        if (Number.isFinite(n) && n >= 0) onEditPrice(item, n);
+                      }}
+                      className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1.5 text-base text-zinc-100 outline-none focus:border-accent"
+                    />
+                  </label>
+                ) : (
+                  <span className="text-sm text-zinc-400">
+                    ₹{Number(item.unit_price).toFixed(2)}
+                  </span>
+                )}
+                <span className="font-medium text-zinc-100">
+                  ₹{Number(item.line_total).toFixed(2)}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-border bg-surface-overlay/50">
@@ -89,14 +149,15 @@ export function BillItemsTable({
                   <td className="px-4 py-3 text-right">
                     {priceEditable ? (
                       <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={item.unit_price}
-                        onChange={(e) =>
-                          onEditPrice(item, Number(e.target.value))
-                        }
-                        className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1 text-right text-sm text-zinc-100 outline-none focus:border-accent"
+                        type="text"
+                        inputMode="decimal"
+                        defaultValue={String(item.unit_price)}
+                        key={`${item.id}-${item.unit_price}`}
+                        onBlur={(e) => {
+                          const n = Number(e.target.value);
+                          if (Number.isFinite(n) && n >= 0) onEditPrice(item, n);
+                        }}
+                        className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1.5 text-right text-base text-zinc-100 outline-none focus:border-accent sm:text-sm"
                       />
                     ) : (
                       <span>₹{Number(item.unit_price).toFixed(2)}</span>

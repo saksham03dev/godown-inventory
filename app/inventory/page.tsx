@@ -6,13 +6,20 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { GodownFilter } from "@/components/godowns/GodownFilter";
 import { InventoryTable } from "@/components/godowns/InventoryTable";
 import { GodownInventoryCharts } from "@/components/inventory/GodownInventoryCharts";
+import { ProductInventoryDetail } from "@/components/inventory/ProductInventoryDetail";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useAuth } from "@/contexts/AuthContext";
 import { useInventory } from "@/hooks/useInventory";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import type { GodownStockItem } from "@/lib/types/database";
 
 export default function InventoryPage() {
+  const { can } = useAuth();
+  const canEditBatch = can("labels");
   const [selectedGodownId, setSelectedGodownId] = useState("");
+  const [selectedProduct, setSelectedProduct] =
+    useState<GodownStockItem | null>(null);
 
   const {
     godowns,
@@ -32,6 +39,10 @@ export default function InventoryPage() {
       setSelectedGodownId(godowns[0].id);
     }
   }, [godowns, selectedGodownId]);
+
+  useEffect(() => {
+    setSelectedProduct(null);
+  }, [selectedGodownId]);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -94,10 +105,20 @@ export default function InventoryPage() {
             <InventoryTable
               items={godownInventory}
               godownName={selectedGodown?.location_name}
+              onProductClick={setSelectedProduct}
             />
           </>
         )}
       </div>
+
+      <ProductInventoryDetail
+        open={Boolean(selectedProduct)}
+        onClose={() => setSelectedProduct(null)}
+        product={selectedProduct}
+        godownId={selectedGodownId}
+        godownName={selectedGodown?.location_name ?? "Godown"}
+        canEditBatch={canEditBatch}
+      />
     </DashboardLayout>
   );
 }

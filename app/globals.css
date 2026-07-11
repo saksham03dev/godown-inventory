@@ -16,17 +16,41 @@ body {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Reduce accidental double-tap zoom on controls */
+  touch-action: manipulation;
 }
 
-/* html5-qrcode overrides for dark theme */
+/* Keep form controls at ≥16px on narrow screens to prevent iOS focus-zoom */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* html5-qrcode overrides — keep feed stable on mobile reflows */
+#barcode-scanner-region {
+  min-height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
 #barcode-scanner-region video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover;
+  /* Prevent iOS Safari from scrolling/zooming the page on camera updates */
+  transform: translateZ(0);
 }
 
 #barcode-scanner-region img {
   display: none !important;
+}
+
+#barcode-scanner-region > div {
+  border: none !important;
+  box-shadow: none !important;
 }
 
 @layer utilities {

@@ -1,12 +1,17 @@
-import { Package } from "lucide-react";
+import { ChevronRight, Package } from "lucide-react";
 import type { GodownStockItem } from "@/lib/types/database";
 
 interface InventoryTableProps {
   items: GodownStockItem[];
   godownName?: string;
+  onProductClick?: (item: GodownStockItem) => void;
 }
 
-export function InventoryTable({ items, godownName }: InventoryTableProps) {
+export function InventoryTable({
+  items,
+  godownName,
+  onProductClick,
+}: InventoryTableProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-surface-border bg-surface-raised p-12 text-center">
@@ -42,13 +47,21 @@ export function InventoryTable({ items, godownName }: InventoryTableProps) {
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Quantity
               </th>
+              {onProductClick && (
+                <th className="w-10 px-3 py-3.5">
+                  <span className="sr-only">Open</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border">
             {items.map((item) => (
               <tr
                 key={item.product_id}
-                className="transition hover:bg-white/[0.02]"
+                onClick={() => onProductClick?.(item)}
+                className={`transition hover:bg-white/[0.02] ${
+                  onProductClick ? "cursor-pointer" : ""
+                }`}
               >
                 <td className="px-5 py-4 font-medium text-zinc-200">
                   {item.product_name}
@@ -75,11 +88,21 @@ export function InventoryTable({ items, godownName }: InventoryTableProps) {
                     {item.quantity}
                   </span>
                 </td>
+                {onProductClick && (
+                  <td className="px-3 py-4 text-zinc-500">
+                    <ChevronRight className="h-4 w-4" />
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {onProductClick && (
+        <p className="border-t border-surface-border px-5 py-2.5 text-xs text-zinc-600">
+          Click a product to see quantity by source and individual SKUs.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { processScanTransaction } from "@/lib/services/unitScanService";
 import type {
   AlertState,
@@ -10,6 +10,8 @@ import type {
 
 interface UseScanTransactionOptions {
   onSuccess?: (result: ScanTransactionResult) => void;
+  /** How long the on-camera success/error flash stays visible */
+  flashMs?: number;
 }
 
 interface UseScanTransactionReturn {
@@ -17,6 +19,7 @@ interface UseScanTransactionReturn {
   alert: AlertState | null;
   lastResult: ScanTransactionResult | null;
   approveFlash: boolean;
+  errorFlash: boolean;
   handleScan: (
     barcodeId: string,
     godownId: string,
@@ -29,15 +32,47 @@ interface UseScanTransactionReturn {
 export function useScanTransaction(
   options: UseScanTransactionOptions = {}
 ): UseScanTransactionReturn {
+  const { flashMs = 1400 } = options;
+  const onSuccessRef = useRef(options.onSuccess);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [processing, setProcessing] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [lastResult, setLastResult] = useState<ScanTransactionResult | null>(
     null
   );
   const [approveFlash, setApproveFlash] = useState(false);
+  const [errorFlash, setErrorFlash] = useState(false);
+
+  useEffect(() => {
+    onSuccessRef.current = options.onSuccess;
+  }, [options.onSuccess]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
 
   const dismissAlert = useCallback(() => setAlert(null), []);
-  const clearApproveFlash = useCallback(() => setApproveFlash(false), []);
+
+  const clearApproveFlash = useCallback(() => {
+    if (flashTimerRef.current) {
+      clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = null;
+    }
+    setApproveFlash(false);
+    setErrorFlash(false);
+  }, []);
+
+  const scheduleFlashClear = useCallback(() => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      setApproveFlash(false);
+      setErrorFlash(false);
+      flashTimerRef.current = null;
+    }, flashMs);
+  }, [flashMs]);
 
   const handleScan = useCallback(
     async (
@@ -53,12 +88,14 @@ export function useScanTransaction(
         setAlert({ type: "error", message: result.message });
         setLastResult(result);
         setApproveFlash(false);
+        setErrorFlash(true);
+        scheduleFlashClear();
         return result;
       }
 
       setProcessing(true);
-      setAlert(null);
       setApproveFlash(false);
+      setErrorFlash(false);
 
       try {
         const result = await processScanTransaction({
@@ -72,12 +109,16 @@ export function useScanTransaction(
 
         if (result.success) {
           setApproveFlash(true);
+          setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
-          options.onSuccess?.(result);
+          onSuccessRef.current?.(result);
         } else {
+          setApproveFlash(false);
+          setErrorFlash(true);
           setAlert({ type: "error", message: result.message });
         }
 
+        scheduleFlashClear();
         return result;
       } catch (err) {
         const message =
@@ -86,12 +127,14 @@ export function useScanTransaction(
         setAlert({ type: "error", message });
         setLastResult(result);
         setApproveFlash(false);
+        setErrorFlash(true);
+        scheduleFlashClear();
         return result;
       } finally {
         setProcessing(false);
       }
     },
-    [options]
+    [scheduleFlashClear]
   );
 
   return {
@@ -99,6 +142,7 @@ export function useScanTransaction(
     alert,
     lastResult,
     approveFlash,
+    errorFlash,
     handleScan,
     dismissAlert,
     clearApproveFlash,

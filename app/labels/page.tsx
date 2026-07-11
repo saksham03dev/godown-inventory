@@ -150,7 +150,6 @@ export default function LabelsPage() {
               productName={activeBatch.products?.name ?? "Product"}
               productCode={activeBatch.products?.product_code ?? ""}
               batchCode={activeBatch.batch_code}
-              sourceName={activeBatch.source_name}
               labelSize={labelSize}
             />
           </div>

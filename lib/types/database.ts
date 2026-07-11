@@ -149,8 +149,14 @@ export interface StockUnit {
   stocked_out_at: string | null;
   bill_id: string | null;
   created_at: string;
-  products?: Pick<Product, "id" | "name" | "product_code" | "size"> | null;
-  stock_batches?: Pick<StockBatch, "id" | "batch_code" | "source_name"> | null;
+  products?: Pick<
+    Product,
+    "id" | "name" | "product_code" | "size" | "retail_selling_price"
+  > | null;
+  stock_batches?: Pick<
+    StockBatch,
+    "id" | "batch_code" | "source_name" | "quantity" | "notes"
+  > | null;
   godowns?: Pick<Godown, "id" | "location_name"> | null;
 }
 
@@ -163,6 +169,25 @@ export interface CreateBatchInput {
   source_name: string;
   quantity: number;
   notes?: string | null;
+}
+
+export interface UpdateBatchInput {
+  source_name: string;
+  notes?: string | null;
+}
+
+/** Units of a product currently stocked in a godown, grouped by batch/source. */
+export interface ProductGodownBatchGroup {
+  batch: StockBatch;
+  in_godown_count: number;
+  units: StockUnit[];
+}
+
+export interface ProductGodownBreakdown {
+  product_id: string;
+  godown_id: string;
+  batches: ProductGodownBatchGroup[];
+  total_units: number;
 }
 
 export interface Bill {

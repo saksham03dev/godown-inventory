@@ -79,17 +79,49 @@ export function useBilling() {
   }, [refreshBills]);
 
   const saveBill = useCallback(
-    async (billId: string, input: BillInput) => {
-      setMutating(true);
-      setAlert(null);
+    async (billId: string, input: BillInput, options?: { silent?: boolean }) => {
+      const silent = options?.silent ?? false;
+      if (!silent) {
+        setMutating(true);
+        setAlert(null);
+      }
       const result = await updateBill(billId, input);
       if (result.success && result.data) {
-        setActiveBill(result.data);
-        setAlert({ type: "success", message: result.message });
-      } else {
+        if (silent) {
+          // Don't replace line items — a scan may have landed during autosave
+          setActiveBill((prev) => {
+            if (!prev || prev.id !== result.data!.id) return result.data!;
+            const tax_percent = result.data!.tax_percent;
+            const discount = result.data!.discount;
+            const subtotal = prev.bill_items.reduce(
+              (sum, i) => sum + Number(i.line_total),
+              0
+            );
+            const tax_amount = Number(((subtotal * tax_percent) / 100).toFixed(2));
+            const total = Number(
+              Math.max(0, subtotal + tax_amount - discount).toFixed(2)
+            );
+            return {
+              ...prev,
+              customer_name: result.data!.customer_name,
+              customer_phone: result.data!.customer_phone,
+              customer_address: result.data!.customer_address,
+              notes: result.data!.notes,
+              tax_percent,
+              discount,
+              subtotal,
+              tax_amount,
+              total,
+            };
+          });
+        } else {
+          setActiveBill(result.data);
+          setAlert({ type: "success", message: result.message });
+        }
+      } else if (!silent) {
         setAlert({ type: "error", message: result.message });
       }
-      setMutating(false);
+      if (!silent) setMutating(false);
       return result;
     },
     []
@@ -97,16 +129,10 @@ export function useBilling() {
 
   const scanToBill = useCallback(
     async (billId: string, barcode: string, unitPrice = 0) => {
-      setMutating(true);
-      setAlert(null);
       const result = await addUnitToBill(billId, barcode, unitPrice);
       if (result.success && result.data) {
         setActiveBill(result.data);
-        setAlert({ type: "success", message: result.message });
-      } else {
-        setAlert({ type: "error", message: result.message });
       }
-      setMutating(false);
       return result;
     },
     []

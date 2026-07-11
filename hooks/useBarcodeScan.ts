@@ -8,6 +8,8 @@ interface UseBarcodeScanOptions {
   enabled?: boolean;
   fps?: number;
   qrboxSize?: number;
+  /** Ignore the same barcode for this many ms after a successful detect */
+  debounceMs?: number;
 }
 
 interface UseBarcodeScanReturn {
@@ -26,11 +28,13 @@ export function useBarcodeScan({
   enabled = true,
   fps = 10,
   qrboxSize = 250,
+  debounceMs = 2200,
 }: UseBarcodeScanOptions): UseBarcodeScanReturn {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
   const onScanRef = useRef(onScan);
+  const startingRef = useRef(false);
   const [isScanning, setIsScanning] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -44,25 +48,48 @@ export function useBarcodeScan({
   }, []);
 
   const stopScanning = useCallback(async () => {
-    if (scannerRef.current?.isScanning) {
-      try {
-        await scannerRef.current.stop();
-      } catch {
-        // Scanner may already be stopped
-      }
+    startingRef.current = false;
+    const scanner = scannerRef.current;
+    if (!scanner) {
+      setIsScanning(false);
+      return;
     }
-    scannerRef.current?.clear();
+
     scannerRef.current = null;
+    try {
+      if (scanner.isScanning) {
+        await scanner.stop();
+      }
+    } catch {
+      // Scanner may already be stopped
+    }
+    try {
+      scanner.clear();
+    } catch {
+      // Element may already be cleared
+    }
     setIsScanning(false);
   }, []);
 
   const startScanning = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || startingRef.current) return;
 
+    startingRef.current = true;
     setCameraError(null);
 
     try {
       await stopScanning();
+      startingRef.current = true;
+
+      // Wait a frame so the scanner DOM node is stable after layout
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
+
+      const el = document.getElementById(SCANNER_ELEMENT_ID);
+      if (!el) {
+        throw new Error("Scanner view is not ready. Try again.");
+      }
 
       const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
         formatsToSupport: [
@@ -81,13 +108,18 @@ export function useBarcodeScan({
 
       await scanner.start(
         { facingMode: "environment" },
-        { fps, qrbox: { width: qrboxSize, height: qrboxSize } },
+        {
+          fps,
+          qrbox: { width: qrboxSize, height: qrboxSize },
+          // Avoid continuous DOM/CSS thrashing from aspect ratio recalcs
+          aspectRatio: 4 / 3,
+          disableFlip: false,
+        },
         (decodedText) => {
           const now = Date.now();
-          // Debounce duplicate scans within 2 seconds
           if (
             decodedText === lastScanRef.current &&
-            now - lastScanTimeRef.current < 2000
+            now - lastScanTimeRef.current < debounceMs
           ) {
             return;
           }
@@ -108,12 +140,15 @@ export function useBarcodeScan({
           : "Unable to access camera. Check permissions.";
       setCameraError(message);
       setIsScanning(false);
+      scannerRef.current = null;
+    } finally {
+      startingRef.current = false;
     }
-  }, [enabled, fps, qrboxSize, stopScanning]);
+  }, [enabled, fps, qrboxSize, debounceMs, stopScanning]);
 
   useEffect(() => {
     return () => {
-      stopScanning();
+      void stopScanning();
     };
   }, [stopScanning]);
 

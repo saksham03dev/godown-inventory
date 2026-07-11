@@ -6,7 +6,6 @@ interface LabelSheetProps {
   productName: string;
   productCode: string;
   batchCode: string;
-  sourceName: string;
   labelSize: LabelSize;
 }
 
@@ -24,7 +23,6 @@ export function LabelSheet({
   productName,
   productCode,
   batchCode,
-  sourceName,
   labelSize,
 }: LabelSheetProps) {
   const size = sizeStyles[labelSize];
@@ -50,7 +48,7 @@ export function LabelSheet({
             displayValue={labelSize !== "small"}
           />
           <p className="w-full truncate text-center text-[5px] text-zinc-500">
-            {batchCode} · Source: {sourceName}
+            {batchCode}
           </p>
         </div>
       ))}

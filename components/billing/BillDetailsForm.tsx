@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { BillInput, BillWithItems } from "@/lib/types/database";
 
 interface BillDetailsFormProps {
@@ -8,99 +9,186 @@ interface BillDetailsFormProps {
   readonly?: boolean;
 }
 
+interface LocalForm {
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  notes: string;
+  tax_percent: string;
+  discount: string;
+}
+
+function toLocal(bill: BillWithItems): LocalForm {
+  return {
+    customer_name: bill.customer_name ?? "",
+    customer_phone: bill.customer_phone ?? "",
+    customer_address: bill.customer_address ?? "",
+    notes: bill.notes ?? "",
+    tax_percent: String(bill.tax_percent ?? 0),
+    discount: String(bill.discount ?? 0),
+  };
+}
+
+function toInput(form: LocalForm): BillInput {
+  const tax = Number(form.tax_percent);
+  const discount = Number(form.discount);
+  return {
+    customer_name: form.customer_name,
+    customer_phone: form.customer_phone,
+    customer_address: form.customer_address,
+    notes: form.notes,
+    tax_percent: Number.isFinite(tax) ? tax : 0,
+    discount: Number.isFinite(discount) ? discount : 0,
+  };
+}
+
+const inputClass =
+  "w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent disabled:opacity-60 sm:text-sm";
+
 export function BillDetailsForm({
   bill,
   onChange,
   readonly = false,
 }: BillDetailsFormProps) {
-  const update = (field: keyof BillInput, value: string | number) => {
-    onChange({
-      customer_name: bill.customer_name,
-      customer_phone: bill.customer_phone,
-      customer_address: bill.customer_address,
-      notes: bill.notes,
-      tax_percent: bill.tax_percent,
-      discount: bill.discount,
-      [field]: value,
+  const [form, setForm] = useState<LocalForm>(() => toLocal(bill));
+  const formRef = useRef(form);
+  const onChangeRef = useRef(onChange);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  formRef.current = form;
+  onChangeRef.current = onChange;
+
+  // Sync from server only when switching bills (not after every autosave)
+  useEffect(() => {
+    setForm(toLocal(bill));
+  }, [bill.id]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: local form owns edits
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const scheduleSave = (next: LocalForm) => {
+    if (readonly) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onChangeRef.current(toInput(next));
+    }, 700);
+  };
+
+  const flushSave = () => {
+    if (readonly) return;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    onChangeRef.current(toInput(formRef.current));
+  };
+
+  const updateField = <K extends keyof LocalForm>(field: K, value: LocalForm[K]) => {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      formRef.current = next;
+      scheduleSave(next);
+      return next;
     });
   };
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-surface-border bg-surface-raised p-5 sm:grid-cols-2">
-      <div>
+    <div className="grid grid-cols-1 gap-4 rounded-2xl border border-surface-border bg-surface-raised p-4 sm:grid-cols-2 sm:p-5">
+      <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
           Customer Name
         </label>
         <input
           type="text"
-          value={bill.customer_name}
-          onChange={(e) => update("customer_name", e.target.value)}
+          autoComplete="name"
+          value={form.customer_name}
+          onChange={(e) => updateField("customer_name", e.target.value)}
+          onBlur={flushSave}
           disabled={readonly}
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+          className={inputClass}
         />
       </div>
-      <div>
+      <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
           Phone
         </label>
         <input
-          type="text"
-          value={bill.customer_phone ?? ""}
-          onChange={(e) => update("customer_phone", e.target.value)}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          value={form.customer_phone}
+          onChange={(e) => updateField("customer_phone", e.target.value)}
+          onBlur={flushSave}
           disabled={readonly}
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+          className={inputClass}
         />
       </div>
-      <div className="sm:col-span-2">
+      <div className="min-w-0 sm:col-span-2">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
           Address
         </label>
         <input
           type="text"
-          value={bill.customer_address ?? ""}
-          onChange={(e) => update("customer_address", e.target.value)}
+          autoComplete="street-address"
+          value={form.customer_address}
+          onChange={(e) => updateField("customer_address", e.target.value)}
+          onBlur={flushSave}
           disabled={readonly}
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+          className={inputClass}
         />
       </div>
-      <div>
+      <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
           Tax %
         </label>
         <input
-          type="number"
-          min={0}
-          step={0.01}
-          value={bill.tax_percent}
-          onChange={(e) => update("tax_percent", Number(e.target.value))}
+          type="text"
+          inputMode="decimal"
+          value={form.tax_percent}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "" || /^\d*\.?\d*$/.test(v)) {
+              updateField("tax_percent", v);
+            }
+          }}
+          onBlur={flushSave}
           disabled={readonly}
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+          className={inputClass}
         />
       </div>
-      <div>
+      <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
           Discount (₹)
         </label>
         <input
-          type="number"
-          min={0}
-          step={0.01}
-          value={bill.discount}
-          onChange={(e) => update("discount", Number(e.target.value))}
+          type="text"
+          inputMode="decimal"
+          value={form.discount}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "" || /^\d*\.?\d*$/.test(v)) {
+              updateField("discount", v);
+            }
+          }}
+          onBlur={flushSave}
           disabled={readonly}
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+          className={inputClass}
         />
       </div>
-      <div className="sm:col-span-2">
+      <div className="min-w-0 sm:col-span-2">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
           Notes
         </label>
         <textarea
-          value={bill.notes ?? ""}
-          onChange={(e) => update("notes", e.target.value)}
+          value={form.notes}
+          onChange={(e) => updateField("notes", e.target.value)}
+          onBlur={flushSave}
           disabled={readonly}
           rows={2}
-          className="w-full resize-none rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+          className={`${inputClass} resize-none`}
         />
       </div>
     </div>

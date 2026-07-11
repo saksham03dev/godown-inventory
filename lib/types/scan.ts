@@ -1,13 +1,18 @@
 export type ScanMode = "STOCK_IN" | "STOCK_OUT" | "VIEW_LABEL";
 
-export interface StockInProductTally {
+export interface ScanProductTally {
   productId: string;
   productName: string;
   productCode: string;
   count: number;
 }
 
-export interface StockInTallyState {
+export interface ScanTallyState {
   sessionTotal: number;
-  byProduct: StockInProductTally[];
+  byProduct: ScanProductTally[];
 }
+
+/** @deprecated Use ScanProductTally */
+export type StockInProductTally = ScanProductTally;
+/** @deprecated Use ScanTallyState */
+export type StockInTallyState = ScanTallyState;

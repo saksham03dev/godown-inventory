@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ClipboardList,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -25,6 +26,7 @@ const NAV_ICONS = {
   "/godowns": Warehouse,
   "/inventory": Boxes,
   "/scan": ScanLine,
+  "/pending-billing": ClipboardList,
   "/billing": FileText,
   "/admin/users": UserCog,
 } as const;

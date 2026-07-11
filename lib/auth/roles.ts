@@ -85,6 +85,11 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/godowns", label: "Godowns", permission: "godowns.manage" },
   { href: "/inventory", label: "View Inventory", permission: "godowns.view" },
   { href: "/scan", label: "Scan Station", permission: "scan" },
+  {
+    href: "/pending-billing",
+    label: "Pending Billing",
+    permission: "billing.view",
+  },
   { href: "/billing", label: "Billing", permission: "billing.view" },
   { href: "/admin/users", label: "Users", permission: "users.manage" },
 ];
@@ -113,6 +118,7 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/godowns": "godowns.manage",
   "/inventory": "godowns.view",
   "/scan": "scan",
+  "/pending-billing": "billing.view",
   "/billing": "billing.view",
   "/admin/users": "users.manage",
 };

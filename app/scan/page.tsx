@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ScanModeToggle } from "@/components/scan/ScanModeToggle";
 import { GodownSelector } from "@/components/scan/GodownSelector";
-import { ScannerWindow } from "@/components/scan/ScannerWindow";
-import { ScanFeedback } from "@/components/scan/ScanFeedback";
-import { StockInTallyPanel } from "@/components/scan/StockInTallyPanel";
+import {
+  ScannerWindow,
+  ScanResultStrip,
+} from "@/components/scan/ScannerWindow";
+import { ScanTallyPanel } from "@/components/scan/ScanTallyPanel";
 import { LabelDetailCard } from "@/components/scan/LabelDetailCard";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { AlertBanner } from "@/components/ui/AlertBanner";
@@ -14,11 +16,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useInventory } from "@/hooks/useInventory";
 import { useBarcodeScan } from "@/hooks/useBarcodeScan";
 import { useScanTransaction } from "@/hooks/useScanTransaction";
-import { useStockInTally } from "@/hooks/useStockInTally";
+import { useScanTally } from "@/hooks/useScanTally";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { ScanMode } from "@/lib/types/scan";
-import type { StockUnit, TransactionType } from "@/lib/types/database";
+import type {
+  ScanTransactionResult,
+  StockUnit,
+  TransactionType,
+} from "@/lib/types/database";
 
 export default function ScanPage() {
   const { can, role } = useAuth();
@@ -34,24 +40,31 @@ export default function ScanPage() {
   const processingRef = useRef(false);
   const selectedGodownIdRef = useRef(selectedGodownId);
   const modeRef = useRef(mode);
+  const onSuccessRef = useRef<(result: ScanTransactionResult) => void>(() => {});
 
   const { godowns, loading, error } = useInventory();
-  const { tally, recordStockIn, resetTally } = useStockInTally();
+  const { tally, recordScan, resetTally } = useScanTally();
+
+  onSuccessRef.current = (result) => {
+    if (
+      (modeRef.current === "STOCK_IN" || modeRef.current === "STOCK_OUT") &&
+      result.isUnitScan
+    ) {
+      recordScan(result);
+    }
+  };
 
   const {
     processing,
     alert,
     lastResult,
     approveFlash,
+    errorFlash,
     handleScan,
     dismissAlert,
     clearApproveFlash,
   } = useScanTransaction({
-    onSuccess: (result) => {
-      if (modeRef.current === "STOCK_IN" && result.isUnitScan) {
-        recordStockIn(result);
-      }
-    },
+    onSuccess: (result) => onSuccessRef.current(result),
   });
 
   useEffect(() => {
@@ -69,15 +82,17 @@ export default function ScanPage() {
   const lookupLabel = useCallback(async (barcode: string) => {
     setLabelLoading(true);
     setLabelError(null);
-    setLabelUnit(null);
+    // Keep previous label visible until new one loads — avoids layout jump
     try {
       const unit = await fetchStockUnitByBarcode(barcode);
       if (!unit) {
+        setLabelUnit(null);
         setLabelError(`No label found for barcode: ${barcode}`);
         return;
       }
       setLabelUnit(unit);
     } catch (err) {
+      setLabelUnit(null);
       setLabelError(
         err instanceof Error ? err.message : "Failed to look up label."
       );
@@ -130,7 +145,7 @@ export default function ScanPage() {
   }, [selectedGodownId, mode, resetDebounce, dismissAlert, clearApproveFlash]);
 
   useEffect(() => {
-    if (mode === "STOCK_IN") {
+    if (mode === "STOCK_IN" || mode === "STOCK_OUT") {
       resetTally();
     }
   }, [selectedGodownId, mode, resetTally]);
@@ -148,6 +163,10 @@ export default function ScanPage() {
     : selectedGodown
       ? `${mode === "STOCK_IN" ? "Stock In" : "Stock Out"} · ${selectedGodown.location_name}`
       : undefined;
+
+  const overlayDetail = lastResult?.stockUnit
+    ? `Unit #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
+    : lastResult?.product?.name ?? null;
 
   if (!isSupabaseConfigured()) {
     return (
@@ -177,7 +196,7 @@ export default function ScanPage() {
       ) : error ? (
         <AlertBanner alert={{ type: "error", message: error }} />
       ) : (
-        <div className="mx-auto max-w-lg space-y-5 animate-fade-in">
+        <div className="mx-auto max-w-lg space-y-4">
           <ScanModeToggle
             mode={mode}
             onChange={setMode}
@@ -203,42 +222,64 @@ export default function ScanPage() {
             />
           )}
 
-          {mode === "STOCK_IN" && (
-            <StockInTallyPanel tally={tally} onReset={resetTally} />
-          )}
+          {/* Camera stays above growing content so scans don't push the frame */}
+          <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-2 pt-1 sm:static sm:mx-0 sm:bg-transparent sm:p-0">
+            <ScannerWindow
+              scannerElementId={scannerElementId}
+              isScanning={isScanning}
+              cameraError={cameraError}
+              onStart={startScanning}
+              onStop={stopScanning}
+              disabled={processing || labelLoading || !scannerEnabled}
+              contextLabel={contextLabel}
+              overlay={
+                isViewLabel
+                  ? {
+                      processing: labelLoading,
+                      flash: labelError ? "error" : null,
+                      message: labelError,
+                    }
+                  : {
+                      processing,
+                      flash: approveFlash
+                        ? "success"
+                        : errorFlash
+                          ? "error"
+                          : null,
+                      message: alert?.message ?? lastResult?.message ?? null,
+                      detail: overlayDetail,
+                    }
+              }
+            />
+          </div>
 
-          <ScannerWindow
-            scannerElementId={scannerElementId}
-            isScanning={isScanning}
-            cameraError={cameraError}
-            onStart={startScanning}
-            onStop={stopScanning}
-            disabled={processing || labelLoading || !scannerEnabled}
-            contextLabel={contextLabel}
-          />
-
-          {isViewLabel && (
-            <>
-              {labelLoading && (
-                <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-center text-sm text-accent">
-                  Looking up label…
-                </div>
-              )}
-              {labelError && (
+          {isViewLabel ? (
+            <div className="min-h-[6rem] [overflow-anchor:none]">
+              {labelError && !labelLoading && (
                 <AlertBanner alert={{ type: "error", message: labelError }} />
               )}
               {labelUnit && <LabelDetailCard unit={labelUnit} />}
-            </>
-          )}
-
-          {!isViewLabel && (
-            <ScanFeedback
+              {!labelUnit && !labelError && !labelLoading && (
+                <div className="rounded-xl border border-dashed border-surface-border px-4 py-6 text-center text-xs text-zinc-600">
+                  Scan a unit barcode to view label details
+                </div>
+              )}
+            </div>
+          ) : (
+            <ScanResultStrip
               alert={alert}
               lastResult={lastResult}
-              processing={processing}
               mode={transactionMode}
               onDismissAlert={dismissAlert}
-              showApproveFlash={approveFlash}
+            />
+          )}
+
+          {/* Tally below camera — growth no longer shifts the viewfinder */}
+          {(mode === "STOCK_IN" || mode === "STOCK_OUT") && (
+            <ScanTallyPanel
+              tally={tally}
+              mode={transactionMode}
+              onReset={resetTally}
             />
           )}
 

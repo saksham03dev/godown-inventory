@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   Plus,
   Printer,
-  Save,
   Trash2,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -23,10 +23,28 @@ import { useBilling } from "@/hooks/useBilling";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { BillInput } from "@/lib/types/database";
 
+type ScanFlash = "success" | "error" | null;
+
 export default function BillingPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardLayout title="Billing" subtitle="Stock-out invoices">
+          <LoadingSpinner label="Loading bills…" />
+        </DashboardLayout>
+      }
+    >
+      <BillingPageContent />
+    </Suspense>
+  );
+}
+
+function BillingPageContent() {
   const { can } = useAuth();
   const canCreateBill = can("billing.create");
   const canEditPrice = can("billing.editPrice");
+  const searchParams = useSearchParams();
+  const billIdFromQuery = searchParams.get("billId");
 
   const {
     bills,
@@ -46,31 +64,79 @@ export default function BillingPage() {
     dismissAlert,
   } = useBilling();
 
-  const [priceOverride, setPriceOverride] = useState<number | null>(null);
+  const [priceOverride, setPriceOverride] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showPrint, setShowPrint] = useState(false);
+  const [scanProcessing, setScanProcessing] = useState(false);
+  const [scanFlash, setScanFlash] = useState<ScanFlash>(null);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+
   const processingRef = useRef(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedQueryBillRef = useRef<string | null>(null);
+  const activeBillIdRef = useRef<string | null>(null);
+  const priceOverrideRef = useRef(priceOverride);
+
+  activeBillIdRef.current = activeBill?.id ?? null;
+  priceOverrideRef.current = priceOverride;
+
+  useEffect(() => {
+    if (!billIdFromQuery || loading) return;
+    if (loadedQueryBillRef.current === billIdFromQuery) return;
+    if (activeBill?.id === billIdFromQuery) {
+      loadedQueryBillRef.current = billIdFromQuery;
+      return;
+    }
+    loadedQueryBillRef.current = billIdFromQuery;
+    loadBill(billIdFromQuery);
+  }, [billIdFromQuery, loading, activeBill?.id, loadBill]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
 
   const isDraft = activeBill?.status === "DRAFT";
   const isReadonly = !canCreateBill || !isDraft;
 
+  const showScanFlash = useCallback((flash: ScanFlash, message: string) => {
+    setScanFlash(flash);
+    setScanMessage(message);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      setScanFlash(null);
+      flashTimerRef.current = null;
+    }, 1400);
+  }, []);
+
   const onBarcodeDetected = useCallback(
     async (barcode: string) => {
-      if (!activeBill || !isDraft || !canCreateBill || processingRef.current)
-        return;
+      const billId = activeBillIdRef.current;
+      if (!billId || !isDraft || !canCreateBill || processingRef.current) return;
+
       processingRef.current = true;
+      setScanProcessing(true);
+      setScanFlash(null);
+
       try {
+        const raw = priceOverrideRef.current.trim();
+        const parsed = Number(raw);
         const override =
-          canEditPrice && priceOverride !== null && priceOverride > 0
-            ? priceOverride
+          canEditPrice && raw !== "" && Number.isFinite(parsed) && parsed > 0
+            ? parsed
             : 0;
-        await scanToBill(activeBill.id, barcode, override);
+        const result = await scanToBill(billId, barcode, override);
+        showScanFlash(
+          result.success ? "success" : "error",
+          result.message
+        );
       } finally {
         processingRef.current = false;
+        setScanProcessing(false);
       }
     },
-    [activeBill, isDraft, canCreateBill, scanToBill, canEditPrice, priceOverride]
+    [isDraft, canCreateBill, canEditPrice, scanToBill, showScanFlash]
   );
 
   const { isScanning, cameraError, startScanning, stopScanning, scannerElementId } =
@@ -82,10 +148,7 @@ export default function BillingPage() {
   const handleDetailsChange = useCallback(
     (input: BillInput) => {
       if (!activeBill || isReadonly) return;
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        saveBill(activeBill.id, input);
-      }, 600);
+      void saveBill(activeBill.id, input, { silent: true });
     },
     [activeBill, isReadonly, saveBill]
   );
@@ -105,12 +168,6 @@ export default function BillingPage() {
       setShowPrint(false);
     }, 300);
   };
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, []);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -157,15 +214,19 @@ export default function BillingPage() {
         </div>
       }
     >
-      <div className="mx-auto max-w-6xl space-y-6 animate-fade-in">
-        {alert && <AlertBanner alert={alert} onDismiss={dismissAlert} />}
+      <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
+        {/* Non-scan alerts only (finalize/delete/etc.) — scans use camera overlay */}
+        {alert && !scanFlash && (
+          <AlertBanner alert={alert} onDismiss={dismissAlert} />
+        )}
 
         {loading ? (
           <LoadingSpinner label="Loading bills…" />
         ) : error ? (
           <AlertBanner alert={{ type: "error", message: error }} />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-4">
+          <div className="grid gap-4 lg:grid-cols-4 lg:gap-6">
+            {/* Recent bills — horizontal on mobile, sidebar on desktop */}
             <div className="space-y-2 lg:col-span-1">
               <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Recent Bills
@@ -173,20 +234,20 @@ export default function BillingPage() {
               {bills.length === 0 ? (
                 <p className="text-sm text-zinc-500">No bills yet</p>
               ) : (
-                <ul className="space-y-1">
+                <ul className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
                   {bills.map((b) => (
-                    <li key={b.id} className="flex gap-1">
+                    <li key={b.id} className="flex shrink-0 gap-1 lg:shrink">
                       <button
                         onClick={() => loadBill(b.id)}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                        className={`min-w-[9.5rem] flex-1 rounded-xl px-3 py-2.5 text-left text-sm transition lg:min-w-0 ${
                           activeBill?.id === b.id
                             ? "bg-accent/15 text-accent"
-                            : "text-zinc-400 hover:bg-white/5"
+                            : "bg-surface-raised text-zinc-400 hover:bg-white/5 lg:bg-transparent"
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          <FileText className="h-3.5 w-3.5" />
-                          {b.bill_number}
+                          <FileText className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{b.bill_number}</span>
                         </span>
                         <span className="text-xs text-zinc-600">
                           ₹{Number(b.total).toFixed(2)} · {b.status}
@@ -207,9 +268,9 @@ export default function BillingPage() {
               )}
             </div>
 
-            <div className="space-y-4 lg:col-span-3">
+            <div className="min-w-0 space-y-4 lg:col-span-3">
               {!activeBill ? (
-                <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-12 text-center">
+                <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-8 text-center sm:p-12">
                   <p className="text-sm text-zinc-400">
                     {canCreateBill
                       ? "Create a new bill or select one from the list"
@@ -217,102 +278,84 @@ export default function BillingPage() {
                   </p>
                   {canCreateBill && (
                     <p className="mt-2 text-xs text-zinc-600">
-                      Flow: Stock Out at Scan Station → scan units here to bill
+                      Flow: Stock Out → Pending Billing (or scan units here)
                     </p>
                   )}
                 </div>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h2 className="text-lg font-semibold text-zinc-100">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-lg font-semibold text-zinc-100">
                         {activeBill.bill_number}
                       </h2>
                       <p className="text-xs text-zinc-500">
                         Status: {activeBill.status}
+                        {activeBill.bill_items.length > 0
+                          ? ` · ${activeBill.bill_items.length} item(s)`
+                          : ""}
                       </p>
                     </div>
                     {canCreateBill && isDraft && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() =>
-                            saveBill(activeBill.id, {
-                              customer_name: activeBill.customer_name,
-                              customer_phone: activeBill.customer_phone,
-                              customer_address: activeBill.customer_address,
-                              notes: activeBill.notes,
-                              tax_percent: activeBill.tax_percent,
-                              discount: activeBill.discount,
-                            })
-                          }
-                          disabled={mutating}
-                          className="flex items-center gap-2 rounded-xl border border-surface-border px-3 py-2 text-sm text-zinc-400 hover:bg-white/5"
-                        >
-                          <Save className="h-4 w-4" />
-                          Save
-                        </button>
-                        <button
-                          onClick={() => finalize(activeBill.id)}
-                          disabled={mutating || activeBill.bill_items.length === 0}
-                          className="rounded-xl bg-success px-3 py-2 text-sm font-medium text-white hover:bg-success-muted disabled:opacity-50"
-                        >
-                          Finalize Bill
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => finalize(activeBill.id)}
+                        disabled={
+                          mutating || activeBill.bill_items.length === 0
+                        }
+                        className="rounded-xl bg-success px-3 py-2 text-sm font-medium text-white hover:bg-success-muted disabled:opacity-50"
+                      >
+                        Finalize
+                      </button>
                     )}
                   </div>
 
                   <BillDetailsForm
+                    key={activeBill.id}
                     bill={activeBill}
                     onChange={handleDetailsChange}
                     readonly={isReadonly}
                   />
 
                   {canCreateBill && isDraft && (
-                    <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-3">
                       {canEditPrice && (
                         <div>
                           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
                             Price Override (₹) — optional
                           </label>
                           <input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            value={priceOverride ?? ""}
-                            onChange={(e) =>
-                              setPriceOverride(
-                                e.target.value === ""
-                                  ? null
-                                  : Number(e.target.value)
-                              )
-                            }
+                            type="text"
+                            inputMode="decimal"
+                            value={priceOverride}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === "" || /^\d*\.?\d*$/.test(v)) {
+                                setPriceOverride(v);
+                              }
+                            }}
                             placeholder="Auto from product price"
-                            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent"
+                            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:max-w-xs sm:text-sm"
                           />
                           <p className="mt-1 text-xs text-zinc-600">
-                            Leave empty to use each product&apos;s retail selling
-                            price automatically.
+                            Leave empty to use each product&apos;s retail price.
                           </p>
                         </div>
                       )}
-                      <div
-                        className={`rounded-xl border border-surface-border bg-surface-raised p-3 ${!canEditPrice ? "lg:col-span-2" : ""}`}
-                      >
-                        <p className="text-xs text-zinc-500">
-                          {canEditPrice
-                            ? "Scan unit barcodes (87…) that were stocked out. Prices default from the product catalog."
-                            : "Scan unit barcodes (87…) that were stocked out. Prices are set from the product catalog."}
-                        </p>
-                      </div>
-                      <div className="lg:col-span-2">
+
+                      <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-1 pt-1 sm:static sm:mx-0 sm:bg-transparent sm:p-0">
                         <ScannerWindow
                           scannerElementId={scannerElementId}
                           isScanning={isScanning}
                           cameraError={cameraError}
                           onStart={startScanning}
                           onStop={stopScanning}
-                          disabled={mutating}
+                          disabled={scanProcessing}
+                          contextLabel={`Billing · ${activeBill.bill_number}`}
+                          overlay={{
+                            processing: scanProcessing,
+                            flash: scanFlash,
+                            message: scanMessage,
+                          }}
                         />
                       </div>
                     </div>
