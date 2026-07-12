@@ -262,6 +262,17 @@ export interface MutationResult<T = void> {
   data?: T;
 }
 
+export type RetailBaleEvent = "FIRST_OPEN" | "DEDUCT_OPEN" | "BALE_EMPTY";
+
+export interface RetailBillLineResult {
+  success: boolean;
+  message: string;
+  event?: RetailBaleEvent;
+  remainingBags?: number;
+  bagsSold?: number;
+  data?: BillWithItems;
+}
+
 export interface AlertState {
   type: "success" | "error" | "info";
   message: string;

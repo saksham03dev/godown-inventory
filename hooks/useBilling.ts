@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  addRetailLineToBill,
   addUnitToBill,
   createBill,
   deleteBill,
@@ -18,6 +19,7 @@ import type {
   BillInput,
   BillItemInput,
   BillWithItems,
+  RetailBillLineResult,
 } from "@/lib/types/database";
 
 export function useBilling() {
@@ -138,6 +140,27 @@ export function useBilling() {
     []
   );
 
+  const retailLineToBill = useCallback(
+    async (
+      billId: string,
+      barcode: string,
+      bagsQty: number,
+      unitPrice = 0
+    ): Promise<RetailBillLineResult> => {
+      const result = await addRetailLineToBill(
+        billId,
+        barcode,
+        bagsQty,
+        unitPrice
+      );
+      if (result.success && result.data) {
+        setActiveBill(result.data);
+      }
+      return result;
+    },
+    []
+  );
+
   const editItem = useCallback(
     async (itemId: string, input: BillItemInput) => {
       setMutating(true);
@@ -211,6 +234,7 @@ export function useBilling() {
     loadBill,
     saveBill,
     scanToBill,
+    retailLineToBill,
     editItem,
     removeItem,
     finalize,

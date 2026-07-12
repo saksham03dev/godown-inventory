@@ -4,6 +4,8 @@ import { isProductBarcode } from "@/lib/utils/barcode";
 import type {
   MutationResult,
   Product,
+  RetailBaleEvent,
+  RetailBillLineResult,
   ScanTransactionResult,
   StockUnit,
   TransactionType,
@@ -118,6 +120,64 @@ export async function attachUnitToBillServer(input: {
     return {
       success: false,
       message: err instanceof Error ? err.message : "Failed to add item.",
+    };
+  }
+}
+
+export async function addRetailLineToBillServer(input: {
+  billId: string;
+  unitBarcode: string;
+  bagsQty: number;
+  unitPrice?: number;
+  handledBy: string;
+}): Promise<RetailBillLineResult> {
+  try {
+    const bagsQty = Math.floor(input.bagsQty);
+    if (bagsQty < 1) {
+      return { success: false, message: "Minimum sale is 1 bag." };
+    }
+
+    const supabase = createServiceClient({ requireServiceRole: true });
+    const { data, error } = await supabase.rpc("process_retail_bill_line", {
+      p_bill_id: input.billId,
+      p_unit_barcode: input.unitBarcode.trim(),
+      p_bags_qty: bagsQty,
+      p_unit_price: input.unitPrice ?? 0,
+      p_handled_by: input.handledBy,
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    const row = data as {
+      success?: boolean;
+      message?: string;
+      event?: RetailBaleEvent;
+      remainingBags?: number;
+      bagsSold?: number;
+    } | null;
+
+    if (!row?.success) {
+      return {
+        success: false,
+        message: row?.message ?? "Failed to add retail line.",
+      };
+    }
+
+    const bill = await fetchBillWithItems(input.billId);
+    return {
+      success: true,
+      message: row.message ?? "Bags added to bill.",
+      event: row.event,
+      remainingBags: row.remainingBags,
+      bagsSold: row.bagsSold,
+      data: bill ?? undefined,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Retail sale failed.",
     };
   }
 }

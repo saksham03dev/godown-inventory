@@ -1,4 +1,4 @@
-import { apiMutation } from "@/lib/api/clientMutation";
+import { apiJson, apiMutation } from "@/lib/api/clientMutation";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type {
@@ -7,6 +7,7 @@ import type {
   BillItemInput,
   BillWithItems,
   MutationResult,
+  RetailBillLineResult,
   StockUnit,
 } from "@/lib/types/database";
 
@@ -148,6 +149,22 @@ export async function updateBill(
   return apiMutation<BillWithItems>(`/api/bills/${billId}`, {
     method: "PATCH",
     body: input,
+  });
+}
+
+export async function addRetailLineToBill(
+  billId: string,
+  unitBarcode: string,
+  bagsQty: number,
+  unitPrice = 0
+): Promise<RetailBillLineResult> {
+  return apiJson("/api/billing/retail-line", {
+    body: {
+      billId,
+      unitBarcode: unitBarcode.trim(),
+      bagsQty: Math.floor(bagsQty),
+      unitPrice,
+    },
   });
 }
 

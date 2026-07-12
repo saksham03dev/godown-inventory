@@ -1,5 +1,5 @@
 import type { BillWithItems } from "@/lib/types/database";
-import { formatUnitLabel } from "@/lib/utils/billItem";
+import { formatBillBags, formatRetailBaleNote, formatUnitLabel } from "@/lib/utils/billItem";
 
 interface BillPrintViewProps {
   bill: BillWithItems;
@@ -54,6 +54,7 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
         <tbody>
           {bill.bill_items.map((item, i) => {
             const unitLabel = formatUnitLabel(item);
+            const lineNote = formatRetailBaleNote(item);
             return (
             <tr key={item.id} className="border-b border-zinc-200">
               <td className="py-2">{i + 1}</td>
@@ -61,9 +62,21 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
                 {item.product_name}
                 <br />
                 <span className="text-xs text-zinc-500">{item.product_code}</span>
+                {lineNote && (
+                  <>
+                    <br />
+                    <span className="text-xs text-zinc-500">{lineNote}</span>
+                  </>
+                )}
               </td>
               <td className="py-2 font-mono text-xs">
                 {unitLabel ?? "—"}
+                {item.sale_channel === "RETAIL" && (
+                  <>
+                    <br />
+                    <span className="text-zinc-500">{formatBillBags(item)}</span>
+                  </>
+                )}
               </td>
               <td className="py-2 font-mono text-xs">{item.unit_barcode}</td>
               <td className="py-2 text-xs">{item.source_name || "—"}</td>

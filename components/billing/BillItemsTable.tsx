@@ -3,6 +3,7 @@
 import { Trash2 } from "lucide-react";
 import {
   formatBillBags,
+  formatRetailBaleNote,
   formatUnitLabel,
   formatWholesaleBaleNote,
 } from "@/lib/utils/billItem";
@@ -14,6 +15,7 @@ interface BillItemsTableProps {
   onRemove: (itemId: string) => void;
   readonly?: boolean;
   canEditPrice?: boolean;
+  isRetail?: boolean;
 }
 
 export function BillItemsTable({
@@ -22,12 +24,15 @@ export function BillItemsTable({
   onRemove,
   readonly = false,
   canEditPrice = false,
+  isRetail = false,
 }: BillItemsTableProps) {
   if (bill.bill_items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-8 text-center sm:p-10">
         <p className="text-sm text-zinc-400">
-          Scan wholesale stocked-out bale barcodes to add lines (1,000 bags each)
+          {isRetail
+            ? "Scan a stocked-in bale and add bag quantities"
+            : "Scan wholesale stocked-out bale barcodes to add lines (1,000 bags each)"}
         </p>
       </div>
     );
@@ -41,7 +46,8 @@ export function BillItemsTable({
       <ul className="divide-y divide-surface-border sm:hidden">
         {bill.bill_items.map((item) => {
           const unitLabel = formatUnitLabel(item);
-          const baleNote = formatWholesaleBaleNote(item);
+          const baleNote =
+            formatRetailBaleNote(item) ?? formatWholesaleBaleNote(item);
           return (
             <li key={item.id} className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-3">
@@ -138,7 +144,8 @@ export function BillItemsTable({
           <tbody className="divide-y divide-surface-border">
             {bill.bill_items.map((item) => {
               const unitLabel = formatUnitLabel(item);
-              const baleNote = formatWholesaleBaleNote(item);
+              const baleNote =
+            formatRetailBaleNote(item) ?? formatWholesaleBaleNote(item);
               return (
                 <tr key={item.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">

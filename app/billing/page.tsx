@@ -13,6 +13,7 @@ import { BillDetailsForm } from "@/components/billing/BillDetailsForm";
 import { BillItemsTable } from "@/components/billing/BillItemsTable";
 import { BillTotals } from "@/components/billing/BillTotals";
 import { BillPrintView } from "@/components/billing/BillPrintView";
+import { RetailBillingPanel } from "@/components/billing/RetailBillingPanel";
 import { ScannerWindow } from "@/components/scan/ScannerWindow";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -60,6 +61,7 @@ function BillingPageContent() {
     loadBill,
     saveBill,
     scanToBill,
+    retailLineToBill,
     editItem,
     removeItem,
     finalize,
@@ -191,7 +193,7 @@ function BillingPageContent() {
       subtitle={
         canCreateBill
           ? isRetail
-            ? "Retail billing — scan bale + bag qty (Phase 4 enables selling)"
+            ? "Retail billing — scan bale, enter bag qty"
             : "Wholesale billing — scan stocked-out bales (1,000 bags each)"
           : "View finalized wholesale bills"
       }
@@ -284,7 +286,7 @@ function BillingPageContent() {
                   {canCreateBill && (
                     <p className="mt-2 text-xs text-zinc-600">
                       {isRetail
-                        ? "Open Bales lists partial bales — retail scan + qty ships in Phase 4"
+                        ? "Scan a stocked-in bale, enter bags, and add lines to the bill"
                         : "Flow: Wholesale Out → Pending Sales (or scan bales here)"}
                     </p>
                   )}
@@ -368,17 +370,14 @@ function BillingPageContent() {
                     </div>
                   )}
 
-                  {canCreateBill && isDraft && isRetail && (
-                    <div className="rounded-2xl border border-dashed border-amber-500/30 bg-amber-500/5 p-6 text-center">
-                      <p className="text-sm text-zinc-300">
-                        Retail billing scanner
-                      </p>
-                      <p className="mt-2 text-xs text-zinc-500">
-                        Phase 4 adds scan bale → enter bags here. Check{" "}
-                        <span className="text-accent">Open Bales</span> for
-                        partially sold inventory.
-                      </p>
-                    </div>
+                  {canCreateBill && isDraft && isRetail && activeBill && (
+                    <RetailBillingPanel
+                      billId={activeBill.id}
+                      billNumber={activeBill.bill_number}
+                      disabled={mutating || scanProcessing}
+                      canEditPrice={canEditPrice}
+                      onAddLine={retailLineToBill}
+                    />
                   )}
 
                   <BillItemsTable
@@ -387,6 +386,7 @@ function BillingPageContent() {
                     onRemove={removeItem}
                     readonly={isReadonly}
                     canEditPrice={canEditPrice}
+                    isRetail={isRetail}
                   />
 
                   <BillTotals bill={activeBill} />
@@ -411,7 +411,7 @@ function BillingPageContent() {
           setDeleteTarget(null);
         }}
         title="Delete Bill"
-        message="Delete this draft bill? Scanned units will be unlinked and can be billed again."
+        message="Delete this draft bill? Scanned units and retail bag deductions will be restored."
         loading={mutating}
       />
     </DashboardLayout>

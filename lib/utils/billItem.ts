@@ -14,6 +14,18 @@ export function formatBillBags(item: Pick<BillItem, "quantity">): string {
   return `${Number(item.quantity).toLocaleString()} bags`;
 }
 
+/** Retail bale line subtitle (partial bag sale from a bale). */
+export function formatRetailBaleNote(
+  item: Pick<BillItem, "quantity" | "unit_number" | "sale_channel">
+): string | null {
+  if (item.sale_channel !== "RETAIL") return null;
+  const bags = Number(item.quantity).toLocaleString();
+  if (item.unit_number != null) {
+    return `${bags} bags from Bale #${item.unit_number}`;
+  }
+  return `${bags} bags (retail)`;
+}
+
 /** Wholesale bale line subtitle (1 sealed bale = 1000 bags). */
 export function formatWholesaleBaleNote(item: Pick<BillItem, "quantity" | "sale_channel">): string | null {
   if (item.sale_channel === "RETAIL") return null;
