@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  PackageOpen,
   PackageSearch,
   ScanLine,
   Tags,
@@ -17,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSaleMode } from "@/contexts/SaleModeContext";
 import { getNavItemsForRole, ROLE_LABELS } from "@/lib/auth/roles";
 
 const NAV_ICONS = {
@@ -27,6 +29,7 @@ const NAV_ICONS = {
   "/inventory": Boxes,
   "/scan": ScanLine,
   "/pending-billing": ClipboardList,
+  "/open-bales": PackageOpen,
   "/billing": FileText,
   "/admin/users": UserCog,
 } as const;
@@ -40,7 +43,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { profile, role, signOut } = useAuth();
-  const navItems = getNavItemsForRole(role);
+  const { mode } = useSaleMode();
+  const navItems = getNavItemsForRole(role, mode);
 
   const handleSignOut = async () => {
     await signOut();
@@ -70,7 +74,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             </div>
             <div>
               <p className="text-sm font-semibold text-zinc-100">Store IMS</p>
-              <p className="text-xs text-zinc-500">Inventory Control</p>
+              <p className="text-xs text-zinc-500">
+                {mode === "retail" ? "Retail sales" : "Wholesale ops"}
+              </p>
             </div>
           </div>
           <button

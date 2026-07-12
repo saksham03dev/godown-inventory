@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { SaleModeGuard } from "./SaleModeGuard";
 
 interface DashboardLayoutProps {
   title: string;
@@ -30,7 +31,9 @@ export function DashboardLayout({
           onMenuClick={() => setSidebarOpen(true)}
           actions={actions}
         />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <SaleModeGuard>{children}</SaleModeGuard>
+        </main>
       </div>
     </div>
   );

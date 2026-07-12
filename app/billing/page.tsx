@@ -18,6 +18,7 @@ import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSaleMode } from "@/contexts/SaleModeContext";
 import { useBarcodeScan } from "@/hooks/useBarcodeScan";
 import { useBilling } from "@/hooks/useBilling";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
@@ -41,6 +42,8 @@ export default function BillingPage() {
 
 function BillingPageContent() {
   const { can } = useAuth();
+  const { mode: saleMode } = useSaleMode();
+  const isRetail = saleMode === "retail";
   const canCreateBill = can("billing.create");
   const canEditPrice = can("billing.editPrice");
   const searchParams = useSearchParams();
@@ -187,7 +190,9 @@ function BillingPageContent() {
       title="Billing"
       subtitle={
         canCreateBill
-          ? "Wholesale billing — scan stocked-out bales (1,000 bags each)"
+          ? isRetail
+            ? "Retail billing — scan bale + bag qty (Phase 4 enables selling)"
+            : "Wholesale billing — scan stocked-out bales (1,000 bags each)"
           : "View finalized wholesale bills"
       }
       actions={
@@ -278,7 +283,9 @@ function BillingPageContent() {
                   </p>
                   {canCreateBill && (
                     <p className="mt-2 text-xs text-zinc-600">
-                      Flow: Wholesale Out → Pending Sales (or scan bales here)
+                      {isRetail
+                        ? "Open Bales lists partial bales — retail scan + qty ships in Phase 4"
+                        : "Flow: Wholesale Out → Pending Sales (or scan bales here)"}
                     </p>
                   )}
                 </div>
@@ -316,7 +323,7 @@ function BillingPageContent() {
                     readonly={isReadonly}
                   />
 
-                  {canCreateBill && isDraft && (
+                  {canCreateBill && isDraft && !isRetail && (
                     <div className="space-y-3">
                       {canEditPrice && (
                         <div>
@@ -358,6 +365,19 @@ function BillingPageContent() {
                           }}
                         />
                       </div>
+                    </div>
+                  )}
+
+                  {canCreateBill && isDraft && isRetail && (
+                    <div className="rounded-2xl border border-dashed border-amber-500/30 bg-amber-500/5 p-6 text-center">
+                      <p className="text-sm text-zinc-300">
+                        Retail billing scanner
+                      </p>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        Phase 4 adds scan bale → enter bags here. Check{" "}
+                        <span className="text-accent">Open Bales</span> for
+                        partially sold inventory.
+                      </p>
                     </div>
                   )}
 
