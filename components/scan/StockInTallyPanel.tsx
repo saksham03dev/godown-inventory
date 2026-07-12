@@ -1,6 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
+import { formatBagCount } from "@/lib/utils/inventory";
 import type { StockInTallyState } from "@/lib/types/scan";
 
 interface StockInTallyPanelProps {
@@ -8,6 +9,7 @@ interface StockInTallyPanelProps {
   onReset: () => void;
 }
 
+/** @deprecated Use ScanTallyPanel */
 export function StockInTallyPanel({ tally, onReset }: StockInTallyPanelProps) {
   return (
     <div className="rounded-2xl border border-success/30 bg-success/5 p-4 [overflow-anchor:none]">
@@ -17,10 +19,8 @@ export function StockInTallyPanel({ tally, onReset }: StockInTallyPanelProps) {
             Stock In Tally
           </p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums text-zinc-100">
-            {tally.sessionTotal}
-            <span className="ml-2 text-sm font-normal text-zinc-500">
-              this session
-            </span>
+            {formatBagCount(tally.sessionTotal)}
+            <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
           </p>
         </div>
         <button
@@ -47,7 +47,7 @@ export function StockInTallyPanel({ tally, onReset }: StockInTallyPanelProps) {
                 <p className="text-xs text-zinc-500">{item.productCode}</p>
               </div>
               <span className="shrink-0 rounded-lg bg-success/15 px-2.5 py-1 font-semibold tabular-nums text-success">
-                {item.count}
+                {formatBagCount(item.bagCount)}
               </span>
             </li>
           ))}

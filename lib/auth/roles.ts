@@ -87,7 +87,7 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/scan", label: "Scan Station", permission: "scan" },
   {
     href: "/pending-billing",
-    label: "Pending Billing",
+    label: "Pending Sales",
     permission: "billing.view",
   },
   { href: "/billing", label: "Billing", permission: "billing.view" },

@@ -1,6 +1,8 @@
 "use client";
 
 import type { StockUnit } from "@/lib/types/database";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
+import { formatBagCount } from "@/lib/utils/inventory";
 
 interface LabelDetailCardProps {
   unit: StockUnit;
@@ -42,17 +44,18 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
   const godown = unit.godowns;
   const retailPrice = (product as { retail_selling_price?: number } | null)
     ?.retail_selling_price;
+  const remaining = Number(unit.remaining_bags ?? BAGS_PER_BALE);
 
   return (
     <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4 animate-slide-up">
       <p className="text-xs font-medium uppercase tracking-wider text-accent">
-        Label Details
+        Bale Label
       </p>
       <p className="mt-1 font-mono text-lg font-bold text-zinc-100">
         {unit.unit_barcode}
       </p>
       <p className="text-xs text-zinc-500">
-        Unique unit ID: {unit.id}
+        {formatBagCount(remaining)} bags in this bale
       </p>
 
       <div className="mt-4 space-y-3 divide-y divide-surface-border/50">
@@ -62,7 +65,7 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
           <DetailRow label="Backend Code" value={product?.product_code} mono />
           <DetailRow label="Size" value={product?.size} />
           <DetailRow
-            label="Retail Price"
+            label="Price / bag"
             value={
               retailPrice !== undefined
                 ? `₹${Number(retailPrice).toFixed(2)}`
@@ -72,9 +75,13 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
         </div>
 
         <div className="space-y-2 py-3">
-          <p className="text-xs font-semibold text-zinc-400">Unit</p>
-          <DetailRow label="Unit Number" value={`#${unit.unit_number}`} />
+          <p className="text-xs font-semibold text-zinc-400">Bale</p>
+          <DetailRow label="Bale #" value={`#${unit.unit_number}`} />
           <DetailRow label="Status" value={STATUS_LABELS[unit.status] ?? unit.status} />
+          <DetailRow
+            label="Bags remaining"
+            value={formatBagCount(remaining)}
+          />
           <DetailRow label="Barcode" value={unit.unit_barcode} mono />
         </div>
 

@@ -159,13 +159,13 @@ export default function ScanPage() {
   const selectedGodown = godowns.find((g) => g.id === selectedGodownId);
 
   const contextLabel = isViewLabel
-    ? "View Label · scan any unit barcode"
+    ? "View Label · scan any bale barcode"
     : selectedGodown
-      ? `${mode === "STOCK_IN" ? "Stock In" : "Stock Out"} · ${selectedGodown.location_name}`
+      ? `${mode === "STOCK_IN" ? "Stock In" : "Wholesale Out"} · ${selectedGodown.location_name}`
       : undefined;
 
   const overlayDetail = lastResult?.stockUnit
-    ? `Unit #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
+    ? `Bale #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
     : lastResult?.product?.name ?? null;
 
   if (!isSupabaseConfigured()) {
@@ -187,8 +187,8 @@ export default function ScanPage() {
       title="Scan Station"
       subtitle={
         isEmployee
-          ? "Scan labels to stock in or stock out inventory"
-          : "Stock in, stock out, and view label details"
+          ? "Wholesale: scan bale labels — stock in (+1,000 bags) or wholesale out (−1,000 bags)"
+          : "Wholesale receiving & dispatch — 1 bale scan = 1,000 bags"
       }
     >
       {loading ? (

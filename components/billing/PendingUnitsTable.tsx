@@ -1,6 +1,8 @@
 "use client";
 
 import { Package } from "lucide-react";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
+import { formatBagCount } from "@/lib/utils/inventory";
 import type { StockUnit } from "@/lib/types/database";
 
 interface PendingUnitsTableProps {
@@ -29,10 +31,10 @@ export function PendingUnitsTable({
       <div className="rounded-2xl border border-surface-border bg-surface-raised p-12 text-center">
         <Package className="mx-auto h-10 w-10 text-zinc-600" />
         <p className="mt-3 text-sm font-medium text-zinc-400">
-          No pending stocked-out units
+          No pending wholesale sales
         </p>
         <p className="mt-1 text-xs text-zinc-600">
-          Units appear here after stock-out and before they are added to a bill.
+          Sealed bales appear here after wholesale stock-out, before billing.
         </p>
       </div>
     );
@@ -59,10 +61,13 @@ export function PendingUnitsTable({
                 Product
               </th>
               <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Unit
+                Bale
               </th>
               <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Barcode
+              </th>
+              <th className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Bags
               </th>
               <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Stocked out from
@@ -71,7 +76,7 @@ export function PendingUnitsTable({
                 Stocked out at
               </th>
               <th className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Price
+                Line total
               </th>
             </tr>
           </thead>
@@ -79,7 +84,9 @@ export function PendingUnitsTable({
             {units.map((unit) => {
               const product = unit.products;
               const selected = selectedIds.has(unit.id);
-              const price = Number(product?.retail_selling_price ?? 0);
+              const pricePerBag = Number(product?.retail_selling_price ?? 0);
+              const bags = BAGS_PER_BALE;
+              const lineTotal = bags * pricePerBag;
               return (
                 <tr
                   key={unit.id}
@@ -93,7 +100,7 @@ export function PendingUnitsTable({
                       type="checkbox"
                       checked={selected}
                       onChange={() => onToggle(unit.id)}
-                      aria-label={`Select ${product?.name ?? "unit"}`}
+                      aria-label={`Select ${product?.name ?? "bale"}`}
                       className="h-4 w-4 rounded border-surface-border bg-surface-overlay accent-accent"
                     />
                   </td>
@@ -117,6 +124,12 @@ export function PendingUnitsTable({
                   <td className="px-4 py-3.5 font-mono text-xs text-zinc-400">
                     {unit.unit_barcode}
                   </td>
+                  <td className="px-4 py-3.5 text-right font-medium text-zinc-200">
+                    {formatBagCount(bags)}
+                    <p className="text-[11px] font-normal text-zinc-500">
+                      @ ₹{pricePerBag.toFixed(2)}/bag
+                    </p>
+                  </td>
                   <td className="px-4 py-3.5 text-zinc-300">
                     {unit.godowns?.location_name ?? "—"}
                   </td>
@@ -124,7 +137,7 @@ export function PendingUnitsTable({
                     {formatWhen(unit.stocked_out_at)}
                   </td>
                   <td className="px-4 py-3.5 text-right font-medium text-zinc-200">
-                    ₹{price.toFixed(2)}
+                    ₹{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               );

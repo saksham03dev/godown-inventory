@@ -1,6 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
+import { formatBagCount } from "@/lib/utils/inventory";
 import type { ScanTallyState } from "@/lib/types/scan";
 import type { TransactionType } from "@/lib/types/database";
 
@@ -27,7 +28,7 @@ export function ScanTallyPanel({ tally, mode, onReset }: ScanTallyPanelProps) {
         label: "text-danger",
         chip: "bg-danger/15 text-danger",
         divider: "border-danger/20",
-        title: "Stock Out Tally",
+        title: "Wholesale Out Tally",
       };
 
   return (
@@ -42,10 +43,12 @@ export function ScanTallyPanel({ tally, mode, onReset }: ScanTallyPanelProps) {
             {accent.title}
           </p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums text-zinc-100">
-            {tally.sessionTotal}
-            <span className="ml-2 text-sm font-normal text-zinc-500">
-              this session
-            </span>
+            {formatBagCount(tally.sessionTotal)}
+            <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
+          </p>
+          <p className="text-xs text-zinc-500">
+            {tally.sessionBales} bale label{tally.sessionBales === 1 ? "" : "s"}{" "}
+            this session
           </p>
         </div>
         <button
@@ -71,12 +74,15 @@ export function ScanTallyPanel({ tally, mode, onReset }: ScanTallyPanelProps) {
                 <p className="truncate font-medium text-zinc-200">
                   {item.productName}
                 </p>
-                <p className="text-xs text-zinc-500">{item.productCode}</p>
+                <p className="text-xs text-zinc-500">
+                  {item.productCode} · {item.baleCount} bale
+                  {item.baleCount === 1 ? "" : "s"}
+                </p>
               </div>
               <span
                 className={`shrink-0 rounded-lg px-2.5 py-1 font-semibold tabular-nums ${accent.chip}`}
               >
-                {item.count}
+                {formatBagCount(item.bagCount)}
               </span>
             </li>
           ))}

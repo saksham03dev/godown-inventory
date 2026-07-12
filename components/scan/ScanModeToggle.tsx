@@ -44,6 +44,9 @@ export function ScanModeToggle({
           } disabled:cursor-not-allowed disabled:opacity-50`}
         >
           Stock Out
+          <span className="mt-0.5 block text-[10px] font-normal uppercase tracking-wide opacity-80">
+            Wholesale
+          </span>
         </button>
         {showViewLabel && (
           <button

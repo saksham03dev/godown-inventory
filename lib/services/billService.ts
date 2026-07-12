@@ -1,4 +1,5 @@
 import { apiMutation } from "@/lib/api/clientMutation";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import type {
   Bill,
@@ -59,7 +60,7 @@ export async function addUnitsToBill(
   unitPrice = 0
 ): Promise<MutationResult<BillWithItems>> {
   if (unitBarcodes.length === 0) {
-    return { success: false, message: "Select at least one unit." };
+    return { success: false, message: "Select at least one bale." };
   }
 
   let last: MutationResult<BillWithItems> | null = null;
@@ -72,7 +73,7 @@ export async function addUnitsToBill(
         success: false,
         message:
           added > 0
-            ? `Added ${added} unit(s), then failed: ${last.message}`
+            ? `Added ${added} bale(s) (${added * BAGS_PER_BALE} bags), then failed: ${last.message}`
             : last.message,
         data: last.data,
       };
@@ -82,7 +83,7 @@ export async function addUnitsToBill(
 
   return {
     success: true,
-    message: `Added ${added} unit(s) to bill.`,
+    message: `Added ${added} bale(s) (${added * BAGS_PER_BALE} bags) to bill.`,
     data: last?.data,
   };
 }
@@ -108,7 +109,7 @@ export async function createBillWithUnits(
 
   return {
     success: true,
-    message: `Bill ${created.data.bill_number} created with ${unitBarcodes.length} unit(s).`,
+    message: `Bill ${created.data.bill_number} created with ${unitBarcodes.length} bale(s) (${unitBarcodes.length * BAGS_PER_BALE} bags).`,
     data: added.data,
   };
 }

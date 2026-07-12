@@ -1,7 +1,11 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { formatUnitLabel } from "@/lib/utils/billItem";
+import {
+  formatBillBags,
+  formatUnitLabel,
+  formatWholesaleBaleNote,
+} from "@/lib/utils/billItem";
 import type { BillItem, BillWithItems } from "@/lib/types/database";
 
 interface BillItemsTableProps {
@@ -23,7 +27,7 @@ export function BillItemsTable({
     return (
       <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-8 text-center sm:p-10">
         <p className="text-sm text-zinc-400">
-          Scan stocked-out unit barcodes to add items to this bill
+          Scan wholesale stocked-out bale barcodes to add lines (1,000 bags each)
         </p>
       </div>
     );
@@ -37,14 +41,23 @@ export function BillItemsTable({
       <ul className="divide-y divide-surface-border sm:hidden">
         {bill.bill_items.map((item) => {
           const unitLabel = formatUnitLabel(item);
+          const baleNote = formatWholesaleBaleNote(item);
           return (
             <li key={item.id} className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-zinc-200">{item.product_name}</p>
                   <p className="text-xs text-zinc-500">{item.product_code}</p>
+                  <p className="mt-1 text-sm font-medium text-accent">
+                    {formatBillBags(item)}
+                    {baleNote ? (
+                      <span className="ml-1 text-xs font-normal text-zinc-500">
+                        · {baleNote}
+                      </span>
+                    ) : null}
+                  </p>
                   {unitLabel && (
-                    <p className="mt-1 font-mono text-xs text-accent">{unitLabel}</p>
+                    <p className="mt-0.5 font-mono text-xs text-zinc-500">{unitLabel}</p>
                   )}
                   <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-600">
                     {item.unit_barcode}
@@ -66,7 +79,7 @@ export function BillItemsTable({
               <div className="flex items-center justify-between gap-3">
                 {priceEditable ? (
                   <label className="flex items-center gap-2 text-xs text-zinc-500">
-                    Price
+                    ₹/bag
                     <input
                       type="text"
                       inputMode="decimal"
@@ -80,7 +93,7 @@ export function BillItemsTable({
                   </label>
                 ) : (
                   <span className="text-sm text-zinc-400">
-                    ₹{Number(item.unit_price).toFixed(2)}
+                    ₹{Number(item.unit_price).toFixed(2)}/bag
                   </span>
                 )}
                 <span className="font-medium text-zinc-100">
@@ -101,19 +114,19 @@ export function BillItemsTable({
                 Product
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Unit ID
+                Bale
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Barcode
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Source
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Bags
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Price
+                ₹/bag
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Total
+                Line total
               </th>
               {!readonly && (
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
@@ -125,11 +138,15 @@ export function BillItemsTable({
           <tbody className="divide-y divide-surface-border">
             {bill.bill_items.map((item) => {
               const unitLabel = formatUnitLabel(item);
+              const baleNote = formatWholesaleBaleNote(item);
               return (
                 <tr key={item.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
                     <p className="font-medium text-zinc-200">{item.product_name}</p>
                     <p className="text-xs text-zinc-500">{item.product_code}</p>
+                    {item.source_name && (
+                      <p className="text-xs text-zinc-600">{item.source_name}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {unitLabel ? (
@@ -139,12 +156,15 @@ export function BillItemsTable({
                     ) : (
                       <span className="text-zinc-600">—</span>
                     )}
+                    {baleNote && (
+                      <p className="mt-0.5 text-xs text-zinc-500">{baleNote}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-zinc-400">
                     {item.unit_barcode}
                   </td>
-                  <td className="px-4 py-3 text-zinc-500">
-                    {item.source_name || "—"}
+                  <td className="px-4 py-3 text-right font-medium text-zinc-200">
+                    {formatBillBags(item)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {priceEditable ? (

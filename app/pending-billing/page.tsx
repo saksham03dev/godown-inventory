@@ -100,8 +100,8 @@ export default function PendingBillingPage() {
   if (!isSupabaseConfigured()) {
     return (
       <DashboardLayout
-        title="Pending Billing"
-        subtitle="Stocked-out units awaiting invoice"
+        title="Pending Sales"
+        subtitle="Wholesale bales stocked out — send to invoice without rescanning (1,000 bags each)"
       >
         <AlertBanner
           alert={{
@@ -115,8 +115,8 @@ export default function PendingBillingPage() {
 
   return (
     <DashboardLayout
-      title="Pending Billing"
-      subtitle="Stocked-out units not yet billed — send to an invoice without rescanning"
+      title="Pending Sales"
+      subtitle="Wholesale bales not yet billed — 1 bale = 1,000 bags"
       actions={
         <button
           onClick={() => {
@@ -135,7 +135,7 @@ export default function PendingBillingPage() {
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <Dropdown
-            label="Stocked out from"
+            label="Wholesale stock-out from"
             options={godownOptions}
             value={godownFilter}
             onChange={(value) => {
@@ -176,19 +176,20 @@ export default function PendingBillingPage() {
 
         {!canCreateBill && (
           <p className="text-xs text-zinc-500">
-            You can view pending units. Managers and admins can send them to
-            billing.
+            You can view pending wholesale bales. Managers and admins can send
+            them to billing.
           </p>
         )}
 
         {loading ? (
-          <LoadingSpinner label="Loading pending units…" />
+          <LoadingSpinner label="Loading pending wholesale bales…" />
         ) : error ? (
           <AlertBanner alert={{ type: "error", message: error }} />
         ) : (
           <>
             <p className="text-xs text-zinc-500">
-              {units.length} pending unit{units.length === 1 ? "" : "s"}
+              {units.length} pending bale{units.length === 1 ? "" : "s"} (
+              {(units.length * 1000).toLocaleString()} bags)
               {selectedBarcodes.length > 0
                 ? ` · ${selectedBarcodes.length} selected`
                 : ""}

@@ -33,7 +33,7 @@ export function GodownManagementTable({
                 Location
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Capacity
+                Capacity (bags)
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Address
