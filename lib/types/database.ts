@@ -157,6 +157,11 @@ export interface StockUnit {
   remaining_bags: number;
   /** Set when bale is first partially sold in retail. */
   opened_at: string | null;
+  /** Wholesale buyer stamped at bill finalize (immutable label lookup). */
+  sold_to_customer_name?: string | null;
+  sold_to_customer_phone?: string | null;
+  sold_bill_number?: string | null;
+  sold_at?: string | null;
   created_at: string;
   products?: Pick<
     Product,
@@ -167,6 +172,16 @@ export interface StockUnit {
     "id" | "batch_code" | "source_name" | "quantity" | "notes"
   > | null;
   godowns?: Pick<Godown, "id" | "location_name"> | null;
+  /** Draft or finalized bill when unit.bill_id is set (label lookup join). */
+  bills?: Pick<
+    Bill,
+    | "id"
+    | "bill_number"
+    | "customer_name"
+    | "customer_phone"
+    | "status"
+    | "finalized_at"
+  > | null;
 }
 
 export interface StockBatchWithUnits extends StockBatch {

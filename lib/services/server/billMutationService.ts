@@ -173,6 +173,9 @@ export async function finalizeBillServer(
   try {
     const bill = await fetchBillWithItems(billId);
     if (!bill) return { success: false, message: "Bill not found." };
+    if (bill.status === "FINALIZED") {
+      return { success: false, message: "Bill is already finalized." };
+    }
     if (bill.bill_items.length === 0) {
       return {
         success: false,
@@ -180,25 +183,44 @@ export async function finalizeBillServer(
       };
     }
 
-    const totals = calcTotals(
-      bill.bill_items,
-      bill.tax_percent,
-      bill.discount
-    );
+    const customerName = bill.customer_name?.trim() ?? "";
+    if (!customerName) {
+      return {
+        success: false,
+        message: "Enter customer name before finalizing.",
+      };
+    }
 
-    await db()
-      .from("bills")
-      .update({
-        ...totals,
-        status: "FINALIZED",
-        finalized_at: new Date().toISOString(),
-      })
-      .eq("id", billId);
+    const supabase = db();
+    const { data, error } = await supabase.rpc("finalize_bill_stamp_sold_to", {
+      p_bill_id: billId,
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    const row = data as {
+      success?: boolean;
+      message?: string;
+      stampedUnits?: number;
+    } | null;
+
+    if (!row?.success) {
+      return {
+        success: false,
+        message: row?.message ?? "Failed to finalize bill.",
+      };
+    }
 
     const final = await fetchBillWithItems(billId);
+    const stamped = row.stampedUnits ?? 0;
     return {
       success: true,
-      message: `Bill ${bill.bill_number} finalized.`,
+      message:
+        stamped > 0
+          ? `Bill ${bill.bill_number} finalized. Sold-to stamped on ${stamped} bale(s).`
+          : row.message ?? `Bill ${bill.bill_number} finalized.`,
       data: final ?? undefined,
     };
   } catch (err) {

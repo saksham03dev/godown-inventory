@@ -43,6 +43,7 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
   const product = unit.products;
   const batch = unit.stock_batches;
   const godown = unit.godowns;
+  const billLink = unit.bills ?? null;
   const retailPrice = (product as { retail_selling_price?: number } | null)
     ?.retail_selling_price;
   const remaining = Number(unit.remaining_bags ?? BAGS_PER_BALE);
@@ -119,8 +120,47 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
         <div className="space-y-2 py-3">
           <p className="text-xs font-semibold text-zinc-400">Batch</p>
           <DetailRow label="Batch Code" value={batch?.batch_code} mono />
-          <DetailRow label="Source / Buyer" value={batch?.source_name} />
+          <DetailRow label="Source (inbound)" value={batch?.source_name} />
         </div>
+
+        {unit.status === "STOCKED_OUT" && (
+          <div className="space-y-2 py-3">
+            <p className="text-xs font-semibold text-zinc-400">Sold to</p>
+            {unit.sold_to_customer_name ? (
+              <>
+                <DetailRow label="Customer" value={unit.sold_to_customer_name} />
+                <DetailRow label="Phone" value={unit.sold_to_customer_phone} />
+                <DetailRow label="Bill" value={unit.sold_bill_number} mono />
+                <DetailRow
+                  label="Sold at"
+                  value={
+                    unit.sold_at
+                      ? new Date(unit.sold_at).toLocaleString()
+                      : null
+                  }
+                />
+              </>
+            ) : billLink ? (
+              <>
+                <DetailRow
+                  label="Status"
+                  value={
+                    billLink.status === "FINALIZED"
+                      ? "Finalized (stamp pending sync)"
+                      : "On draft bill — not finalized yet"
+                  }
+                />
+                <DetailRow label="Customer" value={billLink.customer_name} />
+                <DetailRow label="Phone" value={billLink.customer_phone} />
+                <DetailRow label="Bill" value={billLink.bill_number} mono />
+              </>
+            ) : (
+              <p className="text-sm text-zinc-500">
+                Stocked out — not billed yet
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2 pt-3">
           <p className="text-xs font-semibold text-zinc-400">Location & Timeline</p>

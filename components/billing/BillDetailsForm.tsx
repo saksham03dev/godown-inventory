@@ -7,6 +7,8 @@ interface BillDetailsFormProps {
   bill: BillWithItems;
   onChange: (input: BillInput) => void;
   readonly?: boolean;
+  /** Wholesale: emphasize sold-to customer name (stamped on bales at finalize). */
+  soldToMode?: boolean;
 }
 
 interface LocalForm {
@@ -49,6 +51,7 @@ export function BillDetailsForm({
   bill,
   onChange,
   readonly = false,
+  soldToMode = false,
 }: BillDetailsFormProps) {
   const [form, setForm] = useState<LocalForm>(() => toLocal(bill));
   const formRef = useRef(form);
@@ -99,7 +102,10 @@ export function BillDetailsForm({
     <div className="grid grid-cols-1 gap-4 rounded-2xl border border-surface-border bg-surface-raised p-4 sm:grid-cols-2 sm:p-5">
       <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Customer Name
+          {soldToMode ? "Sold to (customer)" : "Customer Name"}
+          {soldToMode && !readonly ? (
+            <span className="ml-1 text-danger">*</span>
+          ) : null}
         </label>
         <input
           type="text"
@@ -108,8 +114,14 @@ export function BillDetailsForm({
           onChange={(e) => updateField("customer_name", e.target.value)}
           onBlur={flushSave}
           disabled={readonly}
+          placeholder={soldToMode ? "Customer this bale is sold to" : undefined}
           className={inputClass}
         />
+        {soldToMode && !readonly && (
+          <p className="mt-1 text-xs text-zinc-600">
+            Required. Saved onto each bale barcode when you finalize.
+          </p>
+        )}
       </div>
       <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">

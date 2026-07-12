@@ -82,7 +82,8 @@ export async function fetchStockUnitByBarcode(
       *,
       products ( id, name, product_code, size, retail_selling_price, barcode_id, special_note, category ),
       stock_batches ( id, batch_code, source_name, quantity, notes ),
-      godowns ( id, location_name )
+      godowns ( id, location_name ),
+      bills ( id, bill_number, customer_name, customer_phone, status, finalized_at )
     `
     )
     .eq("unit_barcode", barcode.trim())

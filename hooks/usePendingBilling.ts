@@ -50,10 +50,13 @@ export function usePendingBilling(godownId?: string | null) {
   }, [refresh]);
 
   const billSelected = useCallback(
-    async (barcodes: string[]) => {
+    async (barcodes: string[], customerName?: string) => {
       setMutating(true);
       setAlert(null);
-      const result = await createBillWithUnits(barcodes);
+      const name = customerName?.trim() || "Walk-in Customer";
+      const result = await createBillWithUnits(barcodes, {
+        customer_name: name,
+      });
       if (result.success && result.data) {
         setAlert({ type: "success", message: result.message });
       } else {

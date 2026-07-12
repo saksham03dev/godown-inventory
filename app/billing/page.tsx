@@ -307,9 +307,24 @@ function BillingPageContent() {
                     </div>
                     {canCreateBill && isDraft && (
                       <button
-                        onClick={() => finalize(activeBill.id)}
+                        onClick={() => {
+                          if (
+                            !isRetail &&
+                            !activeBill.customer_name?.trim()
+                          ) {
+                            return;
+                          }
+                          void finalize(activeBill.id);
+                        }}
                         disabled={
-                          mutating || activeBill.bill_items.length === 0
+                          mutating ||
+                          activeBill.bill_items.length === 0 ||
+                          (!isRetail && !activeBill.customer_name?.trim())
+                        }
+                        title={
+                          !isRetail && !activeBill.customer_name?.trim()
+                            ? "Enter sold-to customer name first"
+                            : undefined
                         }
                         className="rounded-xl bg-success px-3 py-2 text-sm font-medium text-white hover:bg-success-muted disabled:opacity-50"
                       >
@@ -323,6 +338,7 @@ function BillingPageContent() {
                     bill={activeBill}
                     onChange={handleDetailsChange}
                     readonly={isReadonly}
+                    soldToMode={!isRetail}
                   />
 
                   {canCreateBill && isDraft && !isRetail && (
