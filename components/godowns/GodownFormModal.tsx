@@ -56,7 +56,7 @@ export function GodownFormModal({
       open={open}
       onClose={onClose}
       title={isEdit ? "Edit Godown" : "Add Godown"}
-      description="Manage warehouse location details and capacity."
+      description="Manage warehouse location details and capacity in bags."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -75,7 +75,7 @@ export function GodownFormModal({
 
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Capacity (units) *
+            Capacity (bags) *
           </label>
           <input
             type="number"

@@ -22,7 +22,7 @@ export function GodownInventoryCharts({
   items,
   godownName,
 }: GodownInventoryChartsProps) {
-  const totalUnits = items.reduce((sum, i) => sum + i.quantity, 0);
+  const totalBags = items.reduce((sum, i) => sum + i.quantity, 0);
   const sorted = [...items].sort((a, b) => b.quantity - a.quantity);
   const maxQty = sorted[0]?.quantity ?? 1;
 
@@ -35,9 +35,11 @@ export function GodownInventoryCharts({
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-surface-border bg-surface-raised p-5">
           <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Total Units
+            Total Bags
           </p>
-          <p className="mt-2 text-4xl font-bold text-zinc-100">{totalUnits}</p>
+          <p className="mt-2 text-4xl font-bold text-zinc-100">
+            {totalBags.toLocaleString()}
+          </p>
           <p className="mt-1 text-xs text-zinc-500">in {godownName}</p>
         </div>
         <div className="rounded-2xl border border-surface-border bg-surface-raised p-5">
@@ -55,18 +57,20 @@ export function GodownInventoryCharts({
             {sorted[0]?.product_name ?? "—"}
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            {sorted[0] ? `${sorted[0].quantity} units` : "—"}
+            {sorted[0]
+              ? `${sorted[0].quantity.toLocaleString()} bags`
+              : "—"}
           </p>
         </div>
       </div>
 
       <div className="rounded-2xl border border-surface-border bg-surface-raised p-5">
         <h3 className="mb-4 text-sm font-semibold text-zinc-200">
-          Stock by Product
+          Stock by Product (bags)
         </h3>
         <div className="space-y-4">
           {sorted.map((item, index) => {
-            const pct = totalUnits > 0 ? (item.quantity / totalUnits) * 100 : 0;
+            const pct = totalBags > 0 ? (item.quantity / totalBags) * 100 : 0;
             const barWidth = maxQty > 0 ? (item.quantity / maxQty) * 100 : 0;
             const color = BAR_COLORS[index % BAR_COLORS.length];
 
@@ -83,7 +87,7 @@ export function GodownInventoryCharts({
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-lg font-bold text-zinc-100">
-                      {item.quantity}
+                      {item.quantity.toLocaleString()}
                     </p>
                     <p className="text-xs text-zinc-500">
                       {pct.toFixed(1)}% of stock
@@ -108,7 +112,7 @@ export function GodownInventoryCharts({
         </h3>
         <div className="flex h-8 overflow-hidden rounded-xl">
           {sorted.map((item, index) => {
-            const pct = totalUnits > 0 ? (item.quantity / totalUnits) * 100 : 0;
+            const pct = totalBags > 0 ? (item.quantity / totalBags) * 100 : 0;
             if (pct <= 0) return null;
             const color = BAR_COLORS[index % BAR_COLORS.length];
             return (
@@ -116,14 +120,14 @@ export function GodownInventoryCharts({
                 key={item.product_id}
                 className={`${color} relative min-w-[2px]`}
                 style={{ width: `${pct}%` }}
-                title={`${item.product_name}: ${item.quantity} (${pct.toFixed(1)}%)`}
+                title={`${item.product_name}: ${item.quantity.toLocaleString()} bags (${pct.toFixed(1)}%)`}
               />
             );
           })}
         </div>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {sorted.map((item, index) => {
-            const pct = totalUnits > 0 ? (item.quantity / totalUnits) * 100 : 0;
+            const pct = totalBags > 0 ? (item.quantity / totalBags) * 100 : 0;
             const color = BAR_COLORS[index % BAR_COLORS.length];
             return (
               <li key={item.product_id} className="flex items-center gap-2 text-xs">

@@ -61,7 +61,7 @@ export default function DashboardPage() {
   return (
     <DashboardLayout
       title="Dashboard"
-      subtitle="Stocked-in unit counts across all godowns"
+      subtitle="Bag counts across all godowns (1 bale = 1,000 bags)"
       actions={
         <button
           onClick={handleRefresh}
@@ -90,8 +90,8 @@ export default function DashboardPage() {
               trend="Products with stock > 0"
             />
             <StatCard
-              label="Total Stock Units"
-              value={metrics?.totalStockUnits ?? 0}
+              label="Total Stock (bags)"
+              value={metrics?.totalStockBags ?? 0}
               icon={Boxes}
               accent="green"
               trend="Across all godowns"

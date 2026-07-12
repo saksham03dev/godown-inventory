@@ -109,7 +109,7 @@ export function ProductFormModal({
 
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Retail Selling Price (₹)
+            Retail Selling Price (₹ / bag)
             {!canEditPrice && (
               <span className="ml-2 normal-case text-zinc-600">
                 — admin only
@@ -155,7 +155,7 @@ export function ProductFormModal({
         {isEdit && (
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-              In-warehouse qty
+              In-warehouse stock (bags)
             </label>
             <input
               type="text"
@@ -164,7 +164,8 @@ export function ProductFormModal({
               className="w-full rounded-xl border border-surface-border bg-surface-overlay/50 px-4 py-3 text-sm text-zinc-400 outline-none"
             />
             <p className="mt-1.5 text-xs text-zinc-600">
-              Count of stocked-in unit labels — updated only by Scan Station.
+              Sum of bags in stocked-in bales — updated by Scan Station (1 bale
+              scan = 1,000 bags).
             </p>
           </div>
         )}

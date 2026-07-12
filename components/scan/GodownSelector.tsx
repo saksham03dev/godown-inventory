@@ -18,7 +18,7 @@ export function GodownSelector({
 }: GodownSelectorProps) {
   const options: DropdownOption[] = godowns.map((g) => ({
     value: g.id,
-    label: `${g.location_name} (cap. ${g.capacity})`,
+    label: `${g.location_name} (cap. ${g.capacity.toLocaleString()} bags)`,
   }));
 
   return (

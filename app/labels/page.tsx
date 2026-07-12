@@ -9,6 +9,7 @@ import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useLabels } from "@/hooks/useLabels";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { balesToBags } from "@/lib/utils/inventory";
 import type { LabelSize } from "@/lib/types/database";
 
 const labelSizes: { value: LabelSize; label: string }[] = [
@@ -113,7 +114,9 @@ export default function LabelsPage() {
                         >
                           <span className="font-mono text-accent">{b.batch_code}</span>
                           <span className="ml-2 text-zinc-400">
-                            · {b.quantity} units · {b.source_name}
+                            · {b.quantity} bale{b.quantity === 1 ? "" : "s"} (
+                            {balesToBags(b.quantity).toLocaleString()} bags) ·{" "}
+                            {b.source_name}
                           </span>
                         </button>
                       </li>
@@ -134,7 +137,10 @@ export default function LabelsPage() {
                 </h3>
                 <p className="text-xs text-zinc-500">
                   {activeBatch.products?.name} · Source: {activeBatch.source_name} ·{" "}
-                  {activeBatch.stock_units.length} labels
+                  {activeBatch.stock_units.length} bale label
+                  {activeBatch.stock_units.length === 1 ? "" : "s"} (
+                  {balesToBags(activeBatch.stock_units.length).toLocaleString()}{" "}
+                  bags)
                 </p>
               </div>
               <button

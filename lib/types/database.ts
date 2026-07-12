@@ -74,6 +74,7 @@ export interface InventoryLog {
   quantity: number;
   handled_by: string;
   timestamp: string;
+  sale_channel?: "STOCK_IN" | "WHOLESALE" | "RETAIL" | null;
 }
 
 export interface InventoryLogWithRelations extends InventoryLog {
@@ -87,19 +88,22 @@ export interface GodownStockItem {
   product_code: string;
   barcode_id: string;
   category: string | null;
+  /** Bags in stock for this product at the godown. */
   quantity: number;
 }
 
 export interface GodownDistribution {
   godown_id: string;
   location_name: string;
-  total_units: number;
+  /** Bags in this godown (STOCKED_IN remaining_bags sum). */
+  total_bags: number;
   percentage: number;
 }
 
 export interface DashboardMetrics {
   totalActiveProducts: number;
-  totalStockUnits: number;
+  /** Total bags in warehouse (sum of remaining_bags on STOCKED_IN units). */
+  totalStockBags: number;
   godownDistribution: GodownDistribution[];
   recentLogs: InventoryLogWithRelations[];
 }
@@ -147,6 +151,10 @@ export interface StockUnit {
   stocked_in_at: string | null;
   stocked_out_at: string | null;
   bill_id: string | null;
+  /** Bags remaining in this bale (0–1000). */
+  remaining_bags: number;
+  /** Set when bale is first partially sold in retail. */
+  opened_at: string | null;
   created_at: string;
   products?: Pick<
     Product,
@@ -178,7 +186,10 @@ export interface UpdateBatchInput {
 /** Units of a product currently stocked in a godown, grouped by batch/source. */
 export interface ProductGodownBatchGroup {
   batch: StockBatch;
-  in_godown_count: number;
+  /** Bags in this godown for this batch/source. */
+  in_godown_bags: number;
+  /** Bale labels stocked in for this batch at this godown. */
+  in_godown_bales: number;
   units: StockUnit[];
 }
 
@@ -186,7 +197,10 @@ export interface ProductGodownBreakdown {
   product_id: string;
   godown_id: string;
   batches: ProductGodownBatchGroup[];
-  total_units: number;
+  /** Total bags in godown for this product. */
+  total_bags: number;
+  /** Total sealed + open bale labels in godown. */
+  total_bales: number;
 }
 
 export interface Bill {
@@ -220,6 +234,7 @@ export interface BillItem {
   quantity: number;
   unit_price: number;
   line_total: number;
+  sale_channel?: "WHOLESALE" | "RETAIL" | null;
   created_at: string;
 }
 

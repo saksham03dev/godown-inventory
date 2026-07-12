@@ -39,7 +39,7 @@ export function GodownDistributionCards({
             <div>
               <p className="font-medium text-zinc-100">{item.location_name}</p>
               <p className="text-xs text-zinc-500">
-                {item.total_units} units allocated
+                {item.total_bags.toLocaleString()} bags
               </p>
             </div>
           </div>

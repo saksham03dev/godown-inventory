@@ -11,10 +11,12 @@ import { LabelDetailCard } from "@/components/scan/LabelDetailCard";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Modal } from "@/components/ui/Modal";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import {
   fetchProductGodownBreakdown,
   updateStockBatch,
 } from "@/lib/services/batchService";
+import { isOpenBale } from "@/lib/utils/inventory";
 import type {
   AlertState,
   GodownStockItem,
@@ -101,9 +103,9 @@ export function ProductInventoryDetail({
   const title = product?.product_name ?? "Product";
   const description =
     view.level === "sources"
-      ? `${godownName} · ${product?.quantity ?? 0} unit(s) · by source`
+      ? `${godownName} · ${(product?.quantity ?? 0).toLocaleString()} bags · by source`
       : view.level === "skus"
-        ? `${view.group.batch.source_name} · ${view.group.in_godown_count} SKU(s)`
+        ? `${view.group.batch.source_name} · ${view.group.in_godown_bags.toLocaleString()} bags (${view.group.in_godown_bales} bale(s))`
         : view.level === "sku"
           ? `Unit #${view.unit.unit_number}`
           : `Edit batch ${view.group.batch.batch_code}`;
@@ -172,7 +174,7 @@ export function ProductInventoryDetail({
             batch={view.group.batch}
             productName={product?.product_name ?? ""}
             productCode={product?.product_code ?? ""}
-            inGodownCount={view.group.in_godown_count}
+            inGodownCount={view.group.in_godown_bales}
             loading={mutating}
             onSubmit={(input) => handleSaveBatch(view.group.batch.id, input)}
             onCancel={() => setView({ level: "sources" })}
@@ -225,9 +227,10 @@ function SourcesView({
           </p>
           <p className="text-sm text-zinc-300">
             <span className="font-semibold text-accent">
-              {breakdown.total_units}
+              {breakdown.total_bags.toLocaleString()}
             </span>{" "}
-            unit SKU(s) stocked in here
+            bags ({breakdown.total_bales} bale label
+            {breakdown.total_bales === 1 ? "" : "s"})
           </p>
         </div>
         <p className="font-mono text-xs text-zinc-500">
@@ -238,7 +241,7 @@ function SourcesView({
       <div className="space-y-3">
         {Array.from(bySource.entries()).map(([source, groups]) => {
           const sourceTotal = groups.reduce(
-            (sum, g) => sum + g.in_godown_count,
+            (sum, g) => sum + g.in_godown_bags,
             0
           );
           return (
@@ -246,7 +249,7 @@ function SourcesView({
               <div className="flex items-center justify-between gap-2 px-1">
                 <h3 className="text-sm font-medium text-zinc-200">{source}</h3>
                 <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
-                  {sourceTotal}
+                  {sourceTotal.toLocaleString()} bags
                 </span>
               </div>
               <ul className="space-y-1.5">
@@ -271,7 +274,7 @@ function SourcesView({
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <span className="text-sm font-semibold text-zinc-200">
-                            {group.in_godown_count}
+                            {group.in_godown_bags.toLocaleString()}
                           </span>
                           <ChevronRight className="h-4 w-4 text-zinc-500" />
                         </div>
@@ -341,7 +344,18 @@ function SkusView({
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-zinc-200">
-                  Unit #{unit.unit_number}
+                  Bale #{unit.unit_number}
+                  {isOpenBale(unit.remaining_bags) && (
+                    <span className="ml-2 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
+                      Open · {unit.remaining_bags.toLocaleString()} bags
+                    </span>
+                  )}
+                  {!isOpenBale(unit.remaining_bags) &&
+                    unit.remaining_bags === BAGS_PER_BALE && (
+                      <span className="ml-2 text-xs font-normal text-zinc-500">
+                        Sealed · {BAGS_PER_BALE.toLocaleString()} bags
+                      </span>
+                    )}
                 </p>
                 <p className="mt-0.5 truncate font-mono text-xs text-zinc-500">
                   {unit.unit_barcode}
@@ -437,7 +451,7 @@ function BatchEditForm({
         </label>
         <input
           type="text"
-          value={`${batch.quantity} labelled · ${inGodownCount} in this godown`}
+          value={`${batch.quantity} bale label${batch.quantity === 1 ? "" : "s"} · ${inGodownCount} bale${inGodownCount === 1 ? "" : "s"} in this godown`}
           disabled
           className="w-full rounded-xl border border-surface-border bg-surface-overlay/50 px-4 py-3 text-sm text-zinc-400 outline-none"
         />

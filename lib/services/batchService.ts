@@ -1,5 +1,6 @@
 import { apiMutation } from "@/lib/api/clientMutation";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import type {
   CreateBatchInput,
   MutationResult,
@@ -133,23 +134,31 @@ export async function fetchProductGodownBreakdown(
           created_by: batchRow.created_by ?? "system",
           created_at: batchRow.created_at ?? unit.created_at,
         },
-        in_godown_count: 0,
+        in_godown_bags: 0,
+        in_godown_bales: 0,
         units: [],
       };
       byBatch.set(batchRow.id, group);
     }
     group.units.push(unit);
-    group.in_godown_count += 1;
+    group.in_godown_bales += 1;
+    group.in_godown_bags += Number(unit.remaining_bags ?? BAGS_PER_BALE);
   }
 
   const batches = Array.from(byBatch.values()).sort((a, b) =>
     a.batch.source_name.localeCompare(b.batch.source_name)
   );
 
+  const total_bags = units.reduce(
+    (sum, u) => sum + Number(u.remaining_bags ?? BAGS_PER_BALE),
+    0
+  );
+
   return {
     product_id: productId,
     godown_id: godownId,
     batches,
-    total_units: units.length,
+    total_bags,
+    total_bales: units.length,
   };
 }

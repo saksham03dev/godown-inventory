@@ -3,6 +3,7 @@ import {
   generateBatchCode,
   generateUnitBarcode,
 } from "@/lib/utils/barcode";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import type {
   CreateBatchInput,
   MutationResult,
@@ -59,6 +60,7 @@ export async function createStockBatchServer(
       unit_barcode: generateUnitBarcode(batch_code, i + 1),
       unit_number: i + 1,
       status: "LABELLED" as const,
+      remaining_bags: BAGS_PER_BALE,
     }));
 
     const { data: createdUnits, error: unitsError } = await supabase
@@ -76,7 +78,7 @@ export async function createStockBatchServer(
 
     return {
       success: true,
-      message: `Created batch ${batch_code} with ${input.quantity} unit label(s).`,
+      message: `Created batch ${batch_code} with ${input.quantity} bale label(s) (${input.quantity * BAGS_PER_BALE} bags).`,
       data: {
         ...batch,
         products: product,

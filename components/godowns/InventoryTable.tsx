@@ -45,7 +45,7 @@ export function InventoryTable({
                 Category
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Quantity
+                Bags
               </th>
               {onProductClick && (
                 <th className="w-10 px-3 py-3.5">
@@ -85,7 +85,7 @@ export function InventoryTable({
                 </td>
                 <td className="px-5 py-4 text-right">
                   <span className="inline-flex min-w-[2.5rem] items-center justify-center rounded-lg bg-accent/10 px-2.5 py-1 text-sm font-semibold text-accent">
-                    {item.quantity}
+                    {item.quantity.toLocaleString()}
                   </span>
                 </td>
                 {onProductClick && (
@@ -100,7 +100,7 @@ export function InventoryTable({
       </div>
       {onProductClick && (
         <p className="border-t border-surface-border px-5 py-2.5 text-xs text-zinc-600">
-          Click a product to see quantity by source and individual SKUs.
+          Click a product to see bags by source and individual bale labels.
         </p>
       )}
     </div>

@@ -56,8 +56,8 @@ export function ActivityFeed({ logs }: ActivityFeedProps) {
                 </p>
                 <p className="text-xs text-zinc-500">
                   {isStockIn ? "Stock In" : "Stock Out"} ·{" "}
-                  {log.godowns?.location_name ?? "Unknown Godown"} · ×
-                  {log.quantity}
+                  {log.godowns?.location_name ?? "Unknown Godown"} ·{" "}
+                  {log.quantity.toLocaleString()} bags
                 </p>
               </div>
 

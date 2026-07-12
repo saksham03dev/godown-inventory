@@ -41,13 +41,13 @@ export function ProductTable({
                 Barcode
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Retail Price
+                Price / bag
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Size
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Qty
+                Stock (bags)
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Special Note
@@ -81,7 +81,7 @@ export function ProductTable({
                   {product.size || "—"}
                 </td>
                 <td className="px-5 py-4 text-right font-semibold text-zinc-200">
-                  {product.total_stock}
+                  {product.total_stock.toLocaleString()}
                 </td>
                 <td className="max-w-[200px] truncate px-5 py-4 text-zinc-500">
                   {product.special_note || "—"}

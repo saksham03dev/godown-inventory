@@ -11,6 +11,6 @@
 #   SUPABASE_SERVICE_ROLE_KEY   ← required for stock scan + billing attach APIs
 #   AUTH_SECRET                 ← required for login sessions (32+ random chars)
 #
-# After deploy, apply DB migration 008 locally or via CI:
-#   npm run db:push
+# After deploy, apply pending DB migrations locally:
+#   npm run db:push   (includes 011 bag-based inventory)
 # (needs SUPABASE_DB_PASSWORD — not needed on Netlify runtime)
