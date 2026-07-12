@@ -49,24 +49,18 @@ export function usePendingBilling(godownId?: string | null) {
     refresh();
   }, [refresh]);
 
-  const billSelected = useCallback(
-    async (barcodes: string[], customerName?: string) => {
-      setMutating(true);
-      setAlert(null);
-      const name = customerName?.trim() || "Walk-in Customer";
-      const result = await createBillWithUnits(barcodes, {
-        customer_name: name,
-      });
-      if (result.success && result.data) {
-        setAlert({ type: "success", message: result.message });
-      } else {
-        setAlert({ type: "error", message: result.message });
-      }
-      setMutating(false);
-      return result;
-    },
-    []
-  );
+  const billSelected = useCallback(async (barcodes: string[]) => {
+    setMutating(true);
+    setAlert(null);
+    const result = await createBillWithUnits(barcodes);
+    if (result.success && result.data) {
+      setAlert({ type: "success", message: result.message });
+    } else {
+      setAlert({ type: "error", message: result.message });
+    }
+    setMutating(false);
+    return result;
+  }, []);
 
   const addSelectedToBill = useCallback(
     async (billId: string, barcodes: string[]) => {

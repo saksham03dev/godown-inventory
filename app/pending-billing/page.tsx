@@ -20,7 +20,6 @@ export default function PendingBillingPage() {
   const [godownFilter, setGodownFilter] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [targetBillId, setTargetBillId] = useState("");
-  const [customerName, setCustomerName] = useState("");
 
   const {
     units,
@@ -85,17 +84,12 @@ export default function PendingBillingPage() {
   const handleSend = async () => {
     if (selectedBarcodes.length === 0 || !canCreateBill) return;
 
-    if (!targetBillId && !customerName.trim()) {
-      return;
-    }
-
     const result = targetBillId
       ? await addSelectedToBill(targetBillId, selectedBarcodes)
-      : await billSelected(selectedBarcodes, customerName.trim());
+      : await billSelected(selectedBarcodes);
 
     if (result.success && result.data) {
       setSelectedIds(new Set());
-      setCustomerName("");
       router.push(`/billing?billId=${result.data.id}`);
     } else {
       await refresh();
@@ -153,58 +147,29 @@ export default function PendingBillingPage() {
           />
 
           {canCreateBill && (
-            <div className="flex flex-col gap-3 sm:items-stretch">
-              {!targetBillId && (
-                <div className="min-w-0 sm:w-72 sm:self-end">
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                    Sold to (customer) <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    autoComplete="name"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Customer name for this invoice"
-                    className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:text-sm"
-                  />
-                  <p className="mt-1 text-xs text-zinc-600">
-                    Attached to each bale when the bill is finalized.
-                  </p>
-                </div>
-              )}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <Dropdown
-                  label="Send to"
-                  options={draftOptions}
-                  value={targetBillId}
-                  onChange={setTargetBillId}
-                  placeholder="New bill"
-                  className="sm:w-56"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={
-                    mutating ||
-                    selectedBarcodes.length === 0 ||
-                    (!targetBillId && !customerName.trim())
-                  }
-                  title={
-                    !targetBillId && !customerName.trim()
-                      ? "Enter customer name for the new bill"
-                      : undefined
-                  }
-                  className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
-                >
-                  {targetBillId ? (
-                    <Send className="h-4 w-4" />
-                  ) : (
-                    <FilePlus className="h-4 w-4" />
-                  )}
-                  {targetBillId
-                    ? `Add ${selectedBarcodes.length || ""} to bill`
-                    : `Bill ${selectedBarcodes.length || ""} selected`}
-                </button>
-              </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <Dropdown
+                label="Send to"
+                options={draftOptions}
+                value={targetBillId}
+                onChange={setTargetBillId}
+                placeholder="New bill"
+                className="sm:w-56"
+              />
+              <button
+                onClick={handleSend}
+                disabled={mutating || selectedBarcodes.length === 0}
+                className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
+              >
+                {targetBillId ? (
+                  <Send className="h-4 w-4" />
+                ) : (
+                  <FilePlus className="h-4 w-4" />
+                )}
+                {targetBillId
+                  ? `Add ${selectedBarcodes.length || ""} to bill`
+                  : `Bill ${selectedBarcodes.length || ""} selected`}
+              </button>
             </div>
           )}
         </div>
