@@ -13,17 +13,20 @@ import { BillDetailsForm } from "@/components/billing/BillDetailsForm";
 import { BillItemsTable } from "@/components/billing/BillItemsTable";
 import { BillTotals } from "@/components/billing/BillTotals";
 import { BillPrintView } from "@/components/billing/BillPrintView";
+import { BusinessDayPicker } from "@/components/billing/BusinessDayPicker";
 import { RetailBillingPanel } from "@/components/billing/RetailBillingPanel";
 import { ScannerWindow } from "@/components/scan/ScannerWindow";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBusinessDay } from "@/contexts/BusinessDayContext";
 import { useSaleMode } from "@/contexts/SaleModeContext";
 import { useBarcodeScan } from "@/hooks/useBarcodeScan";
 import { useBilling } from "@/hooks/useBilling";
+import { fetchBillsForDay } from "@/lib/services/businessDayService";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import type { BillInput } from "@/lib/types/database";
+import type { Bill, BillInput } from "@/lib/types/database";
 import { billNeedsSoldToCustomer } from "@/lib/utils/billItem";
 
 type ScanFlash = "success" | "error" | null;
@@ -45,9 +48,11 @@ export default function BillingPage() {
 function BillingPageContent() {
   const { can } = useAuth();
   const { mode: saleMode } = useSaleMode();
+  const { selectedDate, isViewingToday, refreshDays, selectedLabel } =
+    useBusinessDay();
   const isRetail = saleMode === "retail";
-  const canCreateBill = can("billing.create");
-  const canEditPrice = can("billing.editPrice");
+  const canCreateBill = can("billing.create") && isViewingToday;
+  const canEditPrice = can("billing.editPrice") && isViewingToday;
   const searchParams = useSearchParams();
   const billIdFromQuery = searchParams.get("billId");
 
@@ -70,6 +75,8 @@ function BillingPageContent() {
     dismissAlert,
   } = useBilling();
 
+  const [dayBills, setDayBills] = useState<Bill[] | null>(null);
+  const [dayLoading, setDayLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showPrint, setShowPrint] = useState(false);
   const [scanProcessing, setScanProcessing] = useState(false);
@@ -82,6 +89,20 @@ function BillingPageContent() {
   const activeBillIdRef = useRef<string | null>(null);
 
   activeBillIdRef.current = activeBill?.id ?? null;
+
+  const reloadDayBills = useCallback(async () => {
+    setDayLoading(true);
+    try {
+      const data = await fetchBillsForDay(selectedDate);
+      if (data.success) setDayBills(data.bills);
+    } finally {
+      setDayLoading(false);
+    }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    void reloadDayBills();
+  }, [reloadDayBills, bills]);
 
   useEffect(() => {
     if (!billIdFromQuery || loading) return;
@@ -101,9 +122,19 @@ function BillingPageContent() {
   }, []);
 
   const isDraft = activeBill?.status === "DRAFT";
-  const isReadonly = !canCreateBill || !isDraft;
+  const isReadonly = !canCreateBill || !isDraft || !isViewingToday;
   const needsSoldTo = Boolean(
     activeBill && billNeedsSoldToCustomer(activeBill.bill_items)
+  );
+  const listBills = dayBills ?? bills;
+
+  const handleFinalize = useCallback(
+    async (billId: string) => {
+      await finalize(billId);
+      await refreshDays();
+      await reloadDayBills();
+    },
+    [finalize, refreshDays, reloadDayBills]
   );
 
   const showScanFlash = useCallback((flash: ScanFlash, message: string) => {
@@ -186,11 +217,13 @@ function BillingPageContent() {
     <DashboardLayout
       title="Billing"
       subtitle={
-        canCreateBill
-          ? isRetail
-            ? "Retail billing — scan bale, enter bag qty"
-            : "Wholesale billing — scan stocked-out bales (1,000 bags each)"
-          : "View finalized wholesale bills"
+        isViewingToday
+          ? canCreateBill
+            ? isRetail
+              ? "Retail billing — scan bale, enter bag qty"
+              : "Wholesale billing — scan stocked-out bales (1,000 bags each)"
+            : "View today’s bills"
+          : `Closed day · ${selectedLabel}`
       }
       actions={
         <div className="flex items-center gap-2">
@@ -217,12 +250,14 @@ function BillingPageContent() {
       }
     >
       <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
+        <BusinessDayPicker />
+
         {/* Non-scan alerts only (finalize/delete/etc.) — scans use camera overlay */}
         {alert && !scanFlash && (
           <AlertBanner alert={alert} onDismiss={dismissAlert} />
         )}
 
-        {loading ? (
+        {loading || dayLoading ? (
           <LoadingSpinner label="Loading bills…" />
         ) : error ? (
           <AlertBanner alert={{ type: "error", message: error }} />
@@ -231,13 +266,17 @@ function BillingPageContent() {
             {/* Recent bills — horizontal on mobile, sidebar on desktop */}
             <div className="space-y-2 lg:col-span-1">
               <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Recent Bills
+                {isViewingToday ? "Today’s bills" : "Day’s finalized bills"}
               </h3>
-              {bills.length === 0 ? (
-                <p className="text-sm text-zinc-500">No bills yet</p>
+              {listBills.length === 0 ? (
+                <p className="text-sm text-zinc-500">
+                  {isViewingToday
+                    ? "No bills yet today"
+                    : "No finalized bills this day"}
+                </p>
               ) : (
                 <ul className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
-                  {bills.map((b) => (
+                  {listBills.map((b) => (
                     <li key={b.id} className="flex shrink-0 gap-1 lg:shrink">
                       <button
                         onClick={() => loadBill(b.id)}
@@ -306,7 +345,7 @@ function BillingPageContent() {
                           if (needsSoldTo && !activeBill.customer_name?.trim()) {
                             return;
                           }
-                          void finalize(activeBill.id);
+                          void handleFinalize(activeBill.id);
                         }}
                         disabled={
                           mutating ||

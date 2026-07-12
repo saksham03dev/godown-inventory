@@ -239,6 +239,22 @@ export interface Bill {
   status: BillStatus;
   created_at: string;
   finalized_at: string | null;
+  /** Store-local day (Asia/Kolkata) when finalized. Null while DRAFT. */
+  business_date?: string | null;
+}
+
+export interface DailyBillClosing {
+  id: string;
+  business_date: string;
+  closed_at: string;
+  closed_by: string | null;
+  bill_count: number;
+  wholesale_count: number;
+  retail_count: number;
+  total_amount: number;
+  labour_total: number;
+  transport_total: number;
+  created_at: string;
 }
 
 export interface BillItem {

@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu } from "lucide-react";
+import { BusinessDateBadge } from "./BusinessDateBadge";
 import { SaleModeSwitch } from "./SaleModeSwitch";
 
 interface HeaderProps {
@@ -33,6 +34,7 @@ export function Header({ title, subtitle, onMenuClick, actions }: HeaderProps) {
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <BusinessDateBadge />
         <SaleModeSwitch />
         {actions}
       </div>
