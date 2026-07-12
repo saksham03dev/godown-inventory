@@ -8,6 +8,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { LabelDetailCard } from "@/components/scan/LabelDetailCard";
+import { OpenBaleBadge, OpenBaleCountBadge } from "@/components/inventory/OpenBaleBadge";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Modal } from "@/components/ui/Modal";
@@ -16,7 +17,7 @@ import {
   fetchProductGodownBreakdown,
   updateStockBatch,
 } from "@/lib/services/batchService";
-import { isOpenBale } from "@/lib/utils/inventory";
+import { isSealedBale } from "@/lib/utils/inventory";
 import type {
   AlertState,
   GodownStockItem,
@@ -105,9 +106,9 @@ export function ProductInventoryDetail({
     view.level === "sources"
       ? `${godownName} · ${(product?.quantity ?? 0).toLocaleString()} bags · by source`
       : view.level === "skus"
-        ? `${view.group.batch.source_name} · ${view.group.in_godown_bags.toLocaleString()} bags (${view.group.in_godown_bales} bale(s))`
+        ? `${view.group.batch.source_name} · ${view.group.in_godown_bags.toLocaleString()} bags (${view.group.in_godown_bales} bale(s)${view.group.open_bales > 0 ? `, ${view.group.open_bales} open` : ""})`
         : view.level === "sku"
-          ? `Unit #${view.unit.unit_number}`
+          ? `Bale #${view.unit.unit_number}`
           : `Edit batch ${view.group.batch.batch_code}`;
 
   return (
@@ -204,7 +205,7 @@ function SourcesView({
           No stocked-in unit SKUs in this godown for this product.
         </p>
         <p className="mt-1 text-xs text-zinc-600">
-          Stock quantities come from labelled units scanned in at Stock In.
+          Stock quantities come from labelled bales scanned in at Stock In.
         </p>
       </div>
     );
@@ -233,9 +234,14 @@ function SourcesView({
             {breakdown.total_bales === 1 ? "" : "s"})
           </p>
         </div>
-        <p className="font-mono text-xs text-zinc-500">
-          {product?.product_code}
-        </p>
+        <div className="flex items-center gap-2">
+          <OpenBaleCountBadge
+            count={breakdown.batches.reduce((sum, g) => sum + g.open_bales, 0)}
+          />
+          <p className="font-mono text-xs text-zinc-500">
+            {product?.product_code}
+          </p>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -273,6 +279,7 @@ function SourcesView({
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
+                          <OpenBaleCountBadge count={group.open_bales} />
                           <span className="text-sm font-semibold text-zinc-200">
                             {group.in_godown_bags.toLocaleString()}
                           </span>
@@ -321,6 +328,16 @@ function SkusView({
             {group.batch.batch_code}
             {group.batch.notes ? ` · ${group.batch.notes}` : ""}
           </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {group.in_godown_bags.toLocaleString()} bags · {group.in_godown_bales}{" "}
+            bale{group.in_godown_bales === 1 ? "" : "s"}
+            {group.open_bales > 0 ? (
+              <>
+                {" "}
+                · <OpenBaleCountBadge count={group.open_bales} />
+              </>
+            ) : null}
+          </p>
         </div>
         {onEdit && (
           <button
@@ -344,18 +361,16 @@ function SkusView({
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-zinc-200">
-                  Bale #{unit.unit_number}
-                  {isOpenBale(unit.remaining_bags) && (
-                    <span className="ml-2 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
-                      Open · {unit.remaining_bags.toLocaleString()} bags
+                  Bale #{unit.unit_number}{" "}
+                  <OpenBaleBadge
+                    remainingBags={unit.remaining_bags}
+                    className="ml-1 align-middle"
+                  />
+                  {isSealedBale(unit.remaining_bags) && (
+                    <span className="ml-2 text-xs font-normal text-zinc-500">
+                      Sealed · {BAGS_PER_BALE.toLocaleString()} bags
                     </span>
                   )}
-                  {!isOpenBale(unit.remaining_bags) &&
-                    unit.remaining_bags === BAGS_PER_BALE && (
-                      <span className="ml-2 text-xs font-normal text-zinc-500">
-                        Sealed · {BAGS_PER_BALE.toLocaleString()} bags
-                      </span>
-                    )}
                 </p>
                 <p className="mt-0.5 truncate font-mono text-xs text-zinc-500">
                   {unit.unit_barcode}

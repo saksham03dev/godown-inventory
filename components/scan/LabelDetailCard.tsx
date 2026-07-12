@@ -2,7 +2,8 @@
 
 import type { StockUnit } from "@/lib/types/database";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
-import { formatBagCount } from "@/lib/utils/inventory";
+import { OpenBaleBadge } from "@/components/inventory/OpenBaleBadge";
+import { formatBagCount, isOpenBale, isSealedBale } from "@/lib/utils/inventory";
 
 interface LabelDetailCardProps {
   unit: StockUnit;
@@ -45,12 +46,32 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
   const retailPrice = (product as { retail_selling_price?: number } | null)
     ?.retail_selling_price;
   const remaining = Number(unit.remaining_bags ?? BAGS_PER_BALE);
+  const open = isOpenBale(remaining);
+  const sealed = unit.status === "STOCKED_IN" && isSealedBale(remaining);
 
   return (
-    <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4 animate-slide-up">
-      <p className="text-xs font-medium uppercase tracking-wider text-accent">
-        Bale Label
-      </p>
+    <div
+      className={`rounded-2xl border p-4 animate-slide-up ${
+        open
+          ? "border-amber-500/40 bg-amber-500/5"
+          : "border-accent/30 bg-accent/5"
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <p
+          className={`text-xs font-medium uppercase tracking-wider ${
+            open ? "text-amber-400" : "text-accent"
+          }`}
+        >
+          Bale Label
+        </p>
+        <OpenBaleBadge remainingBags={remaining} />
+        {sealed && (
+          <span className="rounded-md bg-surface-overlay px-1.5 py-0.5 text-xs text-zinc-500">
+            Sealed · {formatBagCount(BAGS_PER_BALE)} bags
+          </span>
+        )}
+      </div>
       <p className="mt-1 font-mono text-lg font-bold text-zinc-100">
         {unit.unit_barcode}
       </p>
@@ -81,6 +102,16 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
           <DetailRow
             label="Bags remaining"
             value={formatBagCount(remaining)}
+          />
+          <DetailRow
+            label="Opened"
+            value={
+              unit.opened_at
+                ? new Date(unit.opened_at).toLocaleString()
+                : open
+                  ? "—"
+                  : null
+            }
           />
           <DetailRow label="Barcode" value={unit.unit_barcode} mono />
         </div>

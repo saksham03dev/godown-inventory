@@ -14,6 +14,15 @@ function formatTimestamp(ts: string): string {
   }).format(new Date(ts));
 }
 
+function channelLabel(
+  channel: InventoryLogWithRelations["sale_channel"]
+): string | null {
+  if (channel === "RETAIL") return "Retail";
+  if (channel === "WHOLESALE") return "Wholesale";
+  if (channel === "STOCK_IN") return null;
+  return null;
+}
+
 export function ActivityFeed({ logs }: ActivityFeedProps) {
   if (logs.length === 0) {
     return (
@@ -34,6 +43,7 @@ export function ActivityFeed({ logs }: ActivityFeedProps) {
         {logs.map((log) => {
           const isStockIn = log.transaction_type === "STOCK_IN";
           const Icon = isStockIn ? ArrowDownLeft : ArrowUpRight;
+          const channel = channelLabel(log.sale_channel);
 
           return (
             <li
@@ -55,7 +65,8 @@ export function ActivityFeed({ logs }: ActivityFeedProps) {
                   {log.products?.name ?? "Unknown Product"}
                 </p>
                 <p className="text-xs text-zinc-500">
-                  {isStockIn ? "Stock In" : "Stock Out"} ·{" "}
+                  {isStockIn ? "Stock In" : "Stock Out"}
+                  {channel ? ` · ${channel}` : ""} ·{" "}
                   {log.godowns?.location_name ?? "Unknown Godown"} ·{" "}
                   {log.quantity.toLocaleString()} bags
                 </p>

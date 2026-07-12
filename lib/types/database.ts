@@ -90,6 +90,8 @@ export interface GodownStockItem {
   category: string | null;
   /** Bags in stock for this product at the godown. */
   quantity: number;
+  /** Count of partially sold (open) bales for this product at the godown. */
+  open_bales: number;
 }
 
 export interface GodownDistribution {
@@ -190,6 +192,8 @@ export interface ProductGodownBatchGroup {
   in_godown_bags: number;
   /** Bale labels stocked in for this batch at this godown. */
   in_godown_bales: number;
+  /** Partially sold bales in this batch at this godown. */
+  open_bales: number;
   units: StockUnit[];
 }
 

@@ -145,7 +145,7 @@ export function BillItemsTable({
             {bill.bill_items.map((item) => {
               const unitLabel = formatUnitLabel(item);
               const baleNote =
-            formatRetailBaleNote(item) ?? formatWholesaleBaleNote(item);
+                formatRetailBaleNote(item) ?? formatWholesaleBaleNote(item);
               return (
                 <tr key={item.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">

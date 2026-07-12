@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PackageOpen } from "lucide-react";
+import { OpenBaleBadge } from "@/components/inventory/OpenBaleBadge";
 import { formatBagCount } from "@/lib/utils/inventory";
 import type { StockUnit } from "@/lib/types/database";
 
@@ -68,8 +69,12 @@ export function OpenBalesTable({ units }: OpenBalesTableProps) {
               return (
                 <tr key={unit.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3.5">
-                    <p className="font-medium text-zinc-200">
+                    <p className="inline-flex flex-wrap items-center gap-2 font-medium text-zinc-200">
                       {product?.name ?? "Unknown"}
+                      <OpenBaleBadge
+                        remainingBags={unit.remaining_bags}
+                        compact
+                      />
                     </p>
                     <p className="mt-0.5 font-mono text-xs text-zinc-500">
                       {product?.product_code}

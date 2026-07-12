@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import type {
   DashboardMetrics,
   Godown,
@@ -106,6 +107,7 @@ export async function fetchGodownInventory(
       product_code: string;
       category: string | null;
       qty: number;
+      open_bales: number;
     }
   >();
 
@@ -122,8 +124,12 @@ export async function fetchGodownInventory(
       product_code: product.product_code,
       category: product.category,
       qty: 0,
+      open_bales: 0,
     };
     existing.qty += bags;
+    if (bags > 0 && bags < BAGS_PER_BALE) {
+      existing.open_bales += 1;
+    }
     stockMap.set(product.id, existing);
   }
 
@@ -135,6 +141,7 @@ export async function fetchGodownInventory(
       barcode_id: v.barcode_id,
       category: v.category,
       quantity: v.qty,
+      open_bales: v.open_bales,
     }))
     .sort((a, b) => a.product_name.localeCompare(b.product_name));
 }

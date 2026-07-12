@@ -38,7 +38,7 @@ export function ScanFeedback({
           </div>
           <p className="text-lg font-semibold text-success">Approved</p>
           <p className="text-center text-sm text-zinc-300">
-            {mode === "STOCK_IN" ? "Stock In" : "Stock Out"} successful
+            {mode === "STOCK_IN" ? "Stock In" : "Wholesale Out"} successful
           </p>
           {lastResult?.product && (
             <p className="text-center font-medium text-zinc-100">
@@ -47,7 +47,7 @@ export function ScanFeedback({
           )}
           {lastResult?.stockUnit && (
             <p className="font-mono text-xs text-zinc-500">
-              Unit #{lastResult.stockUnit.unit_number} ·{" "}
+              Bale #{lastResult.stockUnit.unit_number} ·{" "}
               {lastResult.stockUnit.unit_barcode}
             </p>
           )}
@@ -68,20 +68,20 @@ export function ScanFeedback({
       {lastResult?.success && lastResult.product && !showApproveFlash && (
         <div className="rounded-2xl border border-success/30 bg-success/5 p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-success">
-            Last Scan {lastResult.isUnitScan ? "(Unit)" : "(Product)"}
+            Last Scan {lastResult.isUnitScan ? "(Bale)" : "(Product)"}
           </p>
           <p className="mt-1 font-medium text-zinc-100">
             {lastResult.product.name}
           </p>
           {lastResult.stockUnit && (
             <p className="text-xs text-zinc-500">
-              Unit #{lastResult.stockUnit.unit_number} ·{" "}
+              Bale #{lastResult.stockUnit.unit_number} ·{" "}
               {lastResult.stockUnit.unit_barcode}
             </p>
           )}
           {lastResult.newGodownStock !== undefined && (
             <p className="text-xs text-zinc-500">
-              Godown stock: {lastResult.newGodownStock} units
+              Godown stock: {lastResult.newGodownStock.toLocaleString()} bags
             </p>
           )}
         </div>

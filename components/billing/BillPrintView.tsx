@@ -1,5 +1,10 @@
 import type { BillWithItems } from "@/lib/types/database";
-import { formatBillBags, formatRetailBaleNote, formatUnitLabel } from "@/lib/utils/billItem";
+import {
+  formatBillBags,
+  formatRetailBaleNote,
+  formatUnitLabel,
+  formatWholesaleBaleNote,
+} from "@/lib/utils/billItem";
 
 interface BillPrintViewProps {
   bill: BillWithItems;
@@ -11,6 +16,11 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
     month: "long",
     year: "numeric",
   });
+
+  const totalBags = bill.bill_items.reduce(
+    (sum, item) => sum + Number(item.quantity),
+    0
+  );
 
   return (
     <div id="bill-print-area" className="mx-auto max-w-2xl bg-white p-8 text-black">
@@ -44,55 +54,60 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
           <tr className="border-b border-black">
             <th className="py-2 text-left">#</th>
             <th className="py-2 text-left">Item</th>
-            <th className="py-2 text-left">Unit</th>
+            <th className="py-2 text-left">Bale</th>
+            <th className="py-2 text-right">Bags</th>
             <th className="py-2 text-left">Barcode</th>
-            <th className="py-2 text-left">Source</th>
-            <th className="py-2 text-right">Price</th>
+            <th className="py-2 text-right">₹/bag</th>
             <th className="py-2 text-right">Total</th>
           </tr>
         </thead>
         <tbody>
           {bill.bill_items.map((item, i) => {
             const unitLabel = formatUnitLabel(item);
-            const lineNote = formatRetailBaleNote(item);
+            const note =
+              formatRetailBaleNote(item) ?? formatWholesaleBaleNote(item);
             return (
-            <tr key={item.id} className="border-b border-zinc-200">
-              <td className="py-2">{i + 1}</td>
-              <td className="py-2">
-                {item.product_name}
-                <br />
-                <span className="text-xs text-zinc-500">{item.product_code}</span>
-                {lineNote && (
-                  <>
-                    <br />
-                    <span className="text-xs text-zinc-500">{lineNote}</span>
-                  </>
-                )}
-              </td>
-              <td className="py-2 font-mono text-xs">
-                {unitLabel ?? "—"}
-                {item.sale_channel === "RETAIL" && (
-                  <>
-                    <br />
-                    <span className="text-zinc-500">{formatBillBags(item)}</span>
-                  </>
-                )}
-              </td>
-              <td className="py-2 font-mono text-xs">{item.unit_barcode}</td>
-              <td className="py-2 text-xs">{item.source_name || "—"}</td>
-              <td className="py-2 text-right">
-                ₹{Number(item.unit_price).toFixed(2)}
-              </td>
-              <td className="py-2 text-right">
-                ₹{Number(item.line_total).toFixed(2)}
-              </td>
-            </tr>
-          );
+              <tr key={item.id} className="border-b border-zinc-200">
+                <td className="py-2">{i + 1}</td>
+                <td className="py-2">
+                  {item.product_name}
+                  <br />
+                  <span className="text-xs text-zinc-500">{item.product_code}</span>
+                  {item.source_name && (
+                    <>
+                      <br />
+                      <span className="text-xs text-zinc-500">
+                        {item.source_name}
+                      </span>
+                    </>
+                  )}
+                  {note && item.sale_channel === "RETAIL" && (
+                    <>
+                      <br />
+                      <span className="text-xs text-zinc-500">{note}</span>
+                    </>
+                  )}
+                </td>
+                <td className="py-2 font-mono text-xs">{unitLabel ?? "—"}</td>
+                <td className="py-2 text-right">{formatBillBags(item)}</td>
+                <td className="py-2 font-mono text-xs">{item.unit_barcode}</td>
+                <td className="py-2 text-right">
+                  ₹{Number(item.unit_price).toFixed(2)}
+                </td>
+                <td className="py-2 text-right">
+                  ₹{Number(item.line_total).toFixed(2)}
+                </td>
+              </tr>
+            );
           })}
         </tbody>
       </table>
 
       <div className="mt-6 ml-auto w-56 space-y-1 text-sm">
+        <div className="flex justify-between text-zinc-600">
+          <span>Total bags</span>
+          <span>{totalBags.toLocaleString()}</span>
+        </div>
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>₹{Number(bill.subtotal).toFixed(2)}</span>

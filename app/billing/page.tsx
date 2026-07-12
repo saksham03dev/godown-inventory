@@ -411,7 +411,7 @@ function BillingPageContent() {
           setDeleteTarget(null);
         }}
         title="Delete Bill"
-        message="Delete this draft bill? Scanned units and retail bag deductions will be restored."
+        message="Delete this draft bill? Wholesale bales will be unlinked and retail bag deductions restored."
         loading={mutating}
       />
     </DashboardLayout>

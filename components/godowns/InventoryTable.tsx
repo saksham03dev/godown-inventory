@@ -1,4 +1,5 @@
 import { ChevronRight, Package } from "lucide-react";
+import { OpenBaleCountBadge } from "@/components/inventory/OpenBaleBadge";
 import type { GodownStockItem } from "@/lib/types/database";
 
 interface InventoryTableProps {
@@ -64,7 +65,10 @@ export function InventoryTable({
                 }`}
               >
                 <td className="px-5 py-4 font-medium text-zinc-200">
-                  {item.product_name}
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    {item.product_name}
+                    <OpenBaleCountBadge count={item.open_bales} />
+                  </span>
                 </td>
                 <td className="px-5 py-4">
                   <span className="rounded-md bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
@@ -101,6 +105,7 @@ export function InventoryTable({
       {onProductClick && (
         <p className="border-t border-surface-border px-5 py-2.5 text-xs text-zinc-600">
           Click a product to see bags by source and individual bale labels.
+          Amber “open” tags mark partially sold bales.
         </p>
       )}
     </div>

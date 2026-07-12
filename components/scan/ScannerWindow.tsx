@@ -165,18 +165,18 @@ export function ScanResultStrip({
       ) : lastResult?.success ? (
         <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wider text-success">
-            Last {mode === "STOCK_IN" ? "Stock In" : "Stock Out"}
-            {lastResult.isUnitScan ? " · Unit" : " · Product"}
+            Last {mode === "STOCK_IN" ? "Stock In" : "Wholesale Out"}
+            {lastResult.isUnitScan ? " · Bale" : " · Product"}
           </p>
           <p className="mt-0.5 font-medium text-zinc-100">
             {lastResult.product?.name ?? "Success"}
           </p>
           <p className="text-xs text-zinc-500">
             {lastResult.stockUnit
-              ? `Unit #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
+              ? `Bale #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
               : lastResult.message}
             {lastResult.newGodownStock !== undefined
-              ? ` · Godown: ${lastResult.newGodownStock}`
+              ? ` · Godown: ${lastResult.newGodownStock.toLocaleString()} bags`
               : ""}
           </p>
         </div>
