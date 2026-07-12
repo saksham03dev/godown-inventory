@@ -70,7 +70,6 @@ function BillingPageContent() {
     dismissAlert,
   } = useBilling();
 
-  const [priceOverride, setPriceOverride] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showPrint, setShowPrint] = useState(false);
   const [scanProcessing, setScanProcessing] = useState(false);
@@ -81,10 +80,8 @@ function BillingPageContent() {
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedQueryBillRef = useRef<string | null>(null);
   const activeBillIdRef = useRef<string | null>(null);
-  const priceOverrideRef = useRef(priceOverride);
 
   activeBillIdRef.current = activeBill?.id ?? null;
-  priceOverrideRef.current = priceOverride;
 
   useEffect(() => {
     if (!billIdFromQuery || loading) return;
@@ -129,13 +126,7 @@ function BillingPageContent() {
       setScanFlash(null);
 
       try {
-        const raw = priceOverrideRef.current.trim();
-        const parsed = Number(raw);
-        const override =
-          canEditPrice && raw !== "" && Number.isFinite(parsed) && parsed > 0
-            ? parsed
-            : 0;
-        const result = await scanToBill(billId, barcode, override);
+        const result = await scanToBill(billId, barcode);
         showScanFlash(
           result.success ? "success" : "error",
           result.message
@@ -145,7 +136,7 @@ function BillingPageContent() {
         setScanProcessing(false);
       }
     },
-    [isDraft, canCreateBill, canEditPrice, scanToBill, showScanFlash]
+    [isDraft, canCreateBill, scanToBill, showScanFlash]
   );
 
   const { isScanning, cameraError, startScanning, stopScanning, scannerElementId } =
@@ -343,47 +334,21 @@ function BillingPageContent() {
                   />
 
                   {canCreateBill && isDraft && !isRetail && (
-                    <div className="space-y-3">
-                      {canEditPrice && (
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                            Price Override (₹) — optional
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={priceOverride}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              if (v === "" || /^\d*\.?\d*$/.test(v)) {
-                                setPriceOverride(v);
-                              }
-                            }}
-                            placeholder="Auto from product price"
-                            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:max-w-xs sm:text-sm"
-                          />
-                          <p className="mt-1 text-xs text-zinc-600">
-                            Leave empty to use each product&apos;s retail price.
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-1 pt-1 sm:static sm:mx-0 sm:bg-transparent sm:p-0">
-                        <ScannerWindow
-                          scannerElementId={scannerElementId}
-                          isScanning={isScanning}
-                          cameraError={cameraError}
-                          onStart={startScanning}
-                          onStop={stopScanning}
-                          disabled={scanProcessing}
-                          contextLabel={`Billing · ${activeBill.bill_number}`}
-                          overlay={{
-                            processing: scanProcessing,
-                            flash: scanFlash,
-                            message: scanMessage,
-                          }}
-                        />
-                      </div>
+                    <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-1 pt-1 sm:static sm:mx-0 sm:bg-transparent sm:p-0">
+                      <ScannerWindow
+                        scannerElementId={scannerElementId}
+                        isScanning={isScanning}
+                        cameraError={cameraError}
+                        onStart={startScanning}
+                        onStop={stopScanning}
+                        disabled={scanProcessing}
+                        contextLabel={`Billing · ${activeBill.bill_number}`}
+                        overlay={{
+                          processing: scanProcessing,
+                          flash: scanFlash,
+                          message: scanMessage,
+                        }}
+                      />
                     </div>
                   )}
 
@@ -392,7 +357,6 @@ function BillingPageContent() {
                       billId={activeBill.id}
                       billNumber={activeBill.bill_number}
                       disabled={mutating || scanProcessing}
-                      canEditPrice={canEditPrice}
                       onAddLine={retailLineToBill}
                     />
                   )}

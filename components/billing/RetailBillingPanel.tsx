@@ -17,7 +17,6 @@ interface RetailBillingPanelProps {
   billId: string;
   billNumber: string;
   disabled?: boolean;
-  canEditPrice?: boolean;
   onAddLine: (
     billId: string,
     barcode: string,
@@ -30,13 +29,11 @@ export function RetailBillingPanel({
   billId,
   billNumber,
   disabled = false,
-  canEditPrice = false,
   onAddLine,
 }: RetailBillingPanelProps) {
   const [scannedUnit, setScannedUnit] = useState<StockUnit | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [bagsQty, setBagsQty] = useState("1");
-  const [priceOverride, setPriceOverride] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [scanFlash, setScanFlash] = useState<ScanFlash>(null);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
@@ -45,14 +42,10 @@ export function RetailBillingPanel({
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const billIdRef = useRef(billId);
   const bagsQtyRef = useRef(bagsQty);
-  const priceOverrideRef = useRef(priceOverride);
-  const canEditPriceRef = useRef(canEditPrice);
   const scannedBarcodeRef = useRef<string | null>(null);
 
   billIdRef.current = billId;
   bagsQtyRef.current = bagsQty;
-  priceOverrideRef.current = priceOverride;
-  canEditPriceRef.current = canEditPrice;
   scannedBarcodeRef.current = scannedUnit?.unit_barcode ?? null;
 
   const showFlash = useCallback((flash: ScanFlash, message: string) => {
@@ -138,22 +131,12 @@ export function RetailBillingPanel({
       return;
     }
 
-    const rawPrice = priceOverrideRef.current.trim();
-    const parsedPrice = Number(rawPrice);
-    const unitPrice =
-      canEditPriceRef.current &&
-      rawPrice !== "" &&
-      Number.isFinite(parsedPrice) &&
-      parsedPrice > 0
-        ? parsedPrice
-        : 0;
-
     processingRef.current = true;
     setSubmitting(true);
     setScanFlash(null);
 
     try {
-      const result = await onAddLine(billIdRef.current, barcode, qty, unitPrice);
+      const result = await onAddLine(billIdRef.current, barcode, qty);
       showFlash(result.success ? "success" : "error", result.message);
 
       if (result.success) {
@@ -168,9 +151,6 @@ export function RetailBillingPanel({
   }, [disabled, onAddLine, resetDebounce, scannedUnit?.remaining_bags, showFlash]);
 
   const maxBags = scannedUnit?.remaining_bags ?? BAGS_PER_BALE;
-  const retailPrice = (
-    scannedUnit?.products as { retail_selling_price?: number } | null
-  )?.retail_selling_price;
 
   return (
     <div className="space-y-4">
@@ -197,69 +177,37 @@ export function RetailBillingPanel({
         <div className="space-y-4 rounded-2xl border border-surface-border bg-surface-raised p-4">
           <LabelDetailCard unit={scannedUnit} />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Bags to sell
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={bagsQty}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "" || /^\d+$/.test(v)) setBagsQty(v);
-                }}
-                disabled={disabled || submitting}
-                className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:text-sm"
-              />
-              <p className="mt-1 text-xs text-zinc-600">
-                Max {formatBagCount(maxBags)} bags from this bale
-              </p>
-              {Number(bagsQty) === BAGS_PER_BALE &&
-                scannedUnit.remaining_bags === BAGS_PER_BALE && (
-                  <p className="mt-1 text-xs text-amber-400/90">
-                    Full sealed bale — sold-to customer will be stamped on this
-                    label at finalize.
-                  </p>
-                )}
-              {Number(bagsQty) > 0 &&
-                Number(bagsQty) < BAGS_PER_BALE && (
-                  <p className="mt-1 text-xs text-zinc-600">
-                    Partial sale — customer is not attached to this bale label.
-                  </p>
-                )}
-            </div>
-
-            {canEditPrice ? (
-              <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Price override (₹/bag) — optional
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={priceOverride}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "" || /^\d*\.?\d*$/.test(v)) setPriceOverride(v);
-                  }}
-                  disabled={disabled || submitting}
-                  placeholder={
-                    retailPrice !== undefined
-                      ? `Default ₹${Number(retailPrice).toFixed(2)}`
-                      : "Auto from product"
-                  }
-                  className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:text-sm"
-                />
-              </div>
-            ) : retailPrice !== undefined ? (
-              <div className="flex items-end">
-                <p className="text-sm text-zinc-400">
-                  ₹{Number(retailPrice).toFixed(2)} per bag
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Bags to sell
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={bagsQty}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "" || /^\d+$/.test(v)) setBagsQty(v);
+              }}
+              disabled={disabled || submitting}
+              className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:max-w-xs sm:text-sm"
+            />
+            <p className="mt-1 text-xs text-zinc-600">
+              Max {formatBagCount(maxBags)} bags from this bale. Adjust ₹/bag on
+              the line after adding.
+            </p>
+            {Number(bagsQty) === BAGS_PER_BALE &&
+              scannedUnit.remaining_bags === BAGS_PER_BALE && (
+                <p className="mt-1 text-xs text-amber-400/90">
+                  Full sealed bale — sold-to customer will be stamped on this
+                  label at finalize.
                 </p>
-              </div>
-            ) : null}
+              )}
+            {Number(bagsQty) > 0 && Number(bagsQty) < BAGS_PER_BALE && (
+              <p className="mt-1 text-xs text-zinc-600">
+                Partial sale — customer is not attached to this bale label.
+              </p>
+            )}
           </div>
 
           <button
