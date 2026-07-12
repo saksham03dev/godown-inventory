@@ -233,6 +233,8 @@ export interface Bill {
   tax_percent: number;
   tax_amount: number;
   discount: number;
+  labour_cost: number;
+  transportation_cost: number;
   total: number;
   status: BillStatus;
   created_at: string;
@@ -268,6 +270,8 @@ export interface BillInput {
   notes?: string | null;
   tax_percent?: number;
   discount?: number;
+  labour_cost?: number;
+  transportation_cost?: number;
 }
 
 export interface BillItemInput {

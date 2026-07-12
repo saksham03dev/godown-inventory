@@ -18,11 +18,18 @@ function db() {
 function calcTotals(
   items: Pick<BillItem, "line_total">[],
   taxPercent: number,
-  discount: number
+  discount: number,
+  labourCost = 0,
+  transportationCost = 0
 ) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.line_total), 0);
   const tax_amount = (subtotal * taxPercent) / 100;
-  const total = Math.max(0, subtotal + tax_amount - discount);
+  const labour = Math.max(0, labourCost);
+  const transport = Math.max(0, transportationCost);
+  const total = Math.max(
+    0,
+    subtotal + tax_amount + labour + transport - discount
+  );
   return {
     subtotal: Number(subtotal.toFixed(2)),
     tax_amount: Number(tax_amount.toFixed(2)),
@@ -44,6 +51,8 @@ export async function createBillServer(
         notes: input.notes?.trim() || null,
         tax_percent: input.tax_percent ?? 0,
         discount: input.discount ?? 0,
+        labour_cost: Math.max(0, input.labour_cost ?? 0),
+        transportation_cost: Math.max(0, input.transportation_cost ?? 0),
       })
       .select()
       .single();
@@ -76,7 +85,21 @@ export async function updateBillServer(
 
     const tax_percent = input.tax_percent ?? bill.tax_percent;
     const discount = input.discount ?? bill.discount;
-    const totals = calcTotals(bill.bill_items, tax_percent, discount);
+    const labour_cost =
+      input.labour_cost !== undefined
+        ? Math.max(0, input.labour_cost)
+        : Number(bill.labour_cost ?? 0);
+    const transportation_cost =
+      input.transportation_cost !== undefined
+        ? Math.max(0, input.transportation_cost)
+        : Number(bill.transportation_cost ?? 0);
+    const totals = calcTotals(
+      bill.bill_items,
+      tax_percent,
+      discount,
+      labour_cost,
+      transportation_cost
+    );
 
     const { error } = await db()
       .from("bills")
@@ -97,6 +120,8 @@ export async function updateBillServer(
             : bill.notes,
         tax_percent,
         discount,
+        labour_cost,
+        transportation_cost,
         ...totals,
       })
       .eq("id", billId);
@@ -150,7 +175,9 @@ export async function updateBillItemServer(
     const totals = calcTotals(
       refreshed.bill_items,
       refreshed.tax_percent,
-      refreshed.discount
+      refreshed.discount,
+      Number(refreshed.labour_cost ?? 0),
+      Number(refreshed.transportation_cost ?? 0)
     );
     await supabase.from("bills").update(totals).eq("id", bill.id);
 

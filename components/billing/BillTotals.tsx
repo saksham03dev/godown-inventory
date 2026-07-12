@@ -5,6 +5,9 @@ interface BillTotalsProps {
 }
 
 export function BillTotals({ bill }: BillTotalsProps) {
+  const labour = Number(bill.labour_cost ?? 0);
+  const transport = Number(bill.transportation_cost ?? 0);
+
   return (
     <div className="rounded-2xl border border-surface-border bg-surface-raised p-5">
       <div className="space-y-2 text-sm">
@@ -15,6 +18,14 @@ export function BillTotals({ bill }: BillTotalsProps) {
         <div className="flex justify-between text-zinc-400">
           <span>Tax ({bill.tax_percent}%)</span>
           <span>₹{Number(bill.tax_amount).toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-zinc-400">
+          <span>Labour</span>
+          <span>₹{labour.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-zinc-400">
+          <span>Transportation</span>
+          <span>₹{transport.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-zinc-400">
           <span>Discount</span>

@@ -18,6 +18,8 @@ interface LocalForm {
   notes: string;
   tax_percent: string;
   discount: string;
+  labour_cost: string;
+  transportation_cost: string;
 }
 
 function toLocal(bill: BillWithItems): LocalForm {
@@ -28,12 +30,16 @@ function toLocal(bill: BillWithItems): LocalForm {
     notes: bill.notes ?? "",
     tax_percent: String(bill.tax_percent ?? 0),
     discount: String(bill.discount ?? 0),
+    labour_cost: String(bill.labour_cost ?? 0),
+    transportation_cost: String(bill.transportation_cost ?? 0),
   };
 }
 
 function toInput(form: LocalForm): BillInput {
   const tax = Number(form.tax_percent);
   const discount = Number(form.discount);
+  const labour = Number(form.labour_cost);
+  const transport = Number(form.transportation_cost);
   return {
     customer_name: form.customer_name,
     customer_phone: form.customer_phone,
@@ -41,6 +47,10 @@ function toInput(form: LocalForm): BillInput {
     notes: form.notes,
     tax_percent: Number.isFinite(tax) ? tax : 0,
     discount: Number.isFinite(discount) ? discount : 0,
+    labour_cost: Number.isFinite(labour) ? Math.max(0, labour) : 0,
+    transportation_cost: Number.isFinite(transport)
+      ? Math.max(0, transport)
+      : 0,
   };
 }
 
@@ -188,6 +198,46 @@ export function BillDetailsForm({
           }}
           onBlur={flushSave}
           disabled={readonly}
+          className={inputClass}
+        />
+      </div>
+      <div className="min-w-0">
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+          Labour cost (₹)
+        </label>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={form.labour_cost}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "" || /^\d*\.?\d*$/.test(v)) {
+              updateField("labour_cost", v);
+            }
+          }}
+          onBlur={flushSave}
+          disabled={readonly}
+          placeholder="0 if none"
+          className={inputClass}
+        />
+      </div>
+      <div className="min-w-0">
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+          Transportation cost (₹)
+        </label>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={form.transportation_cost}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "" || /^\d*\.?\d*$/.test(v)) {
+              updateField("transportation_cost", v);
+            }
+          }}
+          onBlur={flushSave}
+          disabled={readonly}
+          placeholder="0 if none"
           className={inputClass}
         />
       </div>

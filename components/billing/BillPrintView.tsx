@@ -117,6 +117,14 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
           <span>₹{Number(bill.tax_amount).toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
+          <span>Labour</span>
+          <span>₹{Number(bill.labour_cost ?? 0).toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Transportation</span>
+          <span>₹{Number(bill.transportation_cost ?? 0).toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
           <span>Discount</span>
           <span>- ₹{Number(bill.discount).toFixed(2)}</span>
         </div>

@@ -95,13 +95,20 @@ export function useBilling() {
             if (!prev || prev.id !== result.data!.id) return result.data!;
             const tax_percent = result.data!.tax_percent;
             const discount = result.data!.discount;
+            const labour_cost = Number(result.data!.labour_cost ?? 0);
+            const transportation_cost = Number(
+              result.data!.transportation_cost ?? 0
+            );
             const subtotal = prev.bill_items.reduce(
               (sum, i) => sum + Number(i.line_total),
               0
             );
             const tax_amount = Number(((subtotal * tax_percent) / 100).toFixed(2));
             const total = Number(
-              Math.max(0, subtotal + tax_amount - discount).toFixed(2)
+              Math.max(
+                0,
+                subtotal + tax_amount + labour_cost + transportation_cost - discount
+              ).toFixed(2)
             );
             return {
               ...prev,
@@ -111,6 +118,8 @@ export function useBilling() {
               notes: result.data!.notes,
               tax_percent,
               discount,
+              labour_cost,
+              transportation_cost,
               subtotal,
               tax_amount,
               total,
