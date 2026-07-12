@@ -216,6 +216,19 @@ export function RetailBillingPanel({
               <p className="mt-1 text-xs text-zinc-600">
                 Max {formatBagCount(maxBags)} bags from this bale
               </p>
+              {Number(bagsQty) === BAGS_PER_BALE &&
+                scannedUnit.remaining_bags === BAGS_PER_BALE && (
+                  <p className="mt-1 text-xs text-amber-400/90">
+                    Full sealed bale — sold-to customer will be stamped on this
+                    label at finalize.
+                  </p>
+                )}
+              {Number(bagsQty) > 0 &&
+                Number(bagsQty) < BAGS_PER_BALE && (
+                  <p className="mt-1 text-xs text-zinc-600">
+                    Partial sale — customer is not attached to this bale label.
+                  </p>
+                )}
             </div>
 
             {canEditPrice ? (

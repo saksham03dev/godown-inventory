@@ -9,6 +9,7 @@ import type {
   BillWithItems,
   MutationResult,
 } from "@/lib/types/database";
+import { billNeedsSoldToCustomer } from "@/lib/utils/billItem";
 
 function db() {
   return createServiceClient({ requireServiceRole: true });
@@ -184,10 +185,11 @@ export async function finalizeBillServer(
     }
 
     const customerName = bill.customer_name?.trim() ?? "";
-    if (!customerName) {
+    if (billNeedsSoldToCustomer(bill.bill_items) && !customerName) {
       return {
         success: false,
-        message: "Enter customer name before finalizing.",
+        message:
+          "Enter customer name before finalizing (required for complete sealed bale sales).",
       };
     }
 

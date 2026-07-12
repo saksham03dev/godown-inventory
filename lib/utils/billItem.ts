@@ -36,3 +36,19 @@ export function formatWholesaleBaleNote(item: Pick<BillItem, "quantity" | "sale_
   }
   return null;
 }
+
+/**
+ * Sold-to customer is required / stamped only for complete sealed bales:
+ * wholesale lines, or retail lines of exactly 1000 bags.
+ * Open / partial retail (< 1000) never needs sold-to.
+ */
+export function billNeedsSoldToCustomer(
+  items: Pick<BillItem, "quantity" | "sale_channel">[]
+): boolean {
+  return items.some((item) => {
+    if (item.sale_channel === "RETAIL") {
+      return Number(item.quantity) === BAGS_PER_BALE;
+    }
+    return true;
+  });
+}

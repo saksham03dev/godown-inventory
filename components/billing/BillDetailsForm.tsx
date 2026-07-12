@@ -119,7 +119,8 @@ export function BillDetailsForm({
         />
         {soldToMode && !readonly && (
           <p className="mt-1 text-xs text-zinc-600">
-            Required. Saved onto each bale barcode when you finalize.
+            Required for complete sealed bales (1,000 bags). Not used for open
+            or partial retail sales.
           </p>
         )}
       </div>

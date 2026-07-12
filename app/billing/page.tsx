@@ -24,6 +24,7 @@ import { useBarcodeScan } from "@/hooks/useBarcodeScan";
 import { useBilling } from "@/hooks/useBilling";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { BillInput } from "@/lib/types/database";
+import { billNeedsSoldToCustomer } from "@/lib/utils/billItem";
 
 type ScanFlash = "success" | "error" | null;
 
@@ -104,6 +105,9 @@ function BillingPageContent() {
 
   const isDraft = activeBill?.status === "DRAFT";
   const isReadonly = !canCreateBill || !isDraft;
+  const needsSoldTo = Boolean(
+    activeBill && billNeedsSoldToCustomer(activeBill.bill_items)
+  );
 
   const showScanFlash = useCallback((flash: ScanFlash, message: string) => {
     setScanFlash(flash);
@@ -308,10 +312,7 @@ function BillingPageContent() {
                     {canCreateBill && isDraft && (
                       <button
                         onClick={() => {
-                          if (
-                            !isRetail &&
-                            !activeBill.customer_name?.trim()
-                          ) {
+                          if (needsSoldTo && !activeBill.customer_name?.trim()) {
                             return;
                           }
                           void finalize(activeBill.id);
@@ -319,11 +320,11 @@ function BillingPageContent() {
                         disabled={
                           mutating ||
                           activeBill.bill_items.length === 0 ||
-                          (!isRetail && !activeBill.customer_name?.trim())
+                          (needsSoldTo && !activeBill.customer_name?.trim())
                         }
                         title={
-                          !isRetail && !activeBill.customer_name?.trim()
-                            ? "Enter sold-to customer name first"
+                          needsSoldTo && !activeBill.customer_name?.trim()
+                            ? "Enter sold-to customer name first (complete sealed bales)"
                             : undefined
                         }
                         className="rounded-xl bg-success px-3 py-2 text-sm font-medium text-white hover:bg-success-muted disabled:opacity-50"
@@ -338,7 +339,7 @@ function BillingPageContent() {
                     bill={activeBill}
                     onChange={handleDetailsChange}
                     readonly={isReadonly}
-                    soldToMode={!isRetail}
+                    soldToMode={needsSoldTo}
                   />
 
                   {canCreateBill && isDraft && !isRetail && (
