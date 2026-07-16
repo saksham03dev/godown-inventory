@@ -14,7 +14,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInventory } from "@/hooks/useInventory";
-import { useBarcodeScan } from "@/hooks/useBarcodeScan";
+import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTransaction } from "@/hooks/useScanTransaction";
 import { useScanTally } from "@/hooks/useScanTally";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
@@ -129,11 +129,18 @@ export default function ScanPage() {
     [handleScan, lookupLabel]
   );
 
-  const { isScanning, cameraError, startScanning, stopScanning, resetDebounce, scannerElementId } =
-    useBarcodeScan({
-      onScan: onBarcodeDetected,
-      enabled: scannerEnabled,
-    });
+  const {
+    isScanning,
+    cameraError,
+    startScanning,
+    stopScanning,
+    resetDebounce,
+    scannerElementId,
+    hardwareListening,
+  } = useBarcodeInput({
+    onScan: onBarcodeDetected,
+    enabled: scannerEnabled,
+  });
 
   useEffect(() => {
     resetDebounce();
@@ -227,6 +234,8 @@ export default function ScanPage() {
               onStop={stopScanning}
               disabled={processing || labelLoading || !scannerEnabled}
               contextLabel={contextLabel}
+              hardwareListening={hardwareListening && scannerEnabled}
+              onManualSubmit={onBarcodeDetected}
               overlay={
                 isViewLabel
                   ? {
@@ -279,8 +288,8 @@ export default function ScanPage() {
           )}
 
           <p className="text-center text-xs text-zinc-600">
-            Scan unit label barcodes (87…) one at a time. Camera requires HTTPS
-            or localhost.
+            Scan unit label barcodes (87…) one at a time — camera, 2D scanner, or
+            typed entry. Camera needs HTTPS or localhost.
           </p>
         </div>
       )}

@@ -5,7 +5,7 @@ import { Package, ShoppingBag } from "lucide-react";
 import { LabelDetailCard } from "@/components/scan/LabelDetailCard";
 import { ScannerWindow } from "@/components/scan/ScannerWindow";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { useBarcodeScan } from "@/hooks/useBarcodeScan";
+import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
 import type { RetailBillLineResult, StockUnit } from "@/lib/types/database";
@@ -109,11 +109,18 @@ export function RetailBillingPanel({
     [disabled, lookupBale]
   );
 
-  const { isScanning, cameraError, startScanning, stopScanning, scannerElementId, resetDebounce } =
-    useBarcodeScan({
-      onScan: onBarcodeDetected,
-      enabled: !disabled,
-    });
+  const {
+    isScanning,
+    cameraError,
+    startScanning,
+    stopScanning,
+    scannerElementId,
+    resetDebounce,
+    hardwareListening,
+  } = useBarcodeInput({
+    onScan: onBarcodeDetected,
+    enabled: !disabled,
+  });
 
   const submitLine = useCallback(async () => {
     const barcode = scannedBarcodeRef.current;
@@ -163,6 +170,8 @@ export function RetailBillingPanel({
           onStop={stopScanning}
           disabled={disabled || submitting || lookupLoading}
           contextLabel={`Retail · ${billNumber}`}
+          hardwareListening={hardwareListening && !disabled}
+          onManualSubmit={onBarcodeDetected}
           overlay={{
             processing: lookupLoading || submitting,
             flash: scanFlash,

@@ -1,6 +1,14 @@
 "use client";
 
-import { Camera, CameraOff, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
+import { useState } from "react";
+import {
+  Camera,
+  CameraOff,
+  CheckCircle2,
+  RefreshCw,
+  ScanBarcode,
+  XCircle,
+} from "lucide-react";
 import type { AlertState, ScanTransactionResult, TransactionType } from "@/lib/types/database";
 
 interface ScannerWindowProps {
@@ -11,6 +19,10 @@ interface ScannerWindowProps {
   onStop: () => void;
   disabled?: boolean;
   contextLabel?: string;
+  /** Hardware / keyboard-wedge 2D scanner is listening */
+  hardwareListening?: boolean;
+  /** Optional typed/pasted barcode submit (mobile + laptop fallback) */
+  onManualSubmit?: (barcode: string) => void;
   /** Non-layout-shifting status shown over the camera feed */
   overlay?: {
     processing?: boolean;
@@ -28,17 +40,52 @@ export function ScannerWindow({
   onStop,
   disabled,
   contextLabel,
+  hardwareListening = false,
+  onManualSubmit,
   overlay,
 }: ScannerWindowProps) {
   const showFlash = overlay?.flash === "success" || overlay?.flash === "error";
+  const [manualCode, setManualCode] = useState("");
+
+  const submitManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = manualCode.trim();
+    if (!code || disabled || !onManualSubmit) return;
+    onManualSubmit(code);
+    setManualCode("");
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised [overflow-anchor:none]">
       <div className="border-b border-surface-border px-4 py-3">
-        <p className="text-sm font-medium text-zinc-200">Camera Scanner</p>
+        <p className="text-sm font-medium text-zinc-200">Barcode Scanner</p>
         <p className="text-xs text-zinc-500">
-          Point at a barcode or QR code to scan
+          Use phone/laptop camera or a USB / Bluetooth 2D scanner
         </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
+              isScanning
+                ? "bg-accent/15 text-accent"
+                : "bg-white/5 text-zinc-500"
+            }`}
+          >
+            <Camera className="h-3 w-3" />
+            {isScanning ? "Camera on" : "Camera off"}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium ${
+              hardwareListening && !disabled
+                ? "bg-success/15 text-success"
+                : "bg-white/5 text-zinc-500"
+            }`}
+          >
+            <ScanBarcode className="h-3 w-3" />
+            {hardwareListening && !disabled
+              ? "2D scanner ready"
+              : "2D scanner idle"}
+          </span>
+        </div>
       </div>
 
       {/* Fixed aspect box — never remount the scanner element */}
@@ -52,6 +99,10 @@ export function ScannerWindow({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/80">
             <Camera className="h-10 w-10 text-zinc-500" />
             <p className="text-sm text-zinc-400">Camera is off</p>
+            <p className="max-w-xs px-4 text-center text-xs text-zinc-600">
+              Start the camera on mobile, or scan with a plugged-in 2D scanner
+              anytime below.
+            </p>
             <button
               type="button"
               onClick={onStart}
@@ -67,6 +118,10 @@ export function ScannerWindow({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/90 p-4 text-center">
             <CameraOff className="h-10 w-10 text-danger" />
             <p className="text-sm text-danger">{cameraError}</p>
+            <p className="max-w-xs text-xs text-zinc-500">
+              Camera needs HTTPS or localhost. You can still use a 2D scanner or
+              type the barcode below.
+            </p>
             <button
               type="button"
               onClick={onStart}
@@ -94,7 +149,6 @@ export function ScannerWindow({
           </div>
         )}
 
-        {/* Status overlays — absolute, no document reflow */}
         {overlay?.processing && (
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-accent/90 px-3 py-2 text-center text-xs font-medium text-white">
             Processing scan…
@@ -136,6 +190,43 @@ export function ScannerWindow({
           </button>
         </div>
       )}
+
+      {onManualSubmit && (
+        <form
+          onSubmit={submitManual}
+          className="space-y-2 border-t border-surface-border p-3"
+        >
+          <label className="block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Or enter barcode
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-barcode-capture="manual"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              disabled={disabled}
+              placeholder="Scan with 2D gun or paste code…"
+              className="min-w-0 flex-1 rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 font-mono text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={disabled || !manualCode.trim()}
+              className="shrink-0 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
+            >
+              Go
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-600">
+            2D scanners work without focusing this field. Click away from other
+            inputs first, then scan.
+          </p>
+        </form>
+      )}
     </div>
   );
 }
@@ -160,7 +251,7 @@ export function ScanResultStrip({
     <div className="min-h-[4.5rem] [overflow-anchor:none]">
       {!hasContent ? (
         <div className="rounded-xl border border-dashed border-surface-border px-4 py-3 text-center text-xs text-zinc-600">
-          Scan results appear here — camera stays put
+          Scan results appear here — camera and 2D scanner both work
         </div>
       ) : lastResult?.success ? (
         <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">

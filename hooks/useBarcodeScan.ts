@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 interface UseBarcodeScanOptions {
@@ -10,6 +10,8 @@ interface UseBarcodeScanOptions {
   qrboxSize?: number;
   /** Ignore the same barcode for this many ms after a successful detect */
   debounceMs?: number;
+  /** Unique DOM id when multiple scanner regions may exist */
+  scannerElementId?: string;
 }
 
 interface UseBarcodeScanReturn {
@@ -21,15 +23,20 @@ interface UseBarcodeScanReturn {
   scannerElementId: string;
 }
 
-const SCANNER_ELEMENT_ID = "barcode-scanner-region";
-
 export function useBarcodeScan({
   onScan,
   enabled = true,
   fps = 10,
   qrboxSize = 250,
   debounceMs = 2200,
+  scannerElementId: scannerElementIdProp,
 }: UseBarcodeScanOptions): UseBarcodeScanReturn {
+  const reactId = useId().replace(/:/g, "");
+  const scannerElementId =
+    scannerElementIdProp ?? `barcode-scanner-${reactId}`;
+  const scannerElementIdRef = useRef(scannerElementId);
+  scannerElementIdRef.current = scannerElementId;
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
@@ -86,12 +93,13 @@ export function useBarcodeScan({
         requestAnimationFrame(() => resolve())
       );
 
-      const el = document.getElementById(SCANNER_ELEMENT_ID);
+      const elementId = scannerElementIdRef.current;
+      const el = document.getElementById(elementId);
       if (!el) {
         throw new Error("Scanner view is not ready. Try again.");
       }
 
-      const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID, {
+      const scanner = new Html5Qrcode(elementId, {
         formatsToSupport: [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
@@ -158,6 +166,6 @@ export function useBarcodeScan({
     startScanning,
     stopScanning,
     resetDebounce,
-    scannerElementId: SCANNER_ELEMENT_ID,
+    scannerElementId,
   };
 }

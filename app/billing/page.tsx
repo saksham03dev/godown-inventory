@@ -22,7 +22,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusinessDay } from "@/contexts/BusinessDayContext";
 import { useSaleMode } from "@/contexts/SaleModeContext";
-import { useBarcodeScan } from "@/hooks/useBarcodeScan";
+import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useBilling } from "@/hooks/useBilling";
 import { fetchBillsForDay } from "@/lib/services/businessDayService";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
@@ -170,11 +170,17 @@ function BillingPageContent() {
     [isDraft, canCreateBill, scanToBill, showScanFlash]
   );
 
-  const { isScanning, cameraError, startScanning, stopScanning, scannerElementId } =
-    useBarcodeScan({
-      onScan: onBarcodeDetected,
-      enabled: Boolean(activeBill && isDraft && canCreateBill),
-    });
+  const {
+    isScanning,
+    cameraError,
+    startScanning,
+    stopScanning,
+    scannerElementId,
+    hardwareListening,
+  } = useBarcodeInput({
+    onScan: onBarcodeDetected,
+    enabled: Boolean(activeBill && isDraft && canCreateBill && !isRetail),
+  });
 
   const handleDetailsChange = useCallback(
     (input: BillInput) => {
@@ -363,6 +369,8 @@ function BillingPageContent() {
                         onStop={stopScanning}
                         disabled={scanProcessing}
                         contextLabel={`Billing · ${activeBill.bill_number}`}
+                        hardwareListening={hardwareListening}
+                        onManualSubmit={onBarcodeDetected}
                         overlay={{
                           processing: scanProcessing,
                           flash: scanFlash,
