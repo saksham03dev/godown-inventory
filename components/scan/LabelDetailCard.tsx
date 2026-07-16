@@ -139,25 +139,17 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
                       : null
                   }
                 />
-                <p className="text-xs text-zinc-600">
-                  Complete sealed bale sale (wholesale or full 1,000-bag retail)
-                </p>
               </>
             ) : billLink && billLink.status !== "FINALIZED" ? (
               <>
-                <DetailRow
-                  label="Status"
-                  value="On draft bill — finalize to stamp sold-to"
-                />
+                <DetailRow label="Status" value="On draft bill" />
                 <DetailRow label="Customer" value={billLink.customer_name} />
                 <DetailRow label="Phone" value={billLink.customer_phone} />
                 <DetailRow label="Bill" value={billLink.bill_number} mono />
               </>
             ) : (
               <p className="text-sm text-zinc-500">
-                {unit.bill_id
-                  ? "Stocked out — sold-to not stamped (partial sales do not attach customer)"
-                  : "Stocked out — not billed yet"}
+                {unit.bill_id ? "Not billed to a customer" : "Not billed yet"}
               </p>
             )}
           </div>

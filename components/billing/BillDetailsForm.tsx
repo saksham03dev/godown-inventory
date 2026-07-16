@@ -124,15 +124,8 @@ export function BillDetailsForm({
           onChange={(e) => updateField("customer_name", e.target.value)}
           onBlur={flushSave}
           disabled={readonly}
-          placeholder={soldToMode ? "Customer this bale is sold to" : undefined}
           className={inputClass}
         />
-        {soldToMode && !readonly && (
-          <p className="mt-1 text-xs text-zinc-600">
-            Required for complete sealed bales (1,000 bags). Not used for open
-            or partial retail sales.
-          </p>
-        )}
       </div>
       <div className="min-w-0">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">

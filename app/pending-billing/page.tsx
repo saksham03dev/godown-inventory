@@ -99,10 +99,7 @@ export default function PendingBillingPage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <DashboardLayout
-        title="Pending Sales"
-        subtitle="Wholesale bales stocked out — send to invoice without rescanning (1,000 bags each)"
-      >
+      <DashboardLayout title="Pending Sales">
         <AlertBanner
           alert={{
             type: "info",
@@ -116,7 +113,6 @@ export default function PendingBillingPage() {
   return (
     <DashboardLayout
       title="Pending Sales"
-      subtitle="Wholesale bales not yet billed — 1 bale = 1,000 bags"
       actions={
         <button
           onClick={() => {

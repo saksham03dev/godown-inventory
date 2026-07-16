@@ -33,10 +33,7 @@ export default function OpenBalesPage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <DashboardLayout
-        title="Open Bales"
-        subtitle="Partially sold bales with bags remaining"
-      >
+      <DashboardLayout title="Open Bales">
         <AlertBanner
           alert={{
             type: "info",
@@ -50,7 +47,6 @@ export default function OpenBalesPage() {
   return (
     <DashboardLayout
       title="Open Bales"
-      subtitle="Bales with partial retail sales — scan these in Billing to sell more bags"
       actions={
         <button
           onClick={() => refresh()}
@@ -77,7 +73,7 @@ export default function OpenBalesPage() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-muted"
           >
             <ShoppingBag className="h-4 w-4" />
-            Sell from bale in Billing
+            Sell bags
           </Link>
         </div>
 

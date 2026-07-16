@@ -216,15 +216,7 @@ function BillingPageContent() {
   return (
     <DashboardLayout
       title="Billing"
-      subtitle={
-        isViewingToday
-          ? canCreateBill
-            ? isRetail
-              ? "Retail billing — scan bale, enter bag qty"
-              : "Wholesale billing — scan stocked-out bales (1,000 bags each)"
-            : "View today’s bills"
-          : `Closed day · ${selectedLabel}`
-      }
+      subtitle={isViewingToday ? undefined : selectedLabel}
       actions={
         <div className="flex items-center gap-2">
           {activeBill && (
@@ -266,14 +258,10 @@ function BillingPageContent() {
             {/* Recent bills — horizontal on mobile, sidebar on desktop */}
             <div className="space-y-2 lg:col-span-1">
               <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                {isViewingToday ? "Today’s bills" : "Day’s finalized bills"}
+                Bills
               </h3>
               {listBills.length === 0 ? (
-                <p className="text-sm text-zinc-500">
-                  {isViewingToday
-                    ? "No bills yet today"
-                    : "No finalized bills this day"}
-                </p>
+                <p className="text-sm text-zinc-500">No bills</p>
               ) : (
                 <ul className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
                   {listBills.map((b) => (
@@ -315,15 +303,8 @@ function BillingPageContent() {
                   <p className="text-sm text-zinc-400">
                     {canCreateBill
                       ? "Create a new bill or select one from the list"
-                      : "Select a bill from the list to view details"}
+                      : "Select a bill from the list"}
                   </p>
-                  {canCreateBill && (
-                    <p className="mt-2 text-xs text-zinc-600">
-                      {isRetail
-                        ? "Scan a stocked-in bale, enter bags, and add lines to the bill"
-                        : "Flow: Wholesale Out → Pending Sales (or scan bales here)"}
-                    </p>
-                  )}
                 </div>
               ) : (
                 <>
@@ -354,7 +335,7 @@ function BillingPageContent() {
                         }
                         title={
                           needsSoldTo && !activeBill.customer_name?.trim()
-                            ? "Enter sold-to customer name first (complete sealed bales)"
+                            ? "Enter customer name first"
                             : undefined
                         }
                         className="rounded-xl bg-success px-3 py-2 text-sm font-medium text-white hover:bg-success-muted disabled:opacity-50"

@@ -31,8 +31,8 @@ export function BillItemsTable({
       <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-8 text-center sm:p-10">
         <p className="text-sm text-zinc-400">
           {isRetail
-            ? "Scan a stocked-in bale and add bag quantities"
-            : "Scan wholesale stocked-out bale barcodes to add lines (1,000 bags each)"}
+            ? "Scan a bale to add bags"
+            : "Scan stocked-out bales to add lines"}
         </p>
       </div>
     );

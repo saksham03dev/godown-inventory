@@ -61,7 +61,7 @@ export default function DashboardPage() {
   return (
     <DashboardLayout
       title="Dashboard"
-      subtitle="Bag counts across all godowns (1 bale = 1,000 bags)"
+      subtitle="Overview"
       actions={
         <button
           onClick={handleRefresh}

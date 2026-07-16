@@ -204,9 +204,6 @@ function SourcesView({
         <p className="mt-3 text-sm text-zinc-400">
           No stocked-in unit SKUs in this godown for this product.
         </p>
-        <p className="mt-1 text-xs text-zinc-600">
-          Stock quantities come from labelled bales scanned in at Stock In.
-        </p>
       </div>
     );
   }
@@ -471,7 +468,7 @@ function BatchEditForm({
           className="w-full rounded-xl border border-surface-border bg-surface-overlay/50 px-4 py-3 text-sm text-zinc-400 outline-none"
         />
         <p className="mt-1 text-xs text-zinc-600">
-          Quantity is set when labels are printed and cannot be changed here.
+          Set when labels are printed.
         </p>
       </div>
 

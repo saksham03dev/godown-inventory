@@ -20,9 +20,6 @@ export function InventoryTable({
         <p className="mt-3 text-sm font-medium text-zinc-400">
           No inventory in {godownName ?? "this godown"}
         </p>
-        <p className="mt-1 text-xs text-zinc-600">
-          Use the Scan Station to stock items into this location.
-        </p>
       </div>
     );
   }
@@ -102,12 +99,6 @@ export function InventoryTable({
           </tbody>
         </table>
       </div>
-      {onProductClick && (
-        <p className="border-t border-surface-border px-5 py-2.5 text-xs text-zinc-600">
-          Click a product to see bags by source and individual bale labels.
-          Amber “open” tags mark partially sold bales.
-        </p>
-      )}
     </div>
   );
 }

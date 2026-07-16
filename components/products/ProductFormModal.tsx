@@ -163,17 +163,12 @@ export function ProductFormModal({
               disabled
               className="w-full rounded-xl border border-surface-border bg-surface-overlay/50 px-4 py-3 text-sm text-zinc-400 outline-none"
             />
-            <p className="mt-1.5 text-xs text-zinc-600">
-              Sum of bags in stocked-in bales — updated by Scan Station (1 bale
-              scan = 1,000 bags).
-            </p>
           </div>
         )}
 
         {!isEdit && (
           <p className="text-xs text-zinc-600">
-            New products start at 0 stock. Print labels, then Stock In at Scan
-            Station.
+            New products start at 0 stock.
           </p>
         )}
 

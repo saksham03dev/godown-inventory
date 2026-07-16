@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { PackageOpen } from "lucide-react";
 import { OpenBaleBadge } from "@/components/inventory/OpenBaleBadge";
 import { formatBagCount } from "@/lib/utils/inventory";
@@ -24,14 +23,7 @@ export function OpenBalesTable({ units }: OpenBalesTableProps) {
       <div className="rounded-2xl border border-surface-border bg-surface-raised p-12 text-center">
         <PackageOpen className="mx-auto h-10 w-10 text-zinc-600" />
         <p className="mt-3 text-sm font-medium text-zinc-400">
-          No open bales right now
-        </p>
-        <p className="mt-1 text-xs text-zinc-600">
-          Bales appear here after the first partial retail sale. Use{" "}
-          <Link href="/billing" className="text-accent hover:underline">
-            Billing
-          </Link>{" "}
-          to sell bags from a sealed bale.
+          No open bales
         </p>
       </div>
     );

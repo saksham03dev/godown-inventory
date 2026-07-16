@@ -27,9 +27,8 @@ import type {
 } from "@/lib/types/database";
 
 export default function ScanPage() {
-  const { can, role } = useAuth();
+  const { can } = useAuth();
   const canViewLabel = can("scan.viewLabel");
-  const isEmployee = role === "employee";
 
   const [mode, setMode] = useState<ScanMode>("STOCK_IN");
   const [selectedGodownId, setSelectedGodownId] = useState("");
@@ -185,11 +184,7 @@ export default function ScanPage() {
   return (
     <DashboardLayout
       title="Scan Station"
-      subtitle={
-        isEmployee
-          ? "Wholesale: scan bale labels — stock in (+1,000 bags) or wholesale out (−1,000 bags)"
-          : "Wholesale receiving & dispatch — 1 bale scan = 1,000 bags"
-      }
+      subtitle="Barcode operations"
     >
       {loading ? (
         <LoadingSpinner label="Loading scan station…" />

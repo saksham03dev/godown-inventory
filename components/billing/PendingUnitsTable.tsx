@@ -33,9 +33,6 @@ export function PendingUnitsTable({
         <p className="mt-3 text-sm font-medium text-zinc-400">
           No pending wholesale sales
         </p>
-        <p className="mt-1 text-xs text-zinc-600">
-          Sealed bales appear here after wholesale stock-out, before billing.
-        </p>
       </div>
     );
   }

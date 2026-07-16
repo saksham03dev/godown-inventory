@@ -193,21 +193,8 @@ export function RetailBillingPanel({
               className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent sm:max-w-xs sm:text-sm"
             />
             <p className="mt-1 text-xs text-zinc-600">
-              Max {formatBagCount(maxBags)} bags from this bale. Adjust ₹/bag on
-              the line after adding.
+              Max {formatBagCount(maxBags)} bags
             </p>
-            {Number(bagsQty) === BAGS_PER_BALE &&
-              scannedUnit.remaining_bags === BAGS_PER_BALE && (
-                <p className="mt-1 text-xs text-amber-400/90">
-                  Full sealed bale — sold-to customer will be stamped on this
-                  label at finalize.
-                </p>
-              )}
-            {Number(bagsQty) > 0 && Number(bagsQty) < BAGS_PER_BALE && (
-              <p className="mt-1 text-xs text-zinc-600">
-                Partial sale — customer is not attached to this bale label.
-              </p>
-            )}
           </div>
 
           <button
@@ -223,13 +210,7 @@ export function RetailBillingPanel({
       ) : (
         <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised/50 p-6 text-center">
           <Package className="mx-auto h-8 w-8 text-zinc-600" />
-          <p className="mt-2 text-sm text-zinc-400">
-            Scan a stocked-in bale barcode, then enter bag quantity
-          </p>
-          <p className="mt-1 text-xs text-zinc-600">
-            Sealed bales have {formatBagCount(BAGS_PER_BALE)} bags · partial bales
-            show remaining count
-          </p>
+          <p className="mt-2 text-sm text-zinc-400">Scan a stocked-in bale</p>
         </div>
       )}
     </div>
