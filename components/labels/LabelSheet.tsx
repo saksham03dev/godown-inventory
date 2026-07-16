@@ -5,23 +5,48 @@ interface LabelSheetProps {
   units: StockUnit[];
   productName: string;
   productCode: string;
+  productSize?: string | null;
   batchCode: string;
   labelSize: LabelSize;
 }
 
 const sizeStyles: Record<
   LabelSize,
-  { width: string; height: string; barcodeHeight: number }
+  {
+    width: string;
+    height: string;
+    namePx: number;
+    detailPx: number;
+    metaPx: number;
+    barcodeHeight: number;
+    barcodeWidth: number;
+  }
 > = {
-  small: { width: "38mm", height: "25mm", barcodeHeight: 28 },
-  medium: { width: "50mm", height: "30mm", barcodeHeight: 36 },
-  large: { width: "70mm", height: "40mm", barcodeHeight: 48 },
+  square: {
+    width: "100mm",
+    height: "100mm",
+    namePx: 28,
+    detailPx: 20,
+    metaPx: 14,
+    barcodeHeight: 90,
+    barcodeWidth: 2.2,
+  },
+  wide: {
+    width: "75mm",
+    height: "125mm",
+    namePx: 24,
+    detailPx: 17,
+    metaPx: 13,
+    barcodeHeight: 90,
+    barcodeWidth: 1.8,
+  },
 };
 
 export function LabelSheet({
   units,
   productName,
   productCode,
+  productSize,
   batchCode,
   labelSize,
 }: LabelSheetProps) {
@@ -32,24 +57,46 @@ export function LabelSheet({
       {units.map((unit) => (
         <div
           key={unit.id}
-          className="label-item flex flex-col items-center justify-between border border-dashed border-zinc-300 bg-white p-1 text-black"
+          className="label-item flex flex-col items-center justify-between border border-dashed border-zinc-300 bg-white p-4 text-black"
           style={{ width: size.width, height: size.height, minHeight: size.height }}
         >
-          <p className="w-full truncate text-center text-[7px] font-bold leading-tight">
-            {productName}
-          </p>
-          <p className="text-[6px] text-zinc-600">
-            {productCode} · Unit {unit.unit_number}/{units.length}
-          </p>
-          <BarcodeImage
-            value={unit.unit_barcode}
-            height={size.barcodeHeight}
-            width={1.2}
-            displayValue={labelSize !== "small"}
-          />
-          <p className="w-full truncate text-center text-[5px] text-zinc-500">
-            {batchCode}
-          </p>
+          <div className="flex w-full flex-col items-center gap-1.5 text-center">
+            <p
+              className="w-full font-bold leading-tight"
+              style={{ fontSize: `${size.namePx}px` }}
+            >
+              {productName}
+            </p>
+            {productSize && (
+              <p
+                className="font-semibold text-zinc-700"
+                style={{ fontSize: `${size.detailPx}px` }}
+              >
+                {productSize}
+              </p>
+            )}
+            <p
+              className="text-zinc-600"
+              style={{ fontSize: `${size.detailPx}px` }}
+            >
+              {productCode} · Bale {unit.unit_number}/{units.length}
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col items-center gap-1">
+            <BarcodeImage
+              value={unit.unit_barcode}
+              height={size.barcodeHeight}
+              width={size.barcodeWidth}
+              displayValue
+            />
+            <p
+              className="w-full truncate text-center text-zinc-500"
+              style={{ fontSize: `${size.metaPx}px` }}
+            >
+              {batchCode}
+            </p>
+          </div>
         </div>
       ))}
 

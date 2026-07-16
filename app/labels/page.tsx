@@ -13,9 +13,8 @@ import { balesToBags } from "@/lib/utils/inventory";
 import type { LabelSize } from "@/lib/types/database";
 
 const labelSizes: { value: LabelSize; label: string }[] = [
-  { value: "small", label: "Small (38×25 mm)" },
-  { value: "medium", label: "Medium (50×30 mm)" },
-  { value: "large", label: "Large (70×40 mm)" },
+  { value: "square", label: "4×4 in (100×100 mm)" },
+  { value: "wide", label: "3×5 in (75×125 mm)" },
 ];
 
 export default function LabelsPage() {
@@ -32,7 +31,7 @@ export default function LabelsPage() {
     dismissAlert,
   } = useLabels();
 
-  const [labelSize, setLabelSize] = useState<LabelSize>("medium");
+  const [labelSize, setLabelSize] = useState<LabelSize>("square");
 
   const handlePrint = () => window.print();
 
@@ -155,6 +154,7 @@ export default function LabelsPage() {
               units={activeBatch.stock_units}
               productName={activeBatch.products?.name ?? "Product"}
               productCode={activeBatch.products?.product_code ?? ""}
+              productSize={activeBatch.products?.size}
               batchCode={activeBatch.batch_code}
               labelSize={labelSize}
             />

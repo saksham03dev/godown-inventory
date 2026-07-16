@@ -128,7 +128,7 @@ export interface ScanTransactionResult {
 
 export type StockUnitStatus = "LABELLED" | "STOCKED_IN" | "STOCKED_OUT";
 export type BillStatus = "DRAFT" | "FINALIZED";
-export type LabelSize = "small" | "medium" | "large";
+export type LabelSize = "square" | "wide";
 
 export interface StockBatch {
   id: string;
