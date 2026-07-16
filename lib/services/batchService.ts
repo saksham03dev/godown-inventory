@@ -19,7 +19,7 @@ export async function fetchBatches(limit = 20): Promise<StockBatch[]> {
     .select(
       `
       *,
-      products ( id, name, product_code, size )
+      products ( id, name, product_code, size, special_note )
     `
     )
     .order("created_at", { ascending: false })
@@ -38,7 +38,7 @@ export async function fetchBatchWithUnits(
     .select(
       `
       *,
-      products ( id, name, product_code, size, retail_selling_price ),
+      products ( id, name, product_code, size, special_note, retail_selling_price ),
       stock_units ( * )
     `
     )

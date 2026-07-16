@@ -72,7 +72,7 @@ export async function createStockBatchServer(
 
     const { data: product } = await supabase
       .from("products")
-      .select("id, name, product_code, size")
+      .select("id, name, product_code, size, special_note")
       .eq("id", input.product_id)
       .single();
 

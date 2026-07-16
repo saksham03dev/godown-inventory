@@ -139,7 +139,10 @@ export interface StockBatch {
   notes: string | null;
   created_by: string;
   created_at: string;
-  products?: Pick<Product, "id" | "name" | "product_code" | "size"> | null;
+  products?: Pick<
+    Product,
+    "id" | "name" | "product_code" | "size" | "special_note"
+  > | null;
 }
 
 export interface StockUnit {

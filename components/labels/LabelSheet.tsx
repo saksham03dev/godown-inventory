@@ -6,6 +6,8 @@ interface LabelSheetProps {
   productName: string;
   productCode: string;
   productSize?: string | null;
+  /** Batch notes / product special note shown under name+size */
+  description?: string | null;
   batchCode: string;
   labelSize: LabelSize;
 }
@@ -15,30 +17,37 @@ const sizeStyles: Record<
   {
     width: string;
     height: string;
-    namePx: number;
-    detailPx: number;
+    /** Product name + size — primary readable text */
+    titlePx: number;
+    descriptionPx: number;
+    balePx: number;
     metaPx: number;
     barcodeHeight: number;
     barcodeWidth: number;
+    padding: string;
   }
 > = {
   square: {
     width: "100mm",
     height: "100mm",
-    namePx: 28,
-    detailPx: 20,
-    metaPx: 14,
-    barcodeHeight: 90,
-    barcodeWidth: 2.2,
+    titlePx: 40,
+    descriptionPx: 18,
+    balePx: 14,
+    metaPx: 11,
+    barcodeHeight: 72,
+    barcodeWidth: 2.0,
+    padding: "5mm",
   },
   wide: {
     width: "75mm",
     height: "125mm",
-    namePx: 24,
-    detailPx: 17,
-    metaPx: 13,
-    barcodeHeight: 90,
-    barcodeWidth: 1.8,
+    titlePx: 28,
+    descriptionPx: 15,
+    balePx: 13,
+    metaPx: 11,
+    barcodeHeight: 80,
+    barcodeWidth: 1.7,
+    padding: "4mm",
   },
 };
 
@@ -47,43 +56,68 @@ export function LabelSheet({
   productName,
   productCode,
   productSize,
+  description,
   batchCode,
   labelSize,
 }: LabelSheetProps) {
   const size = sizeStyles[labelSize];
+  const note = description?.trim() || null;
 
   return (
     <div id="label-print-area" className="label-grid">
       {units.map((unit) => (
         <div
           key={unit.id}
-          className="label-item flex flex-col items-center justify-between border border-dashed border-zinc-300 bg-white p-4 text-black"
-          style={{ width: size.width, height: size.height, minHeight: size.height }}
+          className="label-item flex flex-col bg-white text-black"
+          style={{
+            width: size.width,
+            height: size.height,
+            minHeight: size.height,
+            padding: size.padding,
+            border: "1px dashed #d4d4d8",
+          }}
         >
-          <div className="flex w-full flex-col items-center gap-1.5 text-center">
+          {/* Top: name + size dominant, then description, then bale # */}
+          <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-hidden text-center">
             <p
-              className="w-full font-bold leading-tight"
-              style={{ fontSize: `${size.namePx}px` }}
+              className="w-full font-black uppercase leading-none tracking-tight"
+              style={{ fontSize: `${size.titlePx}px` }}
             >
               {productName}
             </p>
-            {productSize && (
+            {productSize ? (
               <p
-                className="font-semibold text-zinc-700"
-                style={{ fontSize: `${size.detailPx}px` }}
+                className="w-full font-black leading-none tracking-tight"
+                style={{ fontSize: `${size.titlePx}px` }}
               >
                 {productSize}
               </p>
-            )}
+            ) : null}
+            {note ? (
+              <p
+                className="mt-1 w-full font-medium leading-snug text-zinc-800"
+                style={{
+                  fontSize: `${size.descriptionPx}px`,
+                  display: "-webkit-box",
+                  WebkitLineClamp: labelSize === "square" ? 3 : 4,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {note}
+              </p>
+            ) : null}
             <p
-              className="text-zinc-600"
-              style={{ fontSize: `${size.detailPx}px` }}
+              className="mt-auto w-full font-semibold text-zinc-700"
+              style={{ fontSize: `${size.balePx}px` }}
             >
-              {productCode} · Bale {unit.unit_number}/{units.length}
+              Bale {unit.unit_number}/{units.length}
+              {productCode ? ` · ${productCode}` : ""}
             </p>
           </div>
 
-          <div className="flex w-full flex-col items-center gap-1">
+          {/* Bottom: barcode */}
+          <div className="mt-2 flex w-full shrink-0 flex-col items-center gap-0.5">
             <BarcodeImage
               value={unit.unit_barcode}
               height={size.barcodeHeight}
@@ -123,6 +157,7 @@ export function LabelSheet({
           .label-item {
             break-inside: avoid;
             page-break-inside: avoid;
+            border-color: #a1a1aa !important;
           }
         }
       `}</style>

@@ -155,6 +155,11 @@ export default function LabelsPage() {
               productName={activeBatch.products?.name ?? "Product"}
               productCode={activeBatch.products?.product_code ?? ""}
               productSize={activeBatch.products?.size}
+              description={
+                activeBatch.notes?.trim() ||
+                activeBatch.products?.special_note ||
+                null
+              }
               batchCode={activeBatch.batch_code}
               labelSize={labelSize}
             />
