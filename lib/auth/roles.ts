@@ -10,8 +10,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full access — products, godowns, pricing, billing, and all operations",
   manager:
     "Add & edit products (no price changes), stock in/out, labels, billing — no godown management",
-  employee:
-    "Stock in and stock out via scan station only",
+  employee: "Stock in and stock out via barcode scanning only",
 };
 
 type Permission =
@@ -76,7 +75,7 @@ export interface NavItem {
   href: string;
   label: string;
   permission: Permission;
-  /** If set, item only appears in this sale mode. */
+  /** If set, item only appears in this sale mode (billing-enabled builds). */
   saleMode?: "wholesale" | "retail";
 }
 
@@ -103,6 +102,16 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     saleMode: "wholesale",
   },
   {
+    href: "/stock-in",
+    label: "Stock In",
+    permission: "scan",
+  },
+  {
+    href: "/stock-out",
+    label: "Stock Out",
+    permission: "scan",
+  },
+  {
     href: "/pending-billing",
     label: "Pending Sales",
     permission: "billing.view",
@@ -118,25 +127,75 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/admin/users", label: "Users", permission: "users.manage" },
 ];
 
+const BILLING_NAV_HREFS = ["/billing", "/pending-billing"] as const;
+
+function isBillingNavEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_BILLING_ENABLED === "true";
+}
+
 export function getNavItemsForRole(
   role: UserRole | null | undefined,
   saleMode: "wholesale" | "retail" = "wholesale"
 ) {
-  const items = ALL_NAV_ITEMS.filter((item) => {
+  const billingEnabled = isBillingNavEnabled();
+
+  let items = ALL_NAV_ITEMS.filter((item) => {
+    if (!billingEnabled && item.href === "/open-bales") {
+      return hasPermission(role, "scan") || hasPermission(role, "godowns.view");
+    }
+
     if (!hasPermission(role, item.permission)) return false;
+
+    if (!billingEnabled) {
+      if ((BILLING_NAV_HREFS as readonly string[]).includes(item.href)) {
+        return false;
+      }
+      if (item.href === "/scan") return false;
+      if (item.saleMode) {
+        // Stock-only: show wholesale-tagged stock routes without mode split
+        return true;
+      }
+      if (item.href === "/open-bales") {
+        return true;
+      }
+      return true;
+    }
+
+    if (item.href === "/stock-in" || item.href === "/stock-out") {
+      return false;
+    }
+
     if (item.saleMode && item.saleMode !== saleMode) return false;
     return true;
   });
+
+  if (!billingEnabled) {
+    items = items.map((item) => {
+      if (item.href === "/open-bales") {
+        return { ...item, permission: "godowns.view" as Permission };
+      }
+      return item;
+    });
+  }
+
   if (role === "employee") {
+    if (!billingEnabled) {
+      return items.filter((item) =>
+        ["/stock-in", "/stock-out"].includes(item.href)
+      );
+    }
     return items.filter((item) => item.href === "/scan");
   }
+
   return items;
 }
 
 export function getDefaultRouteForRole(
   role: UserRole | null | undefined
 ): string {
-  if (role === "employee") return "/scan";
+  if (role === "employee") {
+    return isBillingNavEnabled() ? "/scan" : "/stock-in";
+  }
   return "/";
 }
 
@@ -147,6 +206,8 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/godowns": "godowns.manage",
   "/inventory": "godowns.view",
   "/scan": "scan",
+  "/stock-in": "scan",
+  "/stock-out": "scan",
   "/pending-billing": "billing.view",
   "/billing": "billing.view",
   "/open-bales": "billing.view",
@@ -157,6 +218,20 @@ export function canAccessRoute(
   pathname: string,
   role: UserRole | null | undefined
 ): boolean {
+  const billingEnabled = isBillingNavEnabled();
+
+  if (!billingEnabled && (BILLING_NAV_HREFS as readonly string[]).includes(pathname)) {
+    return false;
+  }
+
+  if (!billingEnabled && pathname === "/scan") {
+    return false;
+  }
+
+  if (!billingEnabled && pathname === "/open-bales") {
+    return hasPermission(role, "scan") || hasPermission(role, "godowns.view");
+  }
+
   const permission = ROUTE_PERMISSIONS[pathname];
   if (!permission) return true;
   return hasPermission(role, permission);

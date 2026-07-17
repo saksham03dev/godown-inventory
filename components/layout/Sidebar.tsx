@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSaleMode } from "@/contexts/SaleModeContext";
+import { BILLING_ENABLED } from "@/lib/constants/features";
 import { getNavItemsForRole, ROLE_LABELS } from "@/lib/auth/roles";
 
 const NAV_ICONS = {
@@ -28,6 +29,8 @@ const NAV_ICONS = {
   "/godowns": Warehouse,
   "/inventory": Boxes,
   "/scan": ScanLine,
+  "/stock-in": ScanLine,
+  "/stock-out": ScanLine,
   "/pending-billing": ClipboardList,
   "/open-bales": PackageOpen,
   "/billing": FileText,
@@ -75,7 +78,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             <div>
               <p className="text-sm font-semibold text-zinc-100">Store IMS</p>
               <p className="text-xs text-zinc-500">
-                {mode === "retail" ? "Retail sales" : "Wholesale ops"}
+                {BILLING_ENABLED
+                  ? mode === "retail"
+                    ? "Retail sales"
+                    : "Wholesale ops"
+                  : "Inventory"}
               </p>
             </div>
           </div>

@@ -13,7 +13,7 @@ export function useScanTally() {
   const recordScan = useCallback((result: ScanTransactionResult) => {
     if (!result.success || !result.product) return;
 
-    const bags = BAGS_PER_BALE;
+    const bags = result.bagsMoved ?? BAGS_PER_BALE;
     const productId = result.product.id;
 
     setTally((prev) => {

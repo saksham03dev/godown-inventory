@@ -28,7 +28,7 @@ export function ScanTallyPanel({ tally, mode, onReset }: ScanTallyPanelProps) {
         label: "text-danger",
         chip: "bg-danger/15 text-danger",
         divider: "border-danger/20",
-        title: "Wholesale Out Tally",
+        title: "Stock Out Tally",
       };
 
   return (

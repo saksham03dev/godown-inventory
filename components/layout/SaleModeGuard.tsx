@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getSaleModeRedirect } from "@/lib/constants/saleMode";
+import { BILLING_ENABLED } from "@/lib/constants/features";
 import { useSaleMode } from "@/contexts/SaleModeContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -14,7 +15,7 @@ export function SaleModeGuard({ children }: { children: React.ReactNode }) {
   const { role } = useAuth();
 
   useEffect(() => {
-    if (role === "employee") return;
+    if (!BILLING_ENABLED || role === "employee") return;
     const redirect = getSaleModeRedirect(pathname, mode);
     if (redirect) {
       router.replace(redirect);

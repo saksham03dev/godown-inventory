@@ -1,4 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  BILLING_ENABLED,
+  isBillingApiPath,
+  isBillingPagePath,
+} from "@/lib/constants/features";
 import { canAccessRoute, getDefaultRouteForRole, type UserRole } from "@/lib/auth/roles";
 import { SESSION_COOKIE, verifySessionToken, clearSessionCookie } from "@/lib/auth/session-edge";
 
@@ -66,8 +71,29 @@ export const updateSession = async (request: NextRequest) => {
 
     if (role === "employee" && pathname === "/") {
       const scanUrl = request.nextUrl.clone();
-      scanUrl.pathname = "/scan";
+      scanUrl.pathname = BILLING_ENABLED ? "/scan" : "/stock-in";
       return NextResponse.redirect(scanUrl);
+    }
+
+    if (!BILLING_ENABLED && pathname === "/scan") {
+      const stockInUrl = request.nextUrl.clone();
+      stockInUrl.pathname = "/stock-in";
+      return NextResponse.redirect(stockInUrl);
+    }
+
+    if (
+      !BILLING_ENABLED &&
+      (isBillingPagePath(pathname) || isBillingApiPath(pathname))
+    ) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { error: "Billing is disabled in stock-only mode." },
+          { status: 404 }
+        );
+      }
+      const fallbackUrl = request.nextUrl.clone();
+      fallbackUrl.pathname = getDefaultRouteForRole(role);
+      return NextResponse.redirect(fallbackUrl);
     }
 
     if (!canAccessRoute(pathname, role)) {

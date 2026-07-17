@@ -115,6 +115,8 @@ export interface ScanTransactionInput {
   godownId: string;
   transactionType: TransactionType;
   quantity?: number;
+  /** Bags to move; null/omit = full (in: 1000, out: all remaining). */
+  bagsQty?: number | null;
 }
 
 export interface ScanTransactionResult {
@@ -124,6 +126,7 @@ export interface ScanTransactionResult {
   newGodownStock?: number;
   stockUnit?: StockUnit;
   isUnitScan?: boolean;
+  bagsMoved?: number;
 }
 
 export type StockUnitStatus = "LABELLED" | "STOCKED_IN" | "STOCKED_OUT";

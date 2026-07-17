@@ -11,28 +11,15 @@ import type {
 export async function processScanTransaction(
   input: ScanTransactionInput
 ): Promise<ScanTransactionResult> {
-  const {
-    barcodeId,
-    godownId,
-    transactionType,
-    quantity = 1,
-  } = input;
+  const { barcodeId, godownId, transactionType, bagsQty } = input;
 
   if (!barcodeId.trim()) {
     return { success: false, message: "Invalid barcode scanned." };
   }
-  if (!godownId) {
+  if (transactionType === "STOCK_IN" && !godownId) {
     return {
       success: false,
       message: "Please select a godown before scanning.",
-    };
-  }
-
-  if (quantity !== 1) {
-    return {
-      success: false,
-      message:
-        "Only unit label scans (quantity 1) are supported. Use printed unit barcodes.",
     };
   }
 
@@ -44,6 +31,7 @@ export async function processScanTransaction(
         barcodeId: barcodeId.trim(),
         godownId,
         transactionType,
+        bagsQty: bagsQty ?? null,
       }),
     });
 

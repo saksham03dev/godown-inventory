@@ -25,11 +25,27 @@ export async function POST(request: Request) {
       auth.session.full_name ||
       auth.session.sub;
 
+    const bagsQty =
+      body.bagsQty === null || body.bagsQty === undefined
+        ? null
+        : Math.floor(Number(body.bagsQty));
+
+    if (
+      bagsQty !== null &&
+      (!Number.isFinite(bagsQty) || bagsQty < 1 || bagsQty > 1000)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Quantity must be between 1 and 1000 bags." },
+        { status: 400 }
+      );
+    }
+
     const result = await processUnitStockTransactionServer({
       barcodeId,
       godownId,
       transactionType,
       handledBy,
+      bagsQty,
     });
 
     return NextResponse.json(result, {

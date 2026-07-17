@@ -15,6 +15,7 @@ import {
   SALE_MODE_STORAGE_KEY,
   type SaleMode,
 } from "@/lib/constants/saleMode";
+import { BILLING_ENABLED } from "@/lib/constants/features";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface SaleModeContextValue {
@@ -37,7 +38,7 @@ export function SaleModeProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mode, setModeState] = useState<SaleMode>(DEFAULT_SALE_MODE);
 
-  const canSwitchMode = role === "admin" || role === "manager";
+  const canSwitchMode = BILLING_ENABLED && (role === "admin" || role === "manager");
 
   useEffect(() => {
     setModeState(readStoredMode());

@@ -24,6 +24,8 @@ function mapRpcScanResult(data: unknown): ScanTransactionResult {
     newGodownStock:
       typeof row.newGodownStock === "number" ? row.newGodownStock : undefined,
     isUnitScan: row.isUnitScan !== false,
+    bagsMoved:
+      typeof row.bagsMoved === "number" ? row.bagsMoved : undefined,
   };
 }
 
@@ -33,12 +35,13 @@ export async function processUnitStockTransactionServer(input: {
   godownId: string;
   transactionType: TransactionType;
   handledBy: string;
+  bagsQty?: number | null;
 }): Promise<ScanTransactionResult> {
   const barcode = input.barcodeId.trim();
   if (!barcode) {
     return { success: false, message: "Invalid barcode scanned." };
   }
-  if (!input.godownId) {
+  if (input.transactionType === "STOCK_IN" && !input.godownId) {
     return {
       success: false,
       message: "Please select a godown before scanning.",
@@ -61,9 +64,10 @@ export async function processUnitStockTransactionServer(input: {
       "process_unit_stock_transaction",
       {
         p_barcode: barcode,
-        p_godown_id: input.godownId,
+        p_godown_id: input.godownId || null,
         p_transaction_type: input.transactionType,
         p_handled_by: input.handledBy,
+        p_bags_qty: input.bagsQty ?? null,
       }
     );
 

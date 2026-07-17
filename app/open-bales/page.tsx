@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, ShoppingBag } from "lucide-react";
+import { ArrowDownToLine, RefreshCw } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { OpenBalesTable } from "@/components/billing/OpenBalesTable";
 import { AlertBanner } from "@/components/ui/AlertBanner";
@@ -69,11 +69,11 @@ export default function OpenBalesPage() {
           />
 
           <Link
-            href="/billing"
+            href="/stock-out"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-muted"
           >
-            <ShoppingBag className="h-4 w-4" />
-            Sell bags
+            <ArrowDownToLine className="h-4 w-4" />
+            Stock Out
           </Link>
         </div>
 

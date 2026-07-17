@@ -23,7 +23,8 @@ interface UseScanTransactionReturn {
   handleScan: (
     barcodeId: string,
     godownId: string,
-    transactionType: TransactionType
+    transactionType: TransactionType,
+    bagsQty?: number | null
   ) => Promise<ScanTransactionResult>;
   dismissAlert: () => void;
   clearApproveFlash: () => void;
@@ -78,9 +79,10 @@ export function useScanTransaction(
     async (
       barcodeId: string,
       godownId: string,
-      transactionType: TransactionType
+      transactionType: TransactionType,
+      bagsQty?: number | null
     ): Promise<ScanTransactionResult> => {
-      if (!godownId) {
+      if (transactionType === "STOCK_IN" && !godownId) {
         const result: ScanTransactionResult = {
           success: false,
           message: "Please select a godown before scanning.",
@@ -102,7 +104,7 @@ export function useScanTransaction(
           barcodeId,
           godownId,
           transactionType,
-          quantity: 1,
+          bagsQty: bagsQty ?? null,
         });
 
         setLastResult(result);

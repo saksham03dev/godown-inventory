@@ -256,7 +256,7 @@ export function ScanResultStrip({
       ) : lastResult?.success ? (
         <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wider text-success">
-            Last {mode === "STOCK_IN" ? "Stock In" : "Wholesale Out"}
+            Last {mode === "STOCK_IN" ? "Stock In" : "Stock Out"}
             {lastResult.isUnitScan ? " · Bale" : " · Product"}
           </p>
           <p className="mt-0.5 font-medium text-zinc-100">
