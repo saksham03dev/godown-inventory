@@ -25,7 +25,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm">
-      <p className="text-sm text-zinc-400">{message}</p>
+      <p className="whitespace-pre-line text-sm text-zinc-300">{message}</p>
       <div className="mt-6 flex justify-end gap-3">
         <button
           type="button"
