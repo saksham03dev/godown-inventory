@@ -44,9 +44,9 @@ export function PasswordModal({
             name="password"
             type="password"
             required
-            minLength={6}
+            minLength={8}
             className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
-            placeholder="At least 6 characters"
+            placeholder="At least 8 characters"
           />
         </div>
 

@@ -23,10 +23,9 @@ interface AuthContextValue {
   role: UserRole | null;
   loading: boolean;
   signIn: (
-    userId: string,
-    password: string,
-    role: UserRole
-  ) => Promise<{ error: string | null }>;
+    username: string,
+    password: string
+  ) => Promise<{ error: string | null; redirectTo?: string }>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   can: (permission: Parameters<typeof hasPermission>[1]) => boolean;
@@ -58,22 +57,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshSession();
   }, [refreshSession]);
 
-  const signIn = useCallback(
-    async (userId: string, password: string, role: UserRole) => {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, password, role }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { error: data.error ?? "Login failed." };
-      }
-      setProfile(data.user);
-      return { error: null };
-    },
-    []
-  );
+  const signIn = useCallback(async (username: string, password: string) => {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { error: data.error ?? "Login failed." };
+    }
+    setProfile(data.user);
+    return { error: null, redirectTo: data.redirectTo as string | undefined };
+  }, []);
 
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });

@@ -67,7 +67,7 @@ export function UserFormModal({
       open={open}
       onClose={onClose}
       title={isEdit ? "Edit User" : "Add User"}
-      description="Manage portal login accounts and roles."
+      description="Accounts use Supabase Auth. Staff sign in with username and password you distribute."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -126,10 +126,11 @@ export function UserFormModal({
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
               className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
+              placeholder="At least 8 characters"
             />
           </div>
         )}

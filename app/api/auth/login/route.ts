@@ -1,62 +1,83 @@
 import { NextResponse } from "next/server";
-import { verifyPassword } from "@/lib/auth/password";
-import {
-  createSessionToken,
-  SESSION_COOKIE,
-  sessionCookieOptions,
-} from "@/lib/auth/session";
-import { getUserWithPassword } from "@/lib/services/portalUserService";
-import type { UserRole } from "@/lib/auth/roles";
+import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { syntheticEmail } from "@/lib/auth/portalEmail";
+import { getDefaultRouteForRole, type UserRole } from "@/lib/auth/roles";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const userId = String(body.userId ?? "");
+    const username = String(body.username ?? "")
+      .trim()
+      .toLowerCase();
     const password = String(body.password ?? "");
-    const role = body.role as UserRole;
 
-    if (!userId || !password || !role) {
+    if (!username || !password) {
       return NextResponse.json(
-        { error: "Select a user and enter your password." },
+        { error: "Enter your username and password." },
         { status: 400 }
       );
     }
 
-    const user = await getUserWithPassword(userId);
-    if (!user || !user.is_active) {
-      return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
+    const admin = createServiceClient({ requireServiceRole: true });
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("id, username, full_name, role, is_active")
+      .eq("username", username)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Login profile lookup:", profileError);
+      return NextResponse.json(
+        { error: "Login failed. Check server configuration." },
+        { status: 500 }
+      );
     }
 
-    if (user.role !== role) {
+    if (!profile || !profile.is_active) {
       return NextResponse.json(
-        { error: "This user does not belong to the selected role." },
+        { error: "Invalid username or password." },
         { status: 401 }
       );
     }
 
-    const valid = await verifyPassword(password, user.password_hash);
-    if (!valid) {
-      return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const email = syntheticEmail(username);
+
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (authError || !authData.user) {
+      return NextResponse.json(
+        { error: "Invalid username or password." },
+        { status: 401 }
+      );
     }
 
-    const token = await createSessionToken({
-      sub: user.id,
-      username: user.username,
-      full_name: user.full_name,
-      role: user.role,
-    });
+    if (authData.user.id !== profile.id) {
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: "Invalid username or password." },
+        { status: 401 }
+      );
+    }
 
-    const response = NextResponse.json({
+    const role = profile.role as UserRole;
+
+    return NextResponse.json({
       user: {
-        id: user.id,
-        username: user.username,
-        full_name: user.full_name,
-        role: user.role,
+        id: profile.id,
+        username: profile.username,
+        full_name: profile.full_name,
+        role,
       },
+      redirectTo: getDefaultRouteForRole(role),
     });
-
-    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
-    return response;
   } catch (err) {
     console.error("Login error:", err);
     return NextResponse.json(

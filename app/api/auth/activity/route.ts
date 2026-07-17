@@ -1,32 +1,11 @@
 import { NextResponse } from "next/server";
-import {
-  clearSessionCookie,
-  createSessionToken,
-  getSessionFromCookies,
-  SESSION_COOKIE,
-  sessionCookieOptions,
-} from "@/lib/auth/session";
+import { getSessionFromCookies } from "@/lib/auth/api";
 
+/** Keep client idle timeout in sync — Auth cookies refresh via middleware. */
 export async function POST() {
   const session = await getSessionFromCookies();
   if (!session) {
-    const response = NextResponse.json(
-      { error: "Session expired due to inactivity." },
-      { status: 401 }
-    );
-    clearSessionCookie(response);
-    return response;
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const token = await createSessionToken({
-    sub: session.sub,
-    username: session.username,
-    full_name: session.full_name,
-    role: session.role,
-    last_active: Math.floor(Date.now() / 1000),
-  });
-
-  const response = NextResponse.json({ success: true });
-  response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
-  return response;
+  return NextResponse.json({ ok: true });
 }
