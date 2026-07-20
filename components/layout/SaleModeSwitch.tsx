@@ -18,12 +18,14 @@ export function SaleModeSwitch() {
         active={mode === "wholesale"}
         label="Wholesale"
         icon={Store}
+        activeClass="bg-wholesale/20 text-wholesale"
         onClick={() => setMode("wholesale")}
       />
       <ModeButton
         active={mode === "retail"}
         label="Retail"
         icon={ShoppingBag}
+        activeClass="bg-retail/20 text-retail"
         onClick={() => setMode("retail")}
       />
     </div>
@@ -34,11 +36,13 @@ function ModeButton({
   active,
   label,
   icon: Icon,
+  activeClass,
   onClick,
 }: {
   active: boolean;
   label: string;
   icon: typeof Store;
+  activeClass: string;
   onClick: () => void;
 }) {
   return (
@@ -48,9 +52,7 @@ function ModeButton({
       aria-selected={active}
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm ${
-        active
-          ? "bg-accent/20 text-accent shadow-sm"
-          : "text-zinc-500 hover:text-zinc-300"
+        active ? `${activeClass} shadow-sm` : "text-zinc-500 hover:text-zinc-300"
       }`}
     >
       <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

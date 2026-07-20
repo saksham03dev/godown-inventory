@@ -174,9 +174,9 @@ export function StockOutScanPanel() {
       />
 
       {saleMode === "wholesale" ? (
-        <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4 text-center">
-          <p className="text-xs font-medium uppercase tracking-wider text-accent">
-            Full bale
+        <div className="rounded-2xl border border-wholesale/30 bg-wholesale/5 p-4 text-center ring-1 ring-wholesale/10">
+          <p className="text-xs font-medium uppercase tracking-wider text-wholesale">
+            Wholesale · full bale
           </p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-zinc-100">
             {BAGS_PER_BALE.toLocaleString()}
@@ -187,8 +187,8 @@ export function StockOutScanPanel() {
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-center">
-          <p className="text-xs font-medium uppercase tracking-wider text-amber-400">
+        <div className="rounded-2xl border border-retail/30 bg-retail/5 p-4 text-center ring-1 ring-retail/10">
+          <p className="text-xs font-medium uppercase tracking-wider text-retail">
             Retail · by bags
           </p>
           <p className="mt-1 text-sm text-zinc-300">
@@ -228,7 +228,12 @@ export function StockOutScanPanel() {
         onDismissAlert={dismissAlert}
       />
 
-      <ScanTallyPanel tally={tally} mode="STOCK_OUT" onReset={resetTally} />
+      <ScanTallyPanel
+        tally={tally}
+        mode="STOCK_OUT"
+        stockOutSaleMode={saleMode}
+        onReset={resetTally}
+      />
 
       <p className="text-center text-xs text-zinc-600">
         {saleMode === "wholesale"

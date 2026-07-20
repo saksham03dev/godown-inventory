@@ -120,10 +120,10 @@ export function useScanTransaction(
           setApproveFlash(true);
           setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
-          if (result.qualityMixWarning) {
+          if (result.skuMixWarning) {
             setWarningAlert({
               type: "warning",
-              message: result.qualityMixWarning.message,
+              message: result.skuMixWarning.message,
             });
           } else {
             setWarningAlert(null);
@@ -171,10 +171,10 @@ export function useScanTransaction(
           setApproveFlash(true);
           setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
-          if (result.qualityMixWarning) {
+          if (result.skuMixWarning) {
             setWarningAlert({
               type: "warning",
-              message: result.qualityMixWarning.message,
+              message: result.skuMixWarning.message,
             });
           } else {
             setWarningAlert(null);

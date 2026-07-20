@@ -71,7 +71,10 @@ export function RetailCutDialog({
     >
       {unit && (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="rounded-xl border border-surface-border bg-surface-overlay/50 p-3">
+          <div className="rounded-xl border border-retail/25 bg-retail/5 p-3 ring-1 ring-retail/10">
+            <span className="mb-2 inline-block rounded-lg bg-retail/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-retail">
+              Retail cut
+            </span>
             <p className="text-sm font-medium text-zinc-100">
               Bale #{unit.unit_number} · {productName(unit)}
             </p>
@@ -103,7 +106,7 @@ export function RetailCutDialog({
               }}
               disabled={loading}
               placeholder="e.g. 10"
-              className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-lg font-semibold tabular-nums text-zinc-100 outline-none focus:border-accent disabled:opacity-50"
+              className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-lg font-semibold tabular-nums text-zinc-100 outline-none focus:border-retail disabled:opacity-50"
             />
             <p className="mt-1.5 text-xs text-zinc-500">
               Enter 1–{remaining.toLocaleString()} bags (max{" "}
@@ -115,7 +118,7 @@ export function RetailCutDialog({
             <p className="text-sm text-zinc-300">
               {validCut ? (
                 leftAfter === 0 ? (
-                  <span className="text-amber-400">
+                  <span className="text-retail">
                     This will empty the bale (0 bags left).
                   </span>
                 ) : (
@@ -145,7 +148,7 @@ export function RetailCutDialog({
             <button
               type="submit"
               disabled={loading || !validCut}
-              className="rounded-xl bg-danger px-4 py-2.5 text-sm font-medium text-white transition hover:bg-danger-muted disabled:opacity-50"
+              className="rounded-xl bg-retail px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:bg-retail-muted disabled:opacity-50"
             >
               {loading ? "Processing…" : "Stock Out"}
             </button>

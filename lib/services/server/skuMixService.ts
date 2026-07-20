@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  buildQualityMixWarning,
-  isDifferentQuality,
+  buildSkuMixWarning,
+  isSameProductCode,
   isSameProductName,
-  type QualityMixConflict,
-  type QualityMixWarning,
-} from "@/lib/utils/qualityMix";
+  type SkuMixConflict,
+  type SkuMixWarning,
+} from "@/lib/utils/skuMix";
 
 type ProductRow = {
   id: string;
@@ -24,13 +24,13 @@ function normalizeRelation<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-/** After stock-in, warn when the same product name already exists with another quality. */
-export async function detectQualityMixAfterStockIn(
+/** After stock-in, warn when the same product name exists with a different backend code. */
+export async function detectSkuMixAfterStockIn(
   supabase: SupabaseClient,
   godownId: string,
   product: Pick<ProductRow, "id" | "name" | "quality" | "size" | "product_code">,
   incomingBatchCode?: string | null
-): Promise<QualityMixWarning | undefined> {
+): Promise<SkuMixWarning | undefined> {
   const { data: units, error } = await supabase
     .from("stock_units")
     .select(
@@ -45,7 +45,7 @@ export async function detectQualityMixAfterStockIn(
 
   if (error || !units?.length) return undefined;
 
-  const conflicts = new Map<string, QualityMixConflict>();
+  const conflicts = new Map<string, SkuMixConflict>();
 
   for (const unit of units) {
     const rowProduct = normalizeRelation(
@@ -56,26 +56,27 @@ export async function detectQualityMixAfterStockIn(
     );
     if (!rowProduct || rowProduct.id === product.id) continue;
     if (!isSameProductName(rowProduct.name, product.name)) continue;
-    if (!isDifferentQuality(rowProduct.quality, product.quality)) continue;
+    if (isSameProductCode(rowProduct.product_code, product.product_code)) continue;
 
-    const conflictKey = `${rowProduct.product_code}:${rowProduct.quality ?? ""}:${rowProduct.size ?? ""}:${batch?.batch_code ?? ""}`;
+    const conflictKey = rowProduct.product_code;
     if (conflicts.has(conflictKey)) continue;
 
     conflicts.set(conflictKey, {
-      quality: rowProduct.quality?.trim() || null,
       productCode: rowProduct.product_code,
       size: rowProduct.size?.trim() || null,
       batchCode: batch?.batch_code ?? null,
+      quality: rowProduct.quality?.trim() || null,
     });
   }
 
   if (conflicts.size === 0) return undefined;
 
-  return buildQualityMixWarning({
+  return buildSkuMixWarning({
     productName: product.name,
-    incomingQuality: product.quality,
+    incomingProductCode: product.product_code,
     incomingSize: product.size,
     incomingBatchCode: incomingBatchCode,
+    incomingQuality: product.quality,
     conflicts: Array.from(conflicts.values()),
   });
 }

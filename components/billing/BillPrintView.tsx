@@ -73,14 +73,6 @@ export function BillPrintView({ bill }: BillPrintViewProps) {
                   {item.product_name}
                   <br />
                   <span className="text-xs text-zinc-500">{item.product_code}</span>
-                  {item.source_name && (
-                    <>
-                      <br />
-                      <span className="text-xs text-zinc-500">
-                        {item.source_name}
-                      </span>
-                    </>
-                  )}
                   {note && item.sale_channel === "RETAIL" && (
                     <>
                       <br />

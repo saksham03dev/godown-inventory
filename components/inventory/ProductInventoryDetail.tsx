@@ -102,14 +102,12 @@ export function ProductInventoryDetail({
   };
 
   const sizeLabel = product?.size?.trim() || null;
-  const qualityLabel = product?.quality?.trim() || null;
   const title = product?.product_name ?? "Product";
   const description =
     view.level === "sources"
       ? [
-          qualityLabel ? `Quality ${qualityLabel}` : null,
-          sizeLabel ? `Size ${sizeLabel}` : null,
           product?.product_code,
+          sizeLabel ? `Size ${sizeLabel}` : null,
           godownName,
           `${(product?.quantity ?? 0).toLocaleString()} bags · by source`,
         ]
@@ -170,7 +168,7 @@ export function ProductInventoryDetail({
           <SkusView
             group={view.group}
             productSize={sizeLabel}
-            productQuality={qualityLabel}
+            productCode={product?.product_code ?? null}
             onSelect={(unit) =>
               setView({ level: "sku", group: view.group, unit })
             }
@@ -181,7 +179,7 @@ export function ProductInventoryDetail({
             }
           />
         ) : view.level === "sku" ? (
-          <LabelDetailCard unit={view.unit} />
+          <LabelDetailCard unit={view.unit} showBatchInboundMeta />
         ) : (
           <BatchEditForm
             batch={view.group.batch}
@@ -247,19 +245,17 @@ function SourcesView({
           <OpenBaleCountBadge
             count={breakdown.batches.reduce((sum, g) => sum + g.open_bales, 0)}
           />
-          {product?.quality ? (
-            <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
-              Quality {product.quality}
-            </span>
-          ) : null}
           {product?.size ? (
             <span className="rounded-lg bg-zinc-100/10 px-2.5 py-1 text-xs font-semibold text-zinc-100">
               Size {product.size}
             </span>
           ) : null}
-          <p className="font-mono text-xs text-zinc-500">
+          <span className="rounded-lg bg-accent/10 px-2.5 py-1 font-mono text-xs font-semibold text-accent">
             {product?.product_code}
-          </p>
+          </span>
+          {product?.quality ? (
+            <span className="text-xs text-zinc-600">{product.quality}</span>
+          ) : null}
         </div>
       </div>
 
@@ -330,13 +326,13 @@ function SourcesView({
 function SkusView({
   group,
   productSize,
-  productQuality,
+  productCode,
   onSelect,
   onEdit,
 }: {
   group: ProductGodownBatchGroup;
   productSize?: string | null;
-  productQuality?: string | null;
+  productCode?: string | null;
   onSelect: (unit: StockUnit) => void;
   onEdit?: () => void;
 }) {
@@ -348,9 +344,9 @@ function SkusView({
             <p className="text-sm font-medium text-zinc-200">
               {group.batch.source_name}
             </p>
-            {productQuality ? (
-              <span className="rounded-lg bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-200">
-                Quality {productQuality}
+            {productCode ? (
+              <span className="rounded-lg bg-accent/10 px-2 py-0.5 font-mono text-xs font-semibold text-accent">
+                {productCode}
               </span>
             ) : null}
             {productSize ? (
@@ -361,6 +357,7 @@ function SkusView({
           </div>
           <p className="mt-0.5 font-mono text-xs text-zinc-500">
             {group.batch.batch_code}
+            {group.batch.purchase_no ? ` · ${group.batch.purchase_no}` : ""}
             {group.batch.notes ? ` · ${group.batch.notes}` : ""}
           </p>
           <p className="mt-1 text-xs text-zinc-400">

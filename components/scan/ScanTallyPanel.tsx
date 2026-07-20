@@ -2,6 +2,7 @@
 
 import { RotateCcw } from "lucide-react";
 import { formatBagCount } from "@/lib/utils/inventory";
+import type { StockOutSaleMode } from "@/lib/constants/stockOut";
 import type { ScanTallyState } from "@/lib/types/scan";
 import type { TransactionType } from "@/lib/types/database";
 
@@ -9,27 +10,59 @@ interface ScanTallyPanelProps {
   tally: ScanTallyState;
   mode: TransactionType;
   onReset: () => void;
+  stockOutSaleMode?: StockOutSaleMode;
 }
 
-export function ScanTallyPanel({ tally, mode, onReset }: ScanTallyPanelProps) {
-  const isStockIn = mode === "STOCK_IN";
-  const accent = isStockIn
-    ? {
-        border: "border-success/30",
-        bg: "bg-success/5",
-        label: "text-success",
-        chip: "bg-success/15 text-success",
-        divider: "border-success/20",
-        title: "Stock In Tally",
-      }
-    : {
-        border: "border-danger/30",
-        bg: "bg-danger/5",
-        label: "text-danger",
-        chip: "bg-danger/15 text-danger",
-        divider: "border-danger/20",
-        title: "Stock Out Tally",
-      };
+const STOCK_IN_ACCENT = {
+  border: "border-success/30",
+  bg: "bg-success/5",
+  label: "text-success",
+  chip: "bg-success/15 text-success",
+  divider: "border-success/20",
+  title: "Stock In Tally",
+};
+
+const STOCK_OUT_WHOLESALE_ACCENT = {
+  border: "border-wholesale/30",
+  bg: "bg-wholesale/5",
+  label: "text-wholesale",
+  chip: "bg-wholesale/15 text-wholesale",
+  divider: "border-wholesale/20",
+  title: "Wholesale Tally",
+};
+
+const STOCK_OUT_RETAIL_ACCENT = {
+  border: "border-retail/30",
+  bg: "bg-retail/5",
+  label: "text-retail",
+  chip: "bg-retail/15 text-retail",
+  divider: "border-retail/20",
+  title: "Retail Tally",
+};
+
+const STOCK_OUT_DEFAULT_ACCENT = {
+  border: "border-danger/30",
+  bg: "bg-danger/5",
+  label: "text-danger",
+  chip: "bg-danger/15 text-danger",
+  divider: "border-danger/20",
+  title: "Stock Out Tally",
+};
+
+export function ScanTallyPanel({
+  tally,
+  mode,
+  onReset,
+  stockOutSaleMode,
+}: ScanTallyPanelProps) {
+  const accent =
+    mode === "STOCK_IN"
+      ? STOCK_IN_ACCENT
+      : stockOutSaleMode === "wholesale"
+        ? STOCK_OUT_WHOLESALE_ACCENT
+        : stockOutSaleMode === "retail"
+          ? STOCK_OUT_RETAIL_ACCENT
+          : STOCK_OUT_DEFAULT_ACCENT;
 
   return (
     <div

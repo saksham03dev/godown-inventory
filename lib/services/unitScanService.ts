@@ -60,23 +60,31 @@ export async function processScanTransaction(
 
 export async function processTransferTransaction(input: {
   barcodeId: string;
-  fromGodownId: string;
+  phase: "dispatch" | "receive";
+  fromGodownId?: string;
   toGodownId: string;
 }): Promise<ScanTransactionResult> {
   if (!input.barcodeId.trim()) {
     return { success: false, message: "Invalid barcode scanned." };
   }
-  if (!input.fromGodownId || !input.toGodownId) {
+  if (!input.toGodownId) {
     return {
       success: false,
-      message: "Select both source and destination godowns.",
+      message: "Select the destination godown.",
+    };
+  }
+  if (input.phase === "dispatch" && !input.fromGodownId) {
+    return {
+      success: false,
+      message: "Select the source godown for dispatch.",
     };
   }
 
   try {
     return await postInventoryJson("/api/inventory/transfer", {
       barcodeId: input.barcodeId.trim(),
-      fromGodownId: input.fromGodownId,
+      phase: input.phase,
+      fromGodownId: input.fromGodownId ?? "",
       toGodownId: input.toGodownId,
     });
   } catch (err) {

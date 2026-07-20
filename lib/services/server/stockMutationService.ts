@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchBillWithItems } from "@/lib/services/billService.server";
-import { detectQualityMixAfterStockIn } from "@/lib/services/server/qualityMixService";
+import { detectSkuMixAfterStockIn } from "@/lib/services/server/skuMixService";
 import { isProductBarcode } from "@/lib/utils/barcode";
 import type {
   MutationResult,
@@ -27,6 +27,10 @@ function mapRpcScanResult(data: unknown): ScanTransactionResult {
     isUnitScan: row.isUnitScan !== false,
     bagsMoved:
       typeof row.bagsMoved === "number" ? row.bagsMoved : undefined,
+    transferPhase:
+      row.transferPhase === "dispatch" || row.transferPhase === "receive"
+        ? row.transferPhase
+        : undefined,
   };
 }
 
@@ -83,7 +87,7 @@ export async function processUnitStockTransactionServer(input: {
       result.product &&
       input.godownId
     ) {
-      const qualityMixWarning = await detectQualityMixAfterStockIn(
+      const skuMixWarning = await detectSkuMixAfterStockIn(
         supabase,
         input.godownId,
         {
@@ -96,8 +100,8 @@ export async function processUnitStockTransactionServer(input: {
         result.stockUnit?.stock_batches?.batch_code ?? null
       );
 
-      if (qualityMixWarning) {
-        result.qualityMixWarning = qualityMixWarning;
+      if (skuMixWarning) {
+        result.skuMixWarning = skuMixWarning;
       }
     }
 
@@ -111,7 +115,81 @@ export async function processUnitStockTransactionServer(input: {
   }
 }
 
-/** Server-only: move sealed full bale between godowns. */
+/** Server-only: two-step transfer — dispatch at source or receive at destination. */
+export async function processTransferServer(input: {
+  barcodeId: string;
+  phase: "dispatch" | "receive";
+  fromGodownId?: string;
+  toGodownId: string;
+  handledBy: string;
+}): Promise<ScanTransactionResult> {
+  const barcode = input.barcodeId.trim();
+  if (!barcode) {
+    return { success: false, message: "Invalid barcode scanned." };
+  }
+  if (!input.toGodownId) {
+    return {
+      success: false,
+      message: "Select the destination godown.",
+    };
+  }
+  if (input.phase === "dispatch" && !input.fromGodownId) {
+    return {
+      success: false,
+      message: "Select the source godown for dispatch.",
+    };
+  }
+  if (
+    input.phase === "dispatch" &&
+    input.fromGodownId === input.toGodownId
+  ) {
+    return {
+      success: false,
+      message: "Source and destination godowns must differ.",
+    };
+  }
+  if (isProductBarcode(barcode)) {
+    return {
+      success: false,
+      message: "Use unit label barcodes (87…).",
+      isUnitScan: false,
+    };
+  }
+
+  try {
+    const supabase = createServiceClient({ requireServiceRole: true });
+
+    if (input.phase === "dispatch") {
+      const { data, error } = await supabase.rpc("dispatch_transfer_bale", {
+        p_barcode: barcode,
+        p_from_godown_id: input.fromGodownId!,
+        p_to_godown_id: input.toGodownId,
+        p_handled_by: input.handledBy,
+      });
+      if (error) {
+        return { success: false, message: error.message };
+      }
+      return mapRpcScanResult(data);
+    }
+
+    const { data, error } = await supabase.rpc("receive_transfer_bale", {
+      p_barcode: barcode,
+      p_to_godown_id: input.toGodownId,
+      p_handled_by: input.handledBy,
+    });
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return mapRpcScanResult(data);
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Transfer failed.",
+    };
+  }
+}
+
+/** @deprecated Use processTransferServer with phase dispatch + receive. */
 export async function transferSealedBaleServer(input: {
   barcodeId: string;
   fromGodownId: string;

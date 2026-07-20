@@ -169,14 +169,14 @@ export function ProductFormModal({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Quality
+              Quality <span className="normal-case text-zinc-600">(optional)</span>
             </label>
             <input
               type="text"
               value={form.quality ?? ""}
               onChange={(e) => update("quality", e.target.value)}
               className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
-              placeholder="e.g. A, Export, Premium"
+              placeholder="Extra info only — not used for matching"
             />
           </div>
         </div>

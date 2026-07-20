@@ -34,6 +34,16 @@ const config: Config = {
           muted: "#7e22ce",
           glow: "rgba(168, 85, 247, 0.12)",
         },
+        wholesale: {
+          DEFAULT: "#3b82f6",
+          muted: "#2563eb",
+          glow: "rgba(59, 130, 246, 0.12)",
+        },
+        retail: {
+          DEFAULT: "#eab308",
+          muted: "#ca8a04",
+          glow: "rgba(234, 179, 8, 0.12)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],

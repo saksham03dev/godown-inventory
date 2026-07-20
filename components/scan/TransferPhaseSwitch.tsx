@@ -1,38 +1,38 @@
 "use client";
 
-import type { StockOutSaleMode } from "@/lib/constants/stockOut";
+import type { TransferPhase } from "@/lib/constants/transfer";
 
-interface StockOutModeSwitchProps {
-  mode: StockOutSaleMode;
-  onChange: (mode: StockOutSaleMode) => void;
+interface TransferPhaseSwitchProps {
+  phase: TransferPhase;
+  onChange: (phase: TransferPhase) => void;
   disabled?: boolean;
 }
 
-const MODE_STYLES = {
-  wholesale: {
-    active: "bg-wholesale/15 ring-1 ring-wholesale/45",
-    title: "text-wholesale",
+const PHASE_STYLES = {
+  dispatch: {
+    active: "bg-danger/15 ring-1 ring-danger/40",
+    title: "text-danger",
   },
-  retail: {
-    active: "bg-retail/15 ring-1 ring-retail/45",
-    title: "text-retail",
+  receive: {
+    active: "bg-success/15 ring-1 ring-success/40",
+    title: "text-success",
   },
 } as const;
 
-export function StockOutModeSwitch({
-  mode,
+export function TransferPhaseSwitch({
+  phase,
   onChange,
   disabled,
-}: StockOutModeSwitchProps) {
+}: TransferPhaseSwitchProps) {
   return (
     <div className="rounded-2xl border border-surface-border bg-surface-raised p-4">
       <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-        Stock out mode
+        Transfer step
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        {(["wholesale", "retail"] as const).map((option) => {
-          const styles = MODE_STYLES[option];
-          const active = mode === option;
+        {(["dispatch", "receive"] as const).map((option) => {
+          const styles = PHASE_STYLES[option];
+          const active = phase === option;
           return (
             <button
               key={option}
@@ -50,12 +50,12 @@ export function StockOutModeSwitch({
                   active ? styles.title : "text-zinc-300"
                 }`}
               >
-                {option === "wholesale" ? "Wholesale" : "Retail"}
+                {option === "dispatch" ? "1. Dispatch" : "2. Receive"}
               </p>
               <p className="mt-0.5 text-xs text-zinc-500">
-                {option === "wholesale"
-                  ? "Full bale · scan & go"
-                  : "Scan · enter bags to cut"}
+                {option === "dispatch"
+                  ? "Scan at source godown"
+                  : "Scan at destination godown"}
               </p>
             </button>
           );

@@ -1,15 +1,78 @@
+import { Fragment } from "react";
 import { Pencil, Trash2 } from "lucide-react";
+import type { ProductTableColumnId } from "@/lib/constants/productTableColumns";
 import type { Product } from "@/lib/types/database";
 
 interface ProductTableProps {
   products: Product[];
+  visibleColumns: ProductTableColumnId[];
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   canDelete?: boolean;
 }
 
+const COLUMN_HEADERS: Record<
+  ProductTableColumnId,
+  { label: string; align: "left" | "right" }
+> = {
+  name: { label: "Name", align: "left" },
+  product_code: { label: "Backend Code", align: "left" },
+  barcode_id: { label: "Barcode", align: "left" },
+  retail_selling_price: { label: "Price / bag", align: "right" },
+  size: { label: "Size", align: "left" },
+  total_stock: { label: "Stock (bags)", align: "right" },
+  notes: { label: "Notes", align: "left" },
+};
+
+function renderCell(column: ProductTableColumnId, product: Product) {
+  switch (column) {
+    case "name":
+      return (
+        <td className="px-5 py-4 font-medium text-zinc-200">{product.name}</td>
+      );
+    case "product_code":
+      return (
+        <td className="px-5 py-4">
+          <span className="rounded-md bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
+            {product.product_code}
+          </span>
+        </td>
+      );
+    case "barcode_id":
+      return (
+        <td className="px-5 py-4 font-mono text-xs text-zinc-400">
+          {product.barcode_id}
+        </td>
+      );
+    case "retail_selling_price":
+      return (
+        <td className="px-5 py-4 text-right font-medium text-zinc-200">
+          ₹{Number(product.retail_selling_price ?? 0).toFixed(2)}
+        </td>
+      );
+    case "size":
+      return (
+        <td className="px-5 py-4 text-zinc-400">{product.size || "—"}</td>
+      );
+    case "total_stock":
+      return (
+        <td className="px-5 py-4 text-right font-semibold text-zinc-200">
+          {product.total_stock.toLocaleString()}
+        </td>
+      );
+    case "notes":
+      return (
+        <td className="max-w-[240px] truncate px-5 py-4 text-zinc-500">
+          {[product.quality, product.special_note].filter(Boolean).join(" · ") ||
+            "—"}
+        </td>
+      );
+  }
+}
+
 export function ProductTable({
   products,
+  visibleColumns,
   onEdit,
   onDelete,
   canDelete = true,
@@ -31,30 +94,19 @@ export function ProductTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-accent/15 bg-accent/5">
-              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Name
-              </th>
-              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Backend Code
-              </th>
-              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Barcode
-              </th>
-              <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Price / bag
-              </th>
-              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Size
-              </th>
-              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Quality
-              </th>
-              <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Stock (bags)
-              </th>
-              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Special Note
-              </th>
+              {visibleColumns.map((column) => {
+                const { label, align } = COLUMN_HEADERS[column];
+                return (
+                  <th
+                    key={column}
+                    className={`px-5 py-3.5 text-xs font-medium uppercase tracking-wider text-zinc-500 ${
+                      align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {label}
+                  </th>
+                );
+              })}
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Actions
               </th>
@@ -66,38 +118,9 @@ export function ProductTable({
                 key={product.id}
                 className="transition hover:bg-white/[0.02]"
               >
-                <td className="px-5 py-4 font-medium text-zinc-200">
-                  {product.name}
-                </td>
-                <td className="px-5 py-4">
-                  <span className="rounded-md bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
-                    {product.product_code}
-                  </span>
-                </td>
-                <td className="px-5 py-4 font-mono text-xs text-zinc-400">
-                  {product.barcode_id}
-                </td>
-                <td className="px-5 py-4 text-right font-medium text-zinc-200">
-                  ₹{Number(product.retail_selling_price ?? 0).toFixed(2)}
-                </td>
-                <td className="px-5 py-4 text-zinc-400">
-                  {product.size || "—"}
-                </td>
-                <td className="px-5 py-4">
-                  {product.quality ? (
-                    <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
-                      {product.quality}
-                    </span>
-                  ) : (
-                    <span className="text-zinc-600">—</span>
-                  )}
-                </td>
-                <td className="px-5 py-4 text-right font-semibold text-zinc-200">
-                  {product.total_stock.toLocaleString()}
-                </td>
-                <td className="max-w-[200px] truncate px-5 py-4 text-zinc-500">
-                  {product.special_note || "—"}
-                </td>
+                {visibleColumns.map((column) => (
+                  <Fragment key={column}>{renderCell(column, product)}</Fragment>
+                ))}
                 <td className="px-5 py-4">
                   <div className="flex justify-end gap-1">
                     <button

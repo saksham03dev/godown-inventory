@@ -1,4 +1,4 @@
-import type { QualityMixWarning } from "@/lib/utils/qualityMix";
+import type { SkuMixWarning } from "@/lib/utils/skuMix";
 
 export type TransactionType = "STOCK_IN" | "STOCK_OUT";
 export type UserRole = "admin" | "manager" | "employee";
@@ -143,11 +143,17 @@ export interface ScanTransactionResult {
   stockUnit?: StockUnit;
   isUnitScan?: boolean;
   bagsMoved?: number;
-  /** Set after stock-in when same product name exists with another quality in godown. */
-  qualityMixWarning?: QualityMixWarning;
+  /** Set after stock-in when same product name exists with another backend code in godown. */
+  skuMixWarning?: SkuMixWarning;
+  /** dispatch = scanned at source; receive = scanned at destination. */
+  transferPhase?: "dispatch" | "receive";
 }
 
-export type StockUnitStatus = "LABELLED" | "STOCKED_IN" | "STOCKED_OUT";
+export type StockUnitStatus =
+  | "LABELLED"
+  | "STOCKED_IN"
+  | "STOCKED_OUT"
+  | "IN_TRANSIT";
 export type BillStatus = "DRAFT" | "FINALIZED";
 export type LabelSize = "square" | "wide";
 
@@ -178,6 +184,9 @@ export interface StockUnit {
   stocked_in_at: string | null;
   stocked_out_at: string | null;
   bill_id: string | null;
+  transfer_from_godown_id?: string | null;
+  transfer_to_godown_id?: string | null;
+  transfer_dispatched_at?: string | null;
   /** Bags remaining in this bale (0–1000). */
   remaining_bags: number;
   /** Set when bale is first partially sold in retail. */

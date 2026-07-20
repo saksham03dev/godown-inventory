@@ -7,6 +7,8 @@ import { formatBagCount, isOpenBale, isSealedBale } from "@/lib/utils/inventory"
 
 interface LabelDetailCardProps {
   unit: StockUnit;
+  /** Source / purchase no. — only in inventory batch drill-down. */
+  showBatchInboundMeta?: boolean;
 }
 
 function DetailRow({
@@ -37,9 +39,13 @@ const STATUS_LABELS: Record<string, string> = {
   LABELLED: "Labelled (not stocked in)",
   STOCKED_IN: "Stocked in",
   STOCKED_OUT: "Stocked out",
+  IN_TRANSIT: "In transit",
 };
 
-export function LabelDetailCard({ unit }: LabelDetailCardProps) {
+export function LabelDetailCard({
+  unit,
+  showBatchInboundMeta = false,
+}: LabelDetailCardProps) {
   const product = unit.products;
   const batch = unit.stock_batches;
   const godown = unit.godowns;
@@ -86,7 +92,7 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
           <DetailRow label="Name" value={product?.name} />
           <DetailRow label="Backend Code" value={product?.product_code} mono />
           <DetailRow label="Size" value={product?.size} />
-          <DetailRow label="Quality" value={product?.quality} />
+          <DetailRow label="Notes" value={product?.quality} />
           <DetailRow
             label="Price / bag"
             value={
@@ -121,8 +127,12 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
         <div className="space-y-2 py-3">
           <p className="text-xs font-semibold text-zinc-400">Batch</p>
           <DetailRow label="Batch Code" value={batch?.batch_code} mono />
-          <DetailRow label="Source (inbound)" value={batch?.source_name} />
-          <DetailRow label="Purchase no." value={batch?.purchase_no} />
+          {showBatchInboundMeta ? (
+            <>
+              <DetailRow label="Source (inbound)" value={batch?.source_name} />
+              <DetailRow label="Purchase no." value={batch?.purchase_no} />
+            </>
+          ) : null}
         </div>
 
         {unit.status === "STOCKED_OUT" && (

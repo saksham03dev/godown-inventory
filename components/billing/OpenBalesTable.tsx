@@ -74,11 +74,6 @@ export function OpenBalesTable({ units }: OpenBalesTableProps) {
                   </td>
                   <td className="px-4 py-3.5 text-zinc-300">
                     #{unit.unit_number}
-                    {unit.stock_batches?.source_name ? (
-                      <span className="ml-1 text-xs text-zinc-500">
-                        · {unit.stock_batches.source_name}
-                      </span>
-                    ) : null}
                   </td>
                   <td className="px-4 py-3.5 font-mono text-xs text-zinc-400">
                     {unit.unit_barcode}

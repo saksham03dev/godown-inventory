@@ -68,9 +68,6 @@ export function BillItemsTable({
                   <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-600">
                     {item.unit_barcode}
                   </p>
-                  {item.source_name && (
-                    <p className="text-xs text-zinc-500">{item.source_name}</p>
-                  )}
                 </div>
                 {!readonly && (
                   <button
@@ -151,9 +148,6 @@ export function BillItemsTable({
                   <td className="px-4 py-3">
                     <p className="font-medium text-zinc-200">{item.product_name}</p>
                     <p className="text-xs text-zinc-500">{item.product_code}</p>
-                    {item.source_name && (
-                      <p className="text-xs text-zinc-600">{item.source_name}</p>
-                    )}
                   </td>
                   <td className="px-4 py-3">
                     {unitLabel ? (

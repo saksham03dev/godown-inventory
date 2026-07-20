@@ -12,7 +12,7 @@ export default function StockTransferPage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <DashboardLayout title="Transfer" subtitle="Move sealed bales between godowns">
+      <DashboardLayout title="Transfer" subtitle="Dispatch at source, then receive at destination — two scans per bale">
         <AlertBanner
           alert={{
             type: "info",
@@ -26,7 +26,7 @@ export default function StockTransferPage() {
   return (
     <DashboardLayout
       title="Transfer"
-      subtitle="Move sealed full bales between godowns"
+      subtitle="Dispatch at source, then receive at destination — two scans per bale"
     >
       {loading ? (
         <LoadingSpinner label="Loading godowns…" />

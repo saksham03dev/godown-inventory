@@ -89,12 +89,8 @@ export function GodownInventoryCharts({
             const pct = totalBags > 0 ? (group.quantity / totalBags) * 100 : 0;
             const barWidth = maxQty > 0 ? (group.quantity / maxQty) * 100 : 0;
             const color = BAR_COLORS[index % BAR_COLORS.length];
-            const qualities = [
-              ...new Set(
-                group.variants
-                  .map((v) => v.quality?.trim())
-                  .filter(Boolean) as string[]
-              ),
+            const codes = [
+              ...new Set(group.variants.map((v) => v.product_code)),
             ];
             const sizes = [
               ...new Set(
@@ -113,14 +109,14 @@ export function GodownInventoryCharts({
                     </p>
                     <p className="text-xs text-zinc-500">
                       {group.variants.length > 1 ? (
-                        <span>{group.variants.length} variants · </span>
+                        <span>{group.variants.length} SKUs · </span>
                       ) : null}
-                      {qualities.length ? (
-                        <span className="font-semibold text-amber-200/90">
-                          {qualities.join(", ")}
+                      {codes.length ? (
+                        <span className="font-mono text-zinc-400">
+                          {codes.join(", ")}
                         </span>
                       ) : null}
-                      {qualities.length && sizes.length ? " · " : ""}
+                      {codes.length && sizes.length ? " · " : ""}
                       {sizes.length ? (
                         <span className="font-semibold text-zinc-300">
                           {sizes.map((s) => `Size ${s}`).join(", ")}

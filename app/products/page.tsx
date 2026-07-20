@@ -4,12 +4,14 @@ import { useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProductTable } from "@/components/products/ProductTable";
+import { ProductColumnPicker } from "@/components/products/ProductColumnPicker";
 import { ProductFormModal } from "@/components/products/ProductFormModal";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProducts } from "@/hooks/useProducts";
+import { useProductTableColumns } from "@/hooks/useProductTableColumns";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { Product, ProductInput } from "@/lib/types/database";
 
@@ -31,6 +33,13 @@ export default function ProductsPage() {
     removeProduct,
     dismissAlert,
   } = useProducts();
+
+  const {
+    visibleColumns,
+    toggleColumn,
+    resetColumns,
+    columnLabels,
+  } = useProductTableColumns();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -123,6 +132,18 @@ export default function ProductsPage() {
           <AlertBanner alert={alert} onDismiss={dismissAlert} />
         )}
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-zinc-500">
+            {products.length} product{products.length === 1 ? "" : "s"}
+          </p>
+          <ProductColumnPicker
+            visibleColumns={visibleColumns}
+            columnLabels={columnLabels}
+            onToggle={toggleColumn}
+            onReset={resetColumns}
+          />
+        </div>
+
         {loading ? (
           <LoadingSpinner label="Loading products…" />
         ) : error ? (
@@ -130,6 +151,7 @@ export default function ProductsPage() {
         ) : (
           <ProductTable
             products={products}
+            visibleColumns={visibleColumns}
             onEdit={handleEdit}
             onDelete={setDeleteTarget}
             canDelete={canDelete}

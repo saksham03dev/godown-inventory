@@ -14,14 +14,14 @@ interface InventoryTableProps {
 
 function VariantMeta({ item }: { item: GodownStockItem }) {
   const parts = [
-    item.quality ? `Quality ${item.quality}` : null,
     item.size ? `Size ${item.size}` : null,
-    item.product_code,
+    item.quality ? item.quality : null,
   ].filter(Boolean);
 
   return (
     <p className="mt-0.5 truncate text-xs text-zinc-500">
-      {parts.join(" · ")}
+      <span className="font-mono text-accent">{item.product_code}</span>
+      {parts.length ? ` · ${parts.join(" · ")}` : ""}
     </p>
   );
 }
@@ -64,10 +64,10 @@ export function InventoryTable({
                 Product
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Variants
+                Backend Code
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Quality / Size
+                Size
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Bags
@@ -84,12 +84,8 @@ export function InventoryTable({
               const isExpanded =
                 group.variants.length === 1 || expanded.has(group.key);
               const single = group.variants.length === 1;
-              const qualities = [
-                ...new Set(
-                  group.variants
-                    .map((v) => v.quality?.trim())
-                    .filter(Boolean) as string[]
-                ),
+              const codes = [
+                ...new Set(group.variants.map((v) => v.product_code)),
               ];
               const sizes = [
                 ...new Set(
@@ -128,39 +124,33 @@ export function InventoryTable({
                         <OpenBaleCountBadge count={group.open_bales} />
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-zinc-400">
+                    <td className="px-5 py-4">
                       {single ? (
                         <span className="font-mono text-xs text-accent">
                           {group.variants[0].product_code}
                         </span>
                       ) : (
                         <span className="rounded-lg bg-surface-overlay px-2 py-0.5 text-xs text-zinc-300">
-                          {group.variants.length} SKUs
+                          {codes.length} code{codes.length === 1 ? "" : "s"}
                         </span>
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {qualities.map((q) => (
-                          <span
-                            key={q}
-                            className="rounded-lg bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-200"
-                          >
-                            {q}
+                      {single ? (
+                        group.variants[0].size ? (
+                          <span className="rounded-lg bg-zinc-100/10 px-2.5 py-1 text-sm font-semibold text-zinc-100">
+                            {group.variants[0].size}
                           </span>
-                        ))}
-                        {sizes.map((s) => (
-                          <span
-                            key={s}
-                            className="rounded-lg bg-zinc-100/10 px-2 py-0.5 text-xs font-semibold text-zinc-100"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                        {!qualities.length && !sizes.length ? (
+                        ) : (
                           <span className="text-zinc-600">—</span>
-                        ) : null}
-                      </div>
+                        )
+                      ) : sizes.length ? (
+                        <span className="text-xs text-zinc-400">
+                          {sizes.join(", ")}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-600">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span className="inline-flex min-w-[2.5rem] items-center justify-center rounded-lg bg-accent/10 px-2.5 py-1 text-sm font-semibold text-accent">
@@ -188,7 +178,11 @@ export function InventoryTable({
                           <p className="text-sm text-zinc-300">
                             {variant.product_name}
                           </p>
-                          <VariantMeta item={variant} />
+                          {variant.quality ? (
+                            <p className="mt-0.5 text-xs text-zinc-600">
+                              {variant.quality}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-5 py-3">
                           <span className="rounded-md bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
@@ -196,21 +190,13 @@ export function InventoryTable({
                           </span>
                         </td>
                         <td className="px-5 py-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {variant.quality ? (
-                              <span className="rounded-lg bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-200">
-                                {variant.quality}
-                              </span>
-                            ) : null}
-                            {variant.size ? (
-                              <span className="rounded-lg bg-zinc-100/10 px-2 py-0.5 text-xs font-semibold text-zinc-100">
-                                {variant.size}
-                              </span>
-                            ) : null}
-                            {!variant.quality && !variant.size ? (
-                              <span className="text-zinc-600">—</span>
-                            ) : null}
-                          </div>
+                          {variant.size ? (
+                            <span className="rounded-lg bg-zinc-100/10 px-2 py-0.5 text-xs font-semibold text-zinc-100">
+                              {variant.size}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-600">—</span>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-right">
                           <span className="text-sm font-medium text-zinc-200">
