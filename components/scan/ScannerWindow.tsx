@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Camera,
   CameraOff,
@@ -23,6 +23,10 @@ interface ScannerWindowProps {
   hardwareListening?: boolean;
   /** Optional typed/pasted barcode submit (mobile + laptop fallback) */
   onManualSubmit?: (barcode: string) => void;
+  /** Ref for auto-focusing the manual barcode field */
+  manualInputRef?: RefObject<HTMLInputElement | null>;
+  /** inputMode for manual field — use "none" to hide soft keyboard on mobile */
+  manualInputMode?: "text" | "numeric" | "none";
   /** Non-layout-shifting status shown over the camera feed */
   overlay?: {
     processing?: boolean;
@@ -42,8 +46,12 @@ export function ScannerWindow({
   contextLabel,
   hardwareListening = false,
   onManualSubmit,
+  manualInputRef,
+  manualInputMode = "numeric",
   overlay,
 }: ScannerWindowProps) {
+  const internalInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = manualInputRef ?? internalInputRef;
   const showFlash = overlay?.flash === "success" || overlay?.flash === "error";
   const [manualCode, setManualCode] = useState("");
 
@@ -54,6 +62,25 @@ export function ScannerWindow({
     onManualSubmit(code);
     setManualCode("");
   };
+
+  useEffect(() => {
+    if (disabled || !onManualSubmit) return;
+    inputRef.current?.focus();
+  }, [disabled, onManualSubmit, inputRef]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (
+        document.visibilityState === "visible" &&
+        !disabled &&
+        onManualSubmit
+      ) {
+        inputRef.current?.focus();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [disabled, onManualSubmit, inputRef]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised [overflow-anchor:none]">
@@ -201,8 +228,9 @@ export function ScannerWindow({
           </label>
           <div className="flex gap-2">
             <input
+              ref={inputRef}
               type="text"
-              inputMode="numeric"
+              inputMode={manualInputMode}
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}

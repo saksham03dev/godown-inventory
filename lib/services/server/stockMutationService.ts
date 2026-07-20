@@ -48,7 +48,6 @@ export async function processUnitStockTransactionServer(input: {
     };
   }
 
-  // Product-level (89…) barcodes are not allowed — they diverge from unit stock.
   if (isProductBarcode(barcode)) {
     return {
       success: false,
@@ -72,10 +71,7 @@ export async function processUnitStockTransactionServer(input: {
     );
 
     if (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
 
     return mapRpcScanResult(data);
@@ -84,6 +80,102 @@ export async function processUnitStockTransactionServer(input: {
       success: false,
       message:
         err instanceof Error ? err.message : "Stock transaction failed.",
+    };
+  }
+}
+
+/** Server-only: move sealed full bale between godowns. */
+export async function transferSealedBaleServer(input: {
+  barcodeId: string;
+  fromGodownId: string;
+  toGodownId: string;
+  handledBy: string;
+}): Promise<ScanTransactionResult> {
+  const barcode = input.barcodeId.trim();
+  if (!barcode) {
+    return { success: false, message: "Invalid barcode scanned." };
+  }
+  if (!input.fromGodownId || !input.toGodownId) {
+    return {
+      success: false,
+      message: "Select both source and destination godowns.",
+    };
+  }
+  if (isProductBarcode(barcode)) {
+    return {
+      success: false,
+      message: "Use unit label barcodes (87…).",
+      isUnitScan: false,
+    };
+  }
+
+  try {
+    const supabase = createServiceClient({ requireServiceRole: true });
+    const { data, error } = await supabase.rpc("transfer_sealed_bale", {
+      p_barcode: barcode,
+      p_from_godown_id: input.fromGodownId,
+      p_to_godown_id: input.toGodownId,
+      p_handled_by: input.handledBy,
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return mapRpcScanResult(data);
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Transfer failed.",
+    };
+  }
+}
+
+/** Server-only: return stock into a godown. */
+export async function processReturnStockInServer(input: {
+  barcodeId: string;
+  godownId: string;
+  bagsQty?: number | null;
+  handledBy: string;
+  reason?: string | null;
+}): Promise<ScanTransactionResult> {
+  const barcode = input.barcodeId.trim();
+  if (!barcode) {
+    return { success: false, message: "Invalid barcode scanned." };
+  }
+  if (!input.godownId) {
+    return {
+      success: false,
+      message: "Please select a godown for returned stock.",
+    };
+  }
+  if (isProductBarcode(barcode)) {
+    return {
+      success: false,
+      message: "Use unit label barcodes (87…).",
+      isUnitScan: false,
+    };
+  }
+
+  try {
+    const supabase = createServiceClient({ requireServiceRole: true });
+    const { data, error } = await supabase.rpc("process_return_stock_in", {
+      p_barcode: barcode,
+      p_godown_id: input.godownId,
+      p_bags_qty: input.bagsQty ?? null,
+      p_handled_by: input.handledBy,
+      p_reason: input.reason ?? null,
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return mapRpcScanResult(data);
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Return failed.",
     };
   }
 }

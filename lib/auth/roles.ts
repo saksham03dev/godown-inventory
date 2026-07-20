@@ -25,6 +25,8 @@ type Permission =
   | "labels"
   | "scan"
   | "scan.viewLabel"
+  | "inventory.transfer"
+  | "inventory.return"
   | "billing.view"
   | "billing.create"
   | "billing.editPrice"
@@ -43,6 +45,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "labels",
     "scan",
     "scan.viewLabel",
+    "inventory.transfer",
+    "inventory.return",
     "billing.view",
     "billing.create",
     "billing.editPrice",
@@ -57,6 +61,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "labels",
     "scan",
     "scan.viewLabel",
+    "inventory.transfer",
+    "inventory.return",
     "billing.view",
     "billing.create",
   ],
@@ -112,6 +118,16 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     permission: "scan",
   },
   {
+    href: "/stock-return",
+    label: "Return Stock",
+    permission: "inventory.return",
+  },
+  {
+    href: "/stock-transfer",
+    label: "Transfer",
+    permission: "inventory.transfer",
+  },
+  {
     href: "/pending-billing",
     label: "Pending Sales",
     permission: "billing.view",
@@ -152,7 +168,6 @@ export function getNavItemsForRole(
       }
       if (item.href === "/scan") return false;
       if (item.saleMode) {
-        // Stock-only: show wholesale-tagged stock routes without mode split
         return true;
       }
       if (item.href === "/open-bales") {
@@ -162,7 +177,7 @@ export function getNavItemsForRole(
     }
 
     if (item.href === "/stock-in" || item.href === "/stock-out") {
-      return false;
+      return hasPermission(role, "scan");
     }
 
     if (item.saleMode && item.saleMode !== saleMode) return false;
@@ -184,7 +199,9 @@ export function getNavItemsForRole(
         ["/stock-in", "/stock-out"].includes(item.href)
       );
     }
-    return items.filter((item) => item.href === "/scan");
+    return items.filter((item) =>
+      ["/scan", "/stock-out"].includes(item.href)
+    );
   }
 
   return items;
@@ -208,6 +225,8 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/scan": "scan",
   "/stock-in": "scan",
   "/stock-out": "scan",
+  "/stock-return": "inventory.return",
+  "/stock-transfer": "inventory.transfer",
   "/pending-billing": "billing.view",
   "/billing": "billing.view",
   "/open-bales": "billing.view",

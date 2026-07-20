@@ -26,6 +26,9 @@ interface UseScanTransactionReturn {
     transactionType: TransactionType,
     bagsQty?: number | null
   ) => Promise<ScanTransactionResult>;
+  runAction: (
+    action: () => Promise<ScanTransactionResult>
+  ) => Promise<ScanTransactionResult>;
   dismissAlert: () => void;
   clearApproveFlash: () => void;
 }
@@ -139,6 +142,48 @@ export function useScanTransaction(
     [scheduleFlashClear]
   );
 
+  const runAction = useCallback(
+    async (
+      action: () => Promise<ScanTransactionResult>
+    ): Promise<ScanTransactionResult> => {
+      setProcessing(true);
+      setApproveFlash(false);
+      setErrorFlash(false);
+
+      try {
+        const result = await action();
+        setLastResult(result);
+
+        if (result.success) {
+          setApproveFlash(true);
+          setErrorFlash(false);
+          setAlert({ type: "success", message: result.message });
+          onSuccessRef.current?.(result);
+        } else {
+          setApproveFlash(false);
+          setErrorFlash(true);
+          setAlert({ type: "error", message: result.message });
+        }
+
+        scheduleFlashClear();
+        return result;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Operation failed.";
+        const result: ScanTransactionResult = { success: false, message };
+        setAlert({ type: "error", message });
+        setLastResult(result);
+        setApproveFlash(false);
+        setErrorFlash(true);
+        scheduleFlashClear();
+        return result;
+      } finally {
+        setProcessing(false);
+      }
+    },
+    [scheduleFlashClear]
+  );
+
   return {
     processing,
     alert,
@@ -146,6 +191,7 @@ export function useScanTransaction(
     approveFlash,
     errorFlash,
     handleScan,
+    runAction,
     dismissAlert,
     clearApproveFlash,
   };
