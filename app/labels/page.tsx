@@ -56,7 +56,7 @@ export default function LabelsPage() {
         activeBatch ? (
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-muted"
+            className="flex items-center gap-2 rounded-xl bg-labels px-3 py-2 text-sm font-medium text-white hover:bg-labels-muted"
           >
             <Printer className="h-4 w-4" />
             <span className="hidden sm:inline">Print Labels</span>
@@ -65,6 +65,11 @@ export default function LabelsPage() {
       }
     >
       <div className="mx-auto max-w-6xl space-y-6 animate-fade-in">
+        <div className="rounded-xl border border-labels/20 bg-labels/5 px-4 py-3 text-sm text-zinc-400">
+          <span className="font-medium text-labels">Label printing</span> — pick a
+          registered product, generate bale barcodes, then print and stock in.
+        </div>
+
         {alert && <AlertBanner alert={alert} onDismiss={dismissAlert} />}
 
         {loading ? (
@@ -89,7 +94,7 @@ export default function LabelsPage() {
                       onClick={() => setLabelSize(s.value)}
                       className={`rounded-xl px-3 py-2 text-xs font-medium transition ${
                         labelSize === s.value
-                          ? "bg-accent/15 text-accent"
+                          ? "bg-labels/15 text-labels"
                           : "border border-surface-border text-zinc-400 hover:bg-white/5"
                       }`}
                     >
@@ -111,11 +116,12 @@ export default function LabelsPage() {
                           onClick={() => loadBatch(b.id)}
                           className="w-full rounded-xl border border-surface-border px-3 py-2.5 text-left text-sm transition hover:bg-white/5"
                         >
-                          <span className="font-mono text-accent">{b.batch_code}</span>
+                          <span className="font-mono text-labels">{b.batch_code}</span>
                           <span className="ml-2 text-zinc-400">
                             · {b.quantity} bale{b.quantity === 1 ? "" : "s"} (
                             {balesToBags(b.quantity).toLocaleString()} bags) ·{" "}
                             {b.source_name}
+                            {b.purchase_no ? ` · PO ${b.purchase_no}` : ""}
                           </span>
                         </button>
                       </li>
@@ -128,15 +134,18 @@ export default function LabelsPage() {
         )}
 
         {activeBatch && activeBatch.stock_units?.length > 0 && (
-          <div className="rounded-2xl border border-surface-border bg-surface-overlay p-4">
+          <div className="rounded-2xl border border-labels/20 bg-surface-overlay p-4 ring-1 ring-labels/10">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-zinc-100">
                   Batch {activeBatch.batch_code}
                 </h3>
                 <p className="text-xs text-zinc-500">
-                  {activeBatch.products?.name} · Source: {activeBatch.source_name} ·{" "}
-                  {activeBatch.stock_units.length} bale label
+                  {activeBatch.products?.name} · Source: {activeBatch.source_name}
+                  {activeBatch.purchase_no
+                    ? ` · Purchase no.: ${activeBatch.purchase_no}`
+                    : ""}{" "}
+                  · {activeBatch.stock_units.length} bale label
                   {activeBatch.stock_units.length === 1 ? "" : "s"} (
                   {balesToBags(activeBatch.stock_units.length).toLocaleString()}{" "}
                   bags)

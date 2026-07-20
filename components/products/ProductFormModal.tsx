@@ -18,6 +18,7 @@ const emptyForm: ProductInput = {
   name: "",
   product_code: "",
   size: "",
+  quality: "",
   special_note: "",
   retail_selling_price: 0,
 };
@@ -41,6 +42,7 @@ export function ProductFormModal({
         product_code: product.product_code,
         total_stock: product.total_stock,
         size: product.size ?? "",
+        quality: product.quality ?? "",
         special_note: product.special_note ?? "",
         category: product.category ?? "",
         retail_selling_price: product.retail_selling_price ?? 0,
@@ -70,9 +72,21 @@ export function ProductFormModal({
       open={open}
       onClose={onClose}
       title={isEdit ? "Edit Product" : "Add Product"}
-      description="Backend code auto-generates the linked barcode."
+      description={
+        isEdit
+          ? "Update catalog details for this product."
+          : "Register a new product in the catalog before printing labels."
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className={`space-y-4 ${!isEdit ? "rounded-xl border border-accent/15 bg-accent/[0.03] p-4 -mx-1" : ""}`}
+      >
+        {!isEdit && (
+          <span className="inline-block rounded-lg bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
+            Product catalog
+          </span>
+        )}
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
             Product Name *
@@ -139,17 +153,32 @@ export function ProductFormModal({
           )}
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Size
-          </label>
-          <input
-            type="text"
-            value={form.size ?? ""}
-            onChange={(e) => update("size", e.target.value)}
-            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
-            placeholder="e.g. Large, 5L, M8"
-          />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Size
+            </label>
+            <input
+              type="text"
+              value={form.size ?? ""}
+              onChange={(e) => update("size", e.target.value)}
+              className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
+              placeholder="e.g. Large, 5L, M8"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Quality
+            </label>
+            <input
+              type="text"
+              value={form.quality ?? ""}
+              onChange={(e) => update("quality", e.target.value)}
+              className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
+              placeholder="e.g. A, Export, Premium"
+            />
+          </div>
         </div>
 
         {isEdit && (

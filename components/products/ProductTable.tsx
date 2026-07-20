@@ -16,7 +16,7 @@ export function ProductTable({
 }: ProductTableProps) {
   if (products.length === 0) {
     return (
-      <div className="rounded-2xl border border-surface-border bg-surface-raised p-12 text-center">
+      <div className="rounded-2xl border border-accent/15 bg-accent/[0.03] p-12 text-center ring-1 ring-accent/10">
         <p className="text-sm font-medium text-zinc-400">No products yet</p>
         <p className="mt-1 text-xs text-zinc-600">
           Add your first product to start managing inventory.
@@ -26,11 +26,11 @@ export function ProductTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised">
+    <div className="overflow-hidden rounded-2xl border border-accent/15 bg-surface-raised ring-1 ring-accent/10">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-surface-border bg-surface-overlay/50">
+            <tr className="border-b border-accent/15 bg-accent/5">
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Name
               </th>
@@ -45,6 +45,9 @@ export function ProductTable({
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Size
+              </th>
+              <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Quality
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Stock (bags)
@@ -79,6 +82,15 @@ export function ProductTable({
                 </td>
                 <td className="px-5 py-4 text-zinc-400">
                   {product.size || "—"}
+                </td>
+                <td className="px-5 py-4">
+                  {product.quality ? (
+                    <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
+                      {product.quality}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-600">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-4 text-right font-semibold text-zinc-200">
                   {product.total_stock.toLocaleString()}

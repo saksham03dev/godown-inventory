@@ -19,7 +19,7 @@ export async function fetchBatches(limit = 20): Promise<StockBatch[]> {
     .select(
       `
       *,
-      products ( id, name, product_code, size, special_note )
+      products ( id, name, product_code, size, quality, special_note )
     `
     )
     .order("created_at", { ascending: false })
@@ -38,7 +38,7 @@ export async function fetchBatchWithUnits(
     .select(
       `
       *,
-      products ( id, name, product_code, size, special_note, retail_selling_price ),
+      products ( id, name, product_code, size, quality, special_note, retail_selling_price ),
       stock_units ( * )
     `
     )
@@ -80,8 +80,8 @@ export async function fetchStockUnitByBarcode(
     .select(
       `
       *,
-      products ( id, name, product_code, size, retail_selling_price, barcode_id, special_note, category ),
-      stock_batches ( id, batch_code, source_name, quantity, notes ),
+      products ( id, name, product_code, size, quality, retail_selling_price, barcode_id, special_note, category ),
+      stock_batches ( id, batch_code, source_name, purchase_no, quantity, notes ),
       godowns ( id, location_name ),
       bills ( id, bill_number, customer_name, customer_phone, status, finalized_at )
     `
@@ -104,8 +104,8 @@ export async function fetchProductGodownBreakdown(
     .select(
       `
       *,
-      products ( id, name, product_code, size, retail_selling_price ),
-      stock_batches ( id, product_id, batch_code, source_name, quantity, notes, created_by, created_at ),
+      products ( id, name, product_code, size, quality, retail_selling_price ),
+      stock_batches ( id, product_id, batch_code, source_name, purchase_no, quantity, notes, created_by, created_at ),
       godowns ( id, location_name )
     `
     )
@@ -131,6 +131,7 @@ export async function fetchProductGodownBreakdown(
           product_id: batchRow.product_id ?? productId,
           batch_code: batchRow.batch_code,
           source_name: batchRow.source_name,
+          purchase_no: batchRow.purchase_no ?? null,
           quantity: batchRow.quantity,
           notes: batchRow.notes ?? null,
           created_by: batchRow.created_by ?? "system",

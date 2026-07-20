@@ -29,6 +29,11 @@ const config: Config = {
           muted: "#b91c1c",
           glow: "rgba(239, 68, 68, 0.15)",
         },
+        labels: {
+          DEFAULT: "#a855f7",
+          muted: "#7e22ce",
+          glow: "rgba(168, 85, 247, 0.12)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],

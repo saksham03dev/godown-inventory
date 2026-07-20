@@ -101,10 +101,20 @@ export function ProductInventoryDetail({
     setMutating(false);
   };
 
+  const sizeLabel = product?.size?.trim() || null;
+  const qualityLabel = product?.quality?.trim() || null;
   const title = product?.product_name ?? "Product";
   const description =
     view.level === "sources"
-      ? `${godownName} · ${(product?.quantity ?? 0).toLocaleString()} bags · by source`
+      ? [
+          qualityLabel ? `Quality ${qualityLabel}` : null,
+          sizeLabel ? `Size ${sizeLabel}` : null,
+          product?.product_code,
+          godownName,
+          `${(product?.quantity ?? 0).toLocaleString()} bags · by source`,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : view.level === "skus"
         ? `${view.group.batch.source_name} · ${view.group.in_godown_bags.toLocaleString()} bags (${view.group.in_godown_bales} bale(s)${view.group.open_bales > 0 ? `, ${view.group.open_bales} open` : ""})`
         : view.level === "sku"
@@ -159,6 +169,8 @@ export function ProductInventoryDetail({
         ) : view.level === "skus" ? (
           <SkusView
             group={view.group}
+            productSize={sizeLabel}
+            productQuality={qualityLabel}
             onSelect={(unit) =>
               setView({ level: "sku", group: view.group, unit })
             }
@@ -231,10 +243,20 @@ function SourcesView({
             {breakdown.total_bales === 1 ? "" : "s"})
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <OpenBaleCountBadge
             count={breakdown.batches.reduce((sum, g) => sum + g.open_bales, 0)}
           />
+          {product?.quality ? (
+            <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
+              Quality {product.quality}
+            </span>
+          ) : null}
+          {product?.size ? (
+            <span className="rounded-lg bg-zinc-100/10 px-2.5 py-1 text-xs font-semibold text-zinc-100">
+              Size {product.size}
+            </span>
+          ) : null}
           <p className="font-mono text-xs text-zinc-500">
             {product?.product_code}
           </p>
@@ -307,10 +329,14 @@ function SourcesView({
 
 function SkusView({
   group,
+  productSize,
+  productQuality,
   onSelect,
   onEdit,
 }: {
   group: ProductGodownBatchGroup;
+  productSize?: string | null;
+  productQuality?: string | null;
   onSelect: (unit: StockUnit) => void;
   onEdit?: () => void;
 }) {
@@ -318,9 +344,21 @@ function SkusView({
     <div className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-surface-border bg-surface-overlay/40 px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-zinc-200">
-            {group.batch.source_name}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-zinc-200">
+              {group.batch.source_name}
+            </p>
+            {productQuality ? (
+              <span className="rounded-lg bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-200">
+                Quality {productQuality}
+              </span>
+            ) : null}
+            {productSize ? (
+              <span className="rounded-lg bg-zinc-100/10 px-2 py-0.5 text-xs font-semibold text-zinc-100">
+                Size {productSize}
+              </span>
+            ) : null}
+          </div>
           <p className="mt-0.5 font-mono text-xs text-zinc-500">
             {group.batch.batch_code}
             {group.batch.notes ? ` · ${group.batch.notes}` : ""}
@@ -407,10 +445,12 @@ function BatchEditForm({
   onCancel: () => void;
 }) {
   const [sourceName, setSourceName] = useState(batch.source_name);
+  const [purchaseNo, setPurchaseNo] = useState(batch.purchase_no ?? "");
   const [notes, setNotes] = useState(batch.notes ?? "");
 
   useEffect(() => {
     setSourceName(batch.source_name);
+    setPurchaseNo(batch.purchase_no ?? "");
     setNotes(batch.notes ?? "");
   }, [batch]);
 
@@ -419,6 +459,7 @@ function BatchEditForm({
     if (!sourceName.trim()) return;
     await onSubmit({
       source_name: sourceName.trim(),
+      purchase_no: purchaseNo.trim() || null,
       notes: notes.trim() || null,
     });
   };
@@ -442,19 +483,35 @@ function BatchEditForm({
         />
       </div>
 
-      <div>
-        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Source / Buyer *
-        </label>
-        <input
-          type="text"
-          required
-          value={sourceName}
-          onChange={(e) => setSourceName(e.target.value)}
-          placeholder="e.g. Anand Traders, Mumbai"
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
-          disabled={loading}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Source / Buyer *
+          </label>
+          <input
+            type="text"
+            required
+            value={sourceName}
+            onChange={(e) => setSourceName(e.target.value)}
+            placeholder="e.g. Anand Traders, Mumbai"
+            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Purchase No.
+          </label>
+          <input
+            type="text"
+            value={purchaseNo}
+            onChange={(e) => setPurchaseNo(e.target.value)}
+            placeholder="e.g. PO-2026-0142"
+            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
+            disabled={loading}
+          />
+        </div>
       </div>
 
       <div>
@@ -480,7 +537,7 @@ function BatchEditForm({
           type="text"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Optional purchase reference"
+          placeholder="Optional extra notes"
           className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
           disabled={loading}
         />

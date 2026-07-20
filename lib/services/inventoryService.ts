@@ -15,6 +15,8 @@ type ProductRelation = {
   name: string;
   barcode_id: string;
   product_code: string;
+  size: string | null;
+  quality: string | null;
   category: string | null;
 };
 
@@ -91,7 +93,7 @@ export async function fetchGodownInventory(
       `
       product_id,
       remaining_bags,
-      products ( id, name, barcode_id, product_code, category )
+      products ( id, name, barcode_id, product_code, size, quality, category )
     `
     )
     .eq("godown_id", godownId)
@@ -105,6 +107,8 @@ export async function fetchGodownInventory(
       name: string;
       barcode_id: string;
       product_code: string;
+      size: string | null;
+      quality: string | null;
       category: string | null;
       qty: number;
       open_bales: number;
@@ -122,6 +126,8 @@ export async function fetchGodownInventory(
       name: product.name,
       barcode_id: product.barcode_id,
       product_code: product.product_code,
+      size: product.size,
+      quality: product.quality,
       category: product.category,
       qty: 0,
       open_bales: 0,
@@ -139,6 +145,8 @@ export async function fetchGodownInventory(
       product_name: v.name,
       product_code: v.product_code,
       barcode_id: v.barcode_id,
+      size: v.size,
+      quality: v.quality,
       category: v.category,
       quantity: v.qty,
       open_bales: v.open_bales,

@@ -114,6 +114,11 @@ export default function ProductsPage() {
       }
     >
       <div className="mx-auto max-w-6xl space-y-4 animate-fade-in">
+        <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-sm text-zinc-400">
+          <span className="font-medium text-accent">Product catalog</span> — register
+          products here first. Use Labels to print bale barcodes later.
+        </div>
+
         {alert && (
           <AlertBanner alert={alert} onDismiss={dismissAlert} />
         )}

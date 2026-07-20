@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle2, Info, X } from "lucide-react";
 import type { AlertState } from "@/lib/types/database";
 
 interface AlertBannerProps {
@@ -23,6 +23,11 @@ const styles = {
     bg: "bg-accent/10 border-accent/30",
     icon: Info,
     iconColor: "text-accent",
+  },
+  warning: {
+    bg: "bg-amber-500/10 border-amber-500/40",
+    icon: Bell,
+    iconColor: "text-amber-300",
   },
 };
 

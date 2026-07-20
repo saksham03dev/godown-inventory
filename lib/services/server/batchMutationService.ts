@@ -23,11 +23,15 @@ export async function createStockBatchServer(
 ): Promise<MutationResult<StockBatchWithUnits>> {
   try {
     const source_name = input.source_name.trim();
+    const purchase_no = input.purchase_no.trim();
     if (!input.product_id) {
       return { success: false, message: "Select a product." };
     }
     if (!source_name) {
       return { success: false, message: "Source / buyer name is required." };
+    }
+    if (!purchase_no) {
+      return { success: false, message: "Purchase no. is required." };
     }
     if (input.quantity < 1 || input.quantity > 500) {
       return {
@@ -45,6 +49,7 @@ export async function createStockBatchServer(
         product_id: input.product_id,
         batch_code,
         source_name,
+        purchase_no,
         quantity: input.quantity,
         notes: input.notes?.trim() || null,
         created_by: createdBy,
@@ -99,6 +104,7 @@ export async function updateStockBatchServer(
 ): Promise<MutationResult<StockBatch>> {
   try {
     const source_name = input.source_name.trim();
+    const purchase_no = input.purchase_no?.trim() ?? null;
     if (!source_name) {
       return { success: false, message: "Source / buyer name is required." };
     }
@@ -107,6 +113,7 @@ export async function updateStockBatchServer(
       .from("stock_batches")
       .update({
         source_name,
+        purchase_no,
         notes: input.notes?.trim() || null,
       })
       .eq("id", batchId)

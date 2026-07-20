@@ -10,6 +10,7 @@ interface BatchCreateFormProps {
   onSubmit: (input: {
     product_id: string;
     source_name: string;
+    purchase_no: string;
     quantity: number;
     notes?: string;
   }) => Promise<unknown>;
@@ -22,6 +23,7 @@ export function BatchCreateForm({
 }: BatchCreateFormProps) {
   const [productId, setProductId] = useState("");
   const [sourceName, setSourceName] = useState("");
+  const [purchaseNo, setPurchaseNo] = useState("");
   const [quantity, setQuantity] = useState(10);
   const [notes, setNotes] = useState("");
 
@@ -32,10 +34,11 @@ export function BatchCreateForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productId || !sourceName.trim()) return;
+    if (!productId || !sourceName.trim() || !purchaseNo.trim()) return;
     await onSubmit({
       product_id: productId,
       source_name: sourceName.trim(),
+      purchase_no: purchaseNo.trim(),
       quantity,
       notes: notes.trim() || undefined,
     });
@@ -44,9 +47,12 @@ export function BatchCreateForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-surface-border bg-surface-raised p-5 space-y-4"
+      className="rounded-2xl border border-labels/25 bg-labels/5 p-5 space-y-4 ring-1 ring-labels/10"
     >
       <div>
+        <span className="mb-2 inline-block rounded-lg bg-labels/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-labels">
+          Label printing
+        </span>
         <h3 className="font-medium text-zinc-100">Create Label Batch</h3>
         <p className="text-xs text-zinc-500">
           Product bought from a source → generate unique barcodes per unit
@@ -62,19 +68,36 @@ export function BatchCreateForm({
         disabled={loading}
       />
 
-      <div>
-        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Source / Buyer *
-        </label>
-        <input
-          type="text"
-          required
-          value={sourceName}
-          onChange={(e) => setSourceName(e.target.value)}
-          placeholder="e.g. Anand Traders, Mumbai"
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
-          disabled={loading}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Source / Buyer *
+          </label>
+          <input
+            type="text"
+            required
+            value={sourceName}
+            onChange={(e) => setSourceName(e.target.value)}
+            placeholder="e.g. Anand Traders, Mumbai"
+            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-labels"
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Purchase No. *
+          </label>
+          <input
+            type="text"
+            required
+            value={purchaseNo}
+            onChange={(e) => setPurchaseNo(e.target.value)}
+            placeholder="e.g. PO-2026-0142"
+            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-labels"
+            disabled={loading}
+          />
+        </div>
       </div>
 
       <div>
@@ -88,7 +111,7 @@ export function BatchCreateForm({
           max={500}
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
+          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-labels"
           disabled={loading}
         />
         <p className="mt-1 text-xs text-zinc-600">
@@ -104,16 +127,18 @@ export function BatchCreateForm({
           type="text"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Optional purchase reference"
-          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent"
+          placeholder="Optional extra notes"
+          className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none focus:border-labels"
           disabled={loading}
         />
       </div>
 
       <button
         type="submit"
-        disabled={loading || !productId || !sourceName.trim()}
-        className="w-full rounded-xl bg-accent py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
+        disabled={
+          loading || !productId || !sourceName.trim() || !purchaseNo.trim()
+        }
+        className="w-full rounded-xl bg-labels py-3 text-sm font-medium text-white transition hover:bg-labels-muted disabled:opacity-50"
       >
         {loading ? "Generating…" : "Generate Barcode Labels"}
       </button>

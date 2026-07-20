@@ -61,7 +61,7 @@ export default function InventoryPage() {
   return (
     <DashboardLayout
       title="View Inventory"
-      subtitle="Select a godown to see product stock levels and breakdowns"
+      subtitle="Select a godown — stock is grouped by product name with variants by quality and size"
       actions={
         selectedGodownId ? (
           <button

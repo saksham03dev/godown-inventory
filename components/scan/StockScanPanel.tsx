@@ -65,11 +65,13 @@ export function StockScanPanel({
   const {
     processing,
     alert,
+    warningAlert,
     lastResult,
     approveFlash,
     errorFlash,
     handleScan,
     dismissAlert,
+    dismissWarningAlert,
     clearApproveFlash,
   } = useScanTransaction({
     onSuccess: (result) => {
@@ -92,9 +94,10 @@ export function StockScanPanel({
   useEffect(() => {
     resetTally();
     dismissAlert();
+    dismissWarningAlert();
     clearApproveFlash();
     setPendingOut(null);
-  }, [selectedGodownId, transactionType, resetTally, dismissAlert, clearApproveFlash]);
+  }, [selectedGodownId, transactionType, resetTally, dismissAlert, dismissWarningAlert, clearApproveFlash]);
 
   const runScan = useCallback(
     async (barcode: string, bagsQty: number | null) => {
@@ -296,9 +299,11 @@ export function StockScanPanel({
 
       <ScanResultStrip
         alert={alert}
+        warningAlert={warningAlert}
         lastResult={lastResult}
         mode={transactionType}
         onDismissAlert={dismissAlert}
+        onDismissWarning={dismissWarningAlert}
       />
 
       <ScanTallyPanel tally={tally} mode={transactionType} onReset={resetTally} />

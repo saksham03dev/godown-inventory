@@ -86,6 +86,7 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
           <DetailRow label="Name" value={product?.name} />
           <DetailRow label="Backend Code" value={product?.product_code} mono />
           <DetailRow label="Size" value={product?.size} />
+          <DetailRow label="Quality" value={product?.quality} />
           <DetailRow
             label="Price / bag"
             value={
@@ -121,6 +122,7 @@ export function LabelDetailCard({ unit }: LabelDetailCardProps) {
           <p className="text-xs font-semibold text-zinc-400">Batch</p>
           <DetailRow label="Batch Code" value={batch?.batch_code} mono />
           <DetailRow label="Source (inbound)" value={batch?.source_name} />
+          <DetailRow label="Purchase no." value={batch?.purchase_no} />
         </div>
 
         {unit.status === "STOCKED_OUT" && (

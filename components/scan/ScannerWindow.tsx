@@ -9,6 +9,7 @@ import {
   ScanBarcode,
   XCircle,
 } from "lucide-react";
+import { AlertBanner } from "@/components/ui/AlertBanner";
 import type { AlertState, ScanTransactionResult, TransactionType } from "@/lib/types/database";
 
 interface ScannerWindowProps {
@@ -262,43 +263,55 @@ export function ScannerWindow({
 /** Compact last-result strip with reserved height to avoid layout jump */
 interface ScanResultStripProps {
   alert: AlertState | null;
+  warningAlert?: AlertState | null;
   lastResult: ScanTransactionResult | null;
   mode: TransactionType;
   onDismissAlert: () => void;
+  onDismissWarning?: () => void;
 }
 
 export function ScanResultStrip({
   alert,
+  warningAlert,
   lastResult,
   mode,
   onDismissAlert,
+  onDismissWarning,
 }: ScanResultStripProps) {
-  const hasContent = Boolean(lastResult || alert);
+  const hasContent = Boolean(lastResult || alert || warningAlert);
 
   return (
-    <div className="min-h-[4.5rem] [overflow-anchor:none]">
+    <div className="min-h-[4.5rem] space-y-2 [overflow-anchor:none]">
       {!hasContent ? (
         <div className="rounded-xl border border-dashed border-surface-border px-4 py-3 text-center text-xs text-zinc-600">
           Scan results appear here — camera and 2D scanner both work
         </div>
       ) : lastResult?.success ? (
-        <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-success">
-            Last {mode === "STOCK_IN" ? "Stock In" : "Stock Out"}
-            {lastResult.isUnitScan ? " · Bale" : " · Product"}
-          </p>
-          <p className="mt-0.5 font-medium text-zinc-100">
-            {lastResult.product?.name ?? "Success"}
-          </p>
-          <p className="text-xs text-zinc-500">
-            {lastResult.stockUnit
-              ? `Bale #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
-              : lastResult.message}
-            {lastResult.newGodownStock !== undefined
-              ? ` · Godown: ${lastResult.newGodownStock.toLocaleString()} bags`
-              : ""}
-          </p>
-        </div>
+        <>
+          <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-success">
+              Last {mode === "STOCK_IN" ? "Stock In" : "Stock Out"}
+              {lastResult.isUnitScan ? " · Bale" : " · Product"}
+            </p>
+            <p className="mt-0.5 font-medium text-zinc-100">
+              {lastResult.product?.name ?? "Success"}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {lastResult.stockUnit
+                ? `Bale #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
+                : lastResult.message}
+              {lastResult.newGodownStock !== undefined
+                ? ` · Godown: ${lastResult.newGodownStock.toLocaleString()} bags`
+                : ""}
+            </p>
+          </div>
+          {warningAlert && (
+            <AlertBanner
+              alert={warningAlert}
+              onDismiss={onDismissWarning}
+            />
+          )}
+        </>
       ) : (
         <div className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
           <div className="flex items-start justify-between gap-2">

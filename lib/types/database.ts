@@ -1,3 +1,5 @@
+import type { QualityMixWarning } from "@/lib/utils/qualityMix";
+
 export type TransactionType = "STOCK_IN" | "STOCK_OUT";
 export type UserRole = "admin" | "manager" | "employee";
 
@@ -8,6 +10,7 @@ export interface Product {
   barcode_id: string;
   total_stock: number;
   size: string | null;
+  quality: string | null;
   special_note: string | null;
   description: string | null;
   category: string | null;
@@ -20,6 +23,7 @@ export interface ProductInput {
   product_code: string;
   total_stock?: number;
   size?: string | null;
+  quality?: string | null;
   special_note?: string | null;
   category?: string | null;
   retail_selling_price?: number;
@@ -87,11 +91,22 @@ export interface GodownStockItem {
   product_name: string;
   product_code: string;
   barcode_id: string;
+  size: string | null;
+  quality: string | null;
   category: string | null;
   /** Bags in stock for this product at the godown. */
   quantity: number;
   /** Count of partially sold (open) bales for this product at the godown. */
   open_bales: number;
+}
+
+/** Stock in a godown grouped by similar product name (case-insensitive). */
+export interface GodownStockNameGroup {
+  key: string;
+  product_name: string;
+  quantity: number;
+  open_bales: number;
+  variants: GodownStockItem[];
 }
 
 export interface GodownDistribution {
@@ -119,6 +134,7 @@ export interface ScanTransactionInput {
   bagsQty?: number | null;
 }
 
+
 export interface ScanTransactionResult {
   success: boolean;
   message: string;
@@ -127,6 +143,8 @@ export interface ScanTransactionResult {
   stockUnit?: StockUnit;
   isUnitScan?: boolean;
   bagsMoved?: number;
+  /** Set after stock-in when same product name exists with another quality in godown. */
+  qualityMixWarning?: QualityMixWarning;
 }
 
 export type StockUnitStatus = "LABELLED" | "STOCKED_IN" | "STOCKED_OUT";
@@ -138,6 +156,7 @@ export interface StockBatch {
   product_id: string;
   batch_code: string;
   source_name: string;
+  purchase_no: string | null;
   quantity: number;
   notes: string | null;
   created_by: string;
@@ -171,11 +190,11 @@ export interface StockUnit {
   created_at: string;
   products?: Pick<
     Product,
-    "id" | "name" | "product_code" | "size" | "retail_selling_price"
+    "id" | "name" | "product_code" | "size" | "quality" | "retail_selling_price"
   > | null;
   stock_batches?: Pick<
     StockBatch,
-    "id" | "batch_code" | "source_name" | "quantity" | "notes"
+    "id" | "batch_code" | "source_name" | "purchase_no" | "quantity" | "notes"
   > | null;
   godowns?: Pick<Godown, "id" | "location_name"> | null;
   /** Draft or finalized bill when unit.bill_id is set (label lookup join). */
@@ -197,12 +216,14 @@ export interface StockBatchWithUnits extends StockBatch {
 export interface CreateBatchInput {
   product_id: string;
   source_name: string;
+  purchase_no: string;
   quantity: number;
   notes?: string | null;
 }
 
 export interface UpdateBatchInput {
   source_name: string;
+  purchase_no?: string | null;
   notes?: string | null;
 }
 
@@ -319,7 +340,7 @@ export interface RetailBillLineResult {
 }
 
 export interface AlertState {
-  type: "success" | "error" | "info";
+  type: "success" | "error" | "info" | "warning";
   message: string;
 }
 

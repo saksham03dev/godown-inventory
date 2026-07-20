@@ -56,11 +56,13 @@ export default function ScanPage() {
   const {
     processing,
     alert,
+    warningAlert,
     lastResult,
     approveFlash,
     errorFlash,
     handleScan,
     dismissAlert,
+    dismissWarningAlert,
     clearApproveFlash,
   } = useScanTransaction({
     onSuccess: (result) => onSuccessRef.current(result),
@@ -145,10 +147,11 @@ export default function ScanPage() {
   useEffect(() => {
     resetDebounce();
     dismissAlert();
+    dismissWarningAlert();
     clearApproveFlash();
     setLabelUnit(null);
     setLabelError(null);
-  }, [selectedGodownId, mode, resetDebounce, dismissAlert, clearApproveFlash]);
+  }, [selectedGodownId, mode, resetDebounce, dismissAlert, dismissWarningAlert, clearApproveFlash]);
 
   useEffect(() => {
     if (mode === "STOCK_IN" || mode === "STOCK_OUT") {
@@ -272,9 +275,11 @@ export default function ScanPage() {
           ) : (
             <ScanResultStrip
               alert={alert}
+              warningAlert={warningAlert}
               lastResult={lastResult}
               mode={transactionMode}
               onDismissAlert={dismissAlert}
+              onDismissWarning={dismissWarningAlert}
             />
           )}
 
