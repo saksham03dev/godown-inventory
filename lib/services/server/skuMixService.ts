@@ -6,11 +6,14 @@ import {
   type SkuMixConflict,
   type SkuMixWarning,
 } from "@/lib/utils/skuMix";
+import {
+  isMissingColumnError,
+} from "@/lib/utils/schemaErrors";
 
 type ProductRow = {
   id: string;
   name: string;
-  quality: string | null;
+  quality?: string | null;
   size: string | null;
   product_code: string;
 };
@@ -31,7 +34,16 @@ export async function detectSkuMixAfterStockIn(
   product: Pick<ProductRow, "id" | "name" | "quality" | "size" | "product_code">,
   incomingBatchCode?: string | null
 ): Promise<SkuMixWarning | undefined> {
-  const { data: units, error } = await supabase
+  type UnitRow = {
+    product_id: string;
+    stock_batches: BatchRow | BatchRow[] | null;
+    products: ProductRow | ProductRow[] | null;
+  };
+
+  let units: UnitRow[] | null = null;
+  let error: { message: string } | null = null;
+
+  const primary = await supabase
     .from("stock_units")
     .select(
       `
@@ -42,6 +54,25 @@ export async function detectSkuMixAfterStockIn(
     )
     .eq("godown_id", godownId)
     .eq("status", "STOCKED_IN");
+
+  units = primary.data as UnitRow[] | null;
+  error = primary.error;
+
+  if (error && isMissingColumnError(error.message, "quality")) {
+    const fallback = await supabase
+      .from("stock_units")
+      .select(
+        `
+      product_id,
+      stock_batches ( batch_code ),
+      products ( id, name, size, product_code )
+    `
+      )
+      .eq("godown_id", godownId)
+      .eq("status", "STOCKED_IN");
+    units = fallback.data as UnitRow[] | null;
+    error = fallback.error;
+  }
 
   if (error || !units?.length) return undefined;
 

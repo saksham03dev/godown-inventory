@@ -1,5 +1,9 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
+import {
+  formatSchemaError,
+  isMissingColumnError,
+} from "@/lib/utils/schemaErrors";
 import type {
   DashboardMetrics,
   Godown,
@@ -16,30 +20,13 @@ type ProductRelation = {
   barcode_id: string;
   product_code: string;
   size: string | null;
-  quality: string | null;
+  quality?: string | null;
   category: string | null;
 };
 
 function normalizeRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
-function formatSchemaError(message: string): string {
-  if (
-    message.includes("product_code") &&
-    (message.includes("schema cache") || message.includes("column"))
-  ) {
-    return (
-      "Database is missing the product_code column. Run supabase/migrations/002_product_godown_management.sql in the Supabase SQL Editor, then retry."
-    );
-  }
-  if (message.includes("remaining_bags")) {
-    return (
-      "Database is missing bag-based inventory columns. Run `npm run db:push` to apply migration 011."
-    );
-  }
-  return message;
 }
 
 export async function fetchProducts(): Promise<Product[]> {
@@ -87,7 +74,16 @@ export async function fetchGodownInventory(
 ): Promise<GodownStockItem[]> {
   const supabase = getSupabaseClient();
 
-  const { data: units, error } = await supabase
+  type UnitRow = {
+    product_id: string;
+    remaining_bags: number | null;
+    products: ProductRelation | ProductRelation[] | null;
+  };
+
+  let units: UnitRow[] | null = null;
+  let error: { message: string } | null = null;
+
+  const primary = await supabase
     .from("stock_units")
     .select(
       `
@@ -98,6 +94,25 @@ export async function fetchGodownInventory(
     )
     .eq("godown_id", godownId)
     .eq("status", "STOCKED_IN");
+
+  units = primary.data as UnitRow[] | null;
+  error = primary.error;
+
+  if (error && isMissingColumnError(error.message, "quality")) {
+    const fallback = await supabase
+      .from("stock_units")
+      .select(
+        `
+      product_id,
+      remaining_bags,
+      products ( id, name, barcode_id, product_code, size, category )
+    `
+      )
+      .eq("godown_id", godownId)
+      .eq("status", "STOCKED_IN");
+    units = fallback.data as UnitRow[] | null;
+    error = fallback.error;
+  }
 
   if (error) throw new Error(formatSchemaError(error.message));
 
@@ -127,7 +142,7 @@ export async function fetchGodownInventory(
       barcode_id: product.barcode_id,
       product_code: product.product_code,
       size: product.size,
-      quality: product.quality,
+      quality: product.quality ?? null,
       category: product.category,
       qty: 0,
       open_bales: 0,

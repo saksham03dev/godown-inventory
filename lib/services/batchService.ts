@@ -2,6 +2,10 @@ import { apiMutation } from "@/lib/api/clientMutation";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import { isOpenBale } from "@/lib/utils/inventory";
+import {
+  formatSchemaError,
+  isMissingColumnError,
+} from "@/lib/utils/schemaErrors";
 import type {
   CreateBatchInput,
   MutationResult,
@@ -14,7 +18,7 @@ import type {
 
 export async function fetchBatches(limit = 20): Promise<StockBatch[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("stock_batches")
     .select(
       `
@@ -25,7 +29,20 @@ export async function fetchBatches(limit = 20): Promise<StockBatch[]> {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error(error.message);
+  if (error && isMissingColumnError(error.message, "quality")) {
+    ({ data, error } = await supabase
+      .from("stock_batches")
+      .select(
+        `
+      *,
+      products ( id, name, product_code, size, special_note )
+    `
+      )
+      .order("created_at", { ascending: false })
+      .limit(limit));
+  }
+
+  if (error) throw new Error(formatSchemaError(error.message));
   return (data ?? []) as StockBatch[];
 }
 
@@ -33,7 +50,7 @@ export async function fetchBatchWithUnits(
   batchId: string
 ): Promise<StockBatchWithUnits | null> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("stock_batches")
     .select(
       `
@@ -45,7 +62,21 @@ export async function fetchBatchWithUnits(
     .eq("id", batchId)
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error && isMissingColumnError(error.message, "quality")) {
+    ({ data, error } = await supabase
+      .from("stock_batches")
+      .select(
+        `
+      *,
+      products ( id, name, product_code, size, special_note, retail_selling_price ),
+      stock_units ( * )
+    `
+      )
+      .eq("id", batchId)
+      .single());
+  }
+
+  if (error) throw new Error(formatSchemaError(error.message));
   if (!data) return null;
 
   const batch = data as StockBatchWithUnits;
@@ -75,7 +106,7 @@ export async function fetchStockUnitByBarcode(
   barcode: string
 ): Promise<StockUnit | null> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("stock_units")
     .select(
       `
@@ -89,7 +120,23 @@ export async function fetchStockUnitByBarcode(
     .eq("unit_barcode", barcode.trim())
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error && isMissingColumnError(error.message, "quality")) {
+    ({ data, error } = await supabase
+      .from("stock_units")
+      .select(
+        `
+      *,
+      products ( id, name, product_code, size, retail_selling_price, barcode_id, special_note, category ),
+      stock_batches ( id, batch_code, source_name, purchase_no, quantity, notes ),
+      godowns ( id, location_name ),
+      bills ( id, bill_number, customer_name, customer_phone, status, finalized_at )
+    `
+      )
+      .eq("unit_barcode", barcode.trim())
+      .maybeSingle());
+  }
+
+  if (error) throw new Error(formatSchemaError(error.message));
   return data as StockUnit | null;
 }
 
@@ -99,7 +146,7 @@ export async function fetchProductGodownBreakdown(
   godownId: string
 ): Promise<ProductGodownBreakdown> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("stock_units")
     .select(
       `
@@ -114,7 +161,24 @@ export async function fetchProductGodownBreakdown(
     .eq("status", "STOCKED_IN")
     .order("unit_number", { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error && isMissingColumnError(error.message, "quality")) {
+    ({ data, error } = await supabase
+      .from("stock_units")
+      .select(
+        `
+      *,
+      products ( id, name, product_code, size, retail_selling_price ),
+      stock_batches ( id, product_id, batch_code, source_name, purchase_no, quantity, notes, created_by, created_at ),
+      godowns ( id, location_name )
+    `
+      )
+      .eq("product_id", productId)
+      .eq("godown_id", godownId)
+      .eq("status", "STOCKED_IN")
+      .order("unit_number", { ascending: true }));
+  }
+
+  if (error) throw new Error(formatSchemaError(error.message));
 
   const units = (data ?? []) as StockUnit[];
   const byBatch = new Map<string, ProductGodownBreakdown["batches"][number]>();
