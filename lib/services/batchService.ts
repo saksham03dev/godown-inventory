@@ -113,7 +113,7 @@ export async function fetchStockUnitByBarcode(
       *,
       products ( id, name, product_code, size, quality, retail_selling_price, barcode_id, special_note, category ),
       stock_batches ( id, batch_code, source_name, purchase_no, quantity, notes ),
-      godowns ( id, location_name ),
+      godowns!godown_id ( id, location_name ),
       bills ( id, bill_number, customer_name, customer_phone, status, finalized_at )
     `
     )
@@ -128,7 +128,7 @@ export async function fetchStockUnitByBarcode(
       *,
       products ( id, name, product_code, size, retail_selling_price, barcode_id, special_note, category ),
       stock_batches ( id, batch_code, source_name, purchase_no, quantity, notes ),
-      godowns ( id, location_name ),
+      godowns!godown_id ( id, location_name ),
       bills ( id, bill_number, customer_name, customer_phone, status, finalized_at )
     `
       )
@@ -153,7 +153,7 @@ export async function fetchProductGodownBreakdown(
       *,
       products ( id, name, product_code, size, quality, retail_selling_price ),
       stock_batches ( id, product_id, batch_code, source_name, purchase_no, quantity, notes, created_by, created_at ),
-      godowns ( id, location_name )
+      godowns!godown_id ( id, location_name )
     `
     )
     .eq("product_id", productId)
@@ -169,7 +169,7 @@ export async function fetchProductGodownBreakdown(
       *,
       products ( id, name, product_code, size, retail_selling_price ),
       stock_batches ( id, product_id, batch_code, source_name, purchase_no, quantity, notes, created_by, created_at ),
-      godowns ( id, location_name )
+      godowns!godown_id ( id, location_name )
     `
       )
       .eq("product_id", productId)

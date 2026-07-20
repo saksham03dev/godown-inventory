@@ -14,7 +14,7 @@ export async function fetchOpenBales(
       *,
       products ( id, name, product_code, size, retail_selling_price ),
       stock_batches ( id, batch_code, source_name, quantity ),
-      godowns ( id, location_name )
+      godowns!godown_id ( id, location_name )
     `
     )
     .eq("status", "STOCKED_IN")
