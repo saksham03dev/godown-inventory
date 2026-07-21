@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchProducts } from "@/lib/services/inventoryService";
+import { useCatalogCache } from "@/contexts/CatalogCacheContext";
 import {
   createProduct,
   deleteProduct,
@@ -10,28 +10,20 @@ import {
 import type { AlertState, Product, ProductInput } from "@/lib/types/database";
 
 export function useProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { products, productsLoading, catalogError, refreshProducts } =
+    useCatalogCache();
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchProducts();
-      setProducts(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load products");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (catalogError) setError(catalogError);
+  }, [catalogError]);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    await refreshProducts();
+  }, [refreshProducts]);
 
   const addProduct = useCallback(
     async (input: ProductInput) => {
@@ -40,14 +32,14 @@ export function useProducts() {
       const result = await createProduct(input);
       if (result.success) {
         setAlert({ type: "success", message: result.message });
-        await refresh();
+        await refreshProducts();
       } else {
         setAlert({ type: "error", message: result.message });
       }
       setMutating(false);
       return result;
     },
-    [refresh]
+    [refreshProducts]
   );
 
   const editProduct = useCallback(
@@ -61,14 +53,14 @@ export function useProducts() {
       const result = await updateProduct(id, input, options);
       if (result.success) {
         setAlert({ type: "success", message: result.message });
-        await refresh();
+        await refreshProducts();
       } else {
         setAlert({ type: "error", message: result.message });
       }
       setMutating(false);
       return result;
     },
-    [refresh]
+    [refreshProducts]
   );
 
   const removeProduct = useCallback(
@@ -78,21 +70,21 @@ export function useProducts() {
       const result = await deleteProduct(id);
       if (result.success) {
         setAlert({ type: "success", message: result.message });
-        await refresh();
+        await refreshProducts();
       } else {
         setAlert({ type: "error", message: result.message });
       }
       setMutating(false);
       return result;
     },
-    [refresh]
+    [refreshProducts]
   );
 
   const dismissAlert = useCallback(() => setAlert(null), []);
 
   return {
     products,
-    loading,
+    loading: productsLoading,
     mutating,
     error,
     alert,

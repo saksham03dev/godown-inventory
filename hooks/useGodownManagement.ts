@@ -1,37 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchGodowns } from "@/lib/services/inventoryService";
+import { useCatalogCache } from "@/contexts/CatalogCacheContext";
 import {
   createGodown,
   deleteGodown,
   updateGodown,
 } from "@/lib/services/godownService";
-import type { AlertState, Godown, GodownInput } from "@/lib/types/database";
+import type { AlertState, GodownInput } from "@/lib/types/database";
 
 export function useGodownManagement() {
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { godowns, godownsLoading, catalogError, refreshGodowns } =
+    useCatalogCache();
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchGodowns();
-      setGodowns(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load godowns");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (catalogError) setError(catalogError);
+  }, [catalogError]);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    await refreshGodowns();
+  }, [refreshGodowns]);
 
   const addGodown = useCallback(
     async (input: GodownInput) => {
@@ -40,14 +32,14 @@ export function useGodownManagement() {
       const result = await createGodown(input);
       if (result.success) {
         setAlert({ type: "success", message: result.message });
-        await refresh();
+        await refreshGodowns();
       } else {
         setAlert({ type: "error", message: result.message });
       }
       setMutating(false);
       return result;
     },
-    [refresh]
+    [refreshGodowns]
   );
 
   const editGodown = useCallback(
@@ -57,14 +49,14 @@ export function useGodownManagement() {
       const result = await updateGodown(id, input);
       if (result.success) {
         setAlert({ type: "success", message: result.message });
-        await refresh();
+        await refreshGodowns();
       } else {
         setAlert({ type: "error", message: result.message });
       }
       setMutating(false);
       return result;
     },
-    [refresh]
+    [refreshGodowns]
   );
 
   const removeGodown = useCallback(
@@ -74,21 +66,21 @@ export function useGodownManagement() {
       const result = await deleteGodown(id);
       if (result.success) {
         setAlert({ type: "success", message: result.message });
-        await refresh();
+        await refreshGodowns();
       } else {
         setAlert({ type: "error", message: result.message });
       }
       setMutating(false);
       return result;
     },
-    [refresh]
+    [refreshGodowns]
   );
 
   const dismissAlert = useCallback(() => setAlert(null), []);
 
   return {
     godowns,
-    loading,
+    loading: godownsLoading,
     mutating,
     error,
     alert,

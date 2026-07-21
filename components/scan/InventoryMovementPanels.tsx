@@ -68,15 +68,6 @@ export function TransferScanPanel({ godowns }: TransferScanPanelProps) {
     resetTally();
   }, [phase, resetTally]);
 
-  useEffect(() => {
-    if (godowns.length > 0 && !fromGodownId) {
-      setFromGodownId(godowns[0].id);
-    }
-    if (godowns.length > 1 && !toGodownId) {
-      setToGodownId(godowns[1].id);
-    }
-  }, [godowns, fromGodownId, toGodownId]);
-
   const {
     processing,
     alert,
@@ -144,7 +135,7 @@ export function TransferScanPanel({ godowns }: TransferScanPanelProps) {
           />
         ) : null}
         <Dropdown
-          label={isDispatch ? "To godown" : "Receiving at"}
+          label={isDispatch ? "To warehouse" : "Receiving at"}
           options={godowns.map((g) => ({
             value: g.id,
             label: g.location_name,
@@ -171,8 +162,8 @@ export function TransferScanPanel({ godowns }: TransferScanPanelProps) {
           alert={{
             type: "info",
             message: isDispatch
-              ? "Select source and destination godowns to dispatch."
-              : "Select the destination godown to receive.",
+              ? "Pick source and destination warehouses."
+              : "Pick destination warehouse.",
           }}
         />
       )}
@@ -276,6 +267,7 @@ export function ReturnScanPanel({ godowns }: ReturnScanPanelProps) {
   const [reason, setReason] = useState<string>(RETURN_REASONS[0]);
   const [pending, setPending] = useState<PendingReturnConfirm | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [scanHint, setScanHint] = useState<string | null>(null);
 
   const processingRef = useRef(false);
   const qtyPresetRef = useRef(qtyPreset);
@@ -292,12 +284,6 @@ export function ReturnScanPanel({ godowns }: ReturnScanPanelProps) {
   selectedGodownIdRef.current = selectedGodownId;
   reasonRef.current = reason;
   pendingRef.current = pending;
-
-  useEffect(() => {
-    if (godowns.length > 0 && !selectedGodownId) {
-      setSelectedGodownId(godowns[0].id);
-    }
-  }, [godowns, selectedGodownId]);
 
   const {
     processing,
@@ -333,12 +319,20 @@ export function ReturnScanPanel({ godowns }: ReturnScanPanelProps) {
     async (barcode: string) => {
       if (processingRef.current || pendingRef.current) return;
       const godownId = selectedGodownIdRef.current;
-      if (!godownId) return;
+      if (!godownId) {
+        setScanHint("Pick a warehouse first.");
+        return;
+      }
 
       if (qtyPresetRef.current === "custom") {
         const n = Math.floor(Number(customQtyRef.current));
-        if (!Number.isFinite(n) || n < 1) return;
+        if (!Number.isFinite(n) || n < 1) {
+          setScanHint("Enter bag count first.");
+          return;
+        }
       }
+
+      setScanHint(null);
 
       const bagsQty = resolvePresetBagsQty(
         qtyPresetRef.current,
@@ -440,8 +434,15 @@ export function ReturnScanPanel({ godowns }: ReturnScanPanelProps) {
         <AlertBanner
           alert={{
             type: "info",
-            message: "Select a godown where returned stock will be placed.",
+            message: "Pick a warehouse for returned stock.",
           }}
+        />
+      )}
+
+      {scanHint && (
+        <AlertBanner
+          alert={{ type: "error", message: scanHint }}
+          onDismiss={() => setScanHint(null)}
         />
       )}
 

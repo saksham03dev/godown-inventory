@@ -1,37 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchGodowns } from "@/lib/services/inventoryService";
+import { useCatalogGodowns } from "@/contexts/CatalogCacheContext";
 import { fetchOpenBales } from "@/lib/services/openBalesService";
-import type { Godown, StockUnit } from "@/lib/types/database";
+import type { StockUnit } from "@/lib/types/database";
 
 export function useOpenBales(godownId?: string | null) {
+  const { godowns, loading: godownsLoading } = useCatalogGodowns();
   const [units, setUnits] = useState<StockUnit[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [unitsLoading, setUnitsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    setUnitsLoading(true);
     setError(null);
     try {
-      const [bales, godownList] = await Promise.all([
-        fetchOpenBales(godownId),
-        fetchGodowns(),
-      ]);
+      const bales = await fetchOpenBales(godownId);
       setUnits(bales);
-      setGodowns(godownList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load open bales.");
       setUnits([]);
     } finally {
-      setLoading(false);
+      setUnitsLoading(false);
     }
   }, [godownId]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
-  return { units, godowns, loading, error, refresh };
+  return {
+    units,
+    godowns,
+    loading: godownsLoading || unitsLoading,
+    error,
+    refresh,
+  };
 }

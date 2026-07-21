@@ -31,6 +31,7 @@ import type {
 } from "@/lib/types/database";
 
 type View =
+  | { level: "pick_godown" }
   | { level: "sources" }
   | { level: "skus"; group: ProductGodownBatchGroup }
   | { level: "sku"; group: ProductGodownBatchGroup; unit: StockUnit }
@@ -45,6 +46,7 @@ interface ProductInventoryDetailProps {
   godowns: Godown[];
   canEditBatch?: boolean;
   canRelocate?: boolean;
+  onGodownPicked?: (godownId: string, godownName: string) => void;
   onInventoryChanged?: () => void;
 }
 
@@ -57,6 +59,7 @@ export function ProductInventoryDetail({
   godowns,
   canEditBatch = false,
   canRelocate = false,
+  onGodownPicked,
   onInventoryChanged,
 }: ProductInventoryDetailProps) {
   const [breakdown, setBreakdown] = useState<ProductGodownBreakdown | null>(
@@ -90,12 +93,25 @@ export function ProductInventoryDetail({
   }, [product, godownId]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !product) return;
+
+    const needsGodownPick =
+      Boolean(product.locations && product.locations.length > 1) && !godownId;
+
+    if (needsGodownPick) {
+      setView({ level: "pick_godown" });
+      setBreakdown(null);
+      setError(null);
+      setAlert(null);
+      setRelocateOpen(false);
+      return;
+    }
+
     setView({ level: "sources" });
     setAlert(null);
     setRelocateOpen(false);
     load();
-  }, [open, load]);
+  }, [open, product, godownId, load]);
 
   const handleSaveBatch = async (batchId: string, input: UpdateBatchInput) => {
     setMutating(true);
@@ -114,7 +130,15 @@ export function ProductInventoryDetail({
   const sizeLabel = product?.size?.trim() || null;
   const title = product?.product_name ?? "Product";
   const description =
-    view.level === "sources"
+    view.level === "pick_godown"
+      ? [
+          product?.product_code,
+          sizeLabel ? `Size ${sizeLabel}` : null,
+          "Choose a godown to view bales",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : view.level === "sources"
       ? [
           product?.product_code,
           sizeLabel ? `Size ${sizeLabel}` : null,
@@ -142,7 +166,7 @@ export function ProductInventoryDetail({
           <AlertBanner alert={alert} onDismiss={() => setAlert(null)} />
         )}
 
-        {view.level !== "sources" && (
+        {view.level !== "sources" && view.level !== "pick_godown" && (
           <button
             type="button"
             onClick={() => {
@@ -163,6 +187,13 @@ export function ProductInventoryDetail({
           <LoadingSpinner label="Loading source breakdown…" />
         ) : error ? (
           <AlertBanner alert={{ type: "error", message: error }} />
+        ) : view.level === "pick_godown" ? (
+          <GodownPickerView
+            product={product}
+            onSelect={(godownId, godownName) => {
+              onGodownPicked?.(godownId, godownName);
+            }}
+          />
         ) : view.level === "sources" ? (
           <SourcesView
             product={product}
@@ -233,6 +264,56 @@ export function ProductInventoryDetail({
         }}
       />
     </Modal>
+  );
+}
+
+function GodownPickerView({
+  product,
+  onSelect,
+}: {
+  product: GodownStockItem | null;
+  onSelect: (godownId: string, godownName: string) => void;
+}) {
+  const locations = product?.locations ?? [];
+
+  if (locations.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-surface-border bg-surface-overlay/40 p-8 text-center">
+        <Package className="mx-auto h-8 w-8 text-zinc-600" />
+        <p className="mt-3 text-sm text-zinc-400">
+          No godown locations found for this product.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-zinc-400">
+        This SKU is stocked in multiple godowns. Pick one to view bales and
+        batches.
+      </p>
+      <ul className="space-y-2">
+        {locations.map((loc) => (
+          <li key={loc.godown_id}>
+            <button
+              type="button"
+              onClick={() => onSelect(loc.godown_id, loc.godown_name)}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-surface-border bg-surface-raised px-4 py-3 text-left transition hover:border-accent/40 hover:bg-accent/5"
+            >
+              <span className="font-medium text-zinc-200">{loc.godown_name}</span>
+              <div className="flex items-center gap-2">
+                <OpenBaleCountBadge count={loc.open_bales} />
+                <span className="text-sm font-semibold text-accent">
+                  {loc.quantity.toLocaleString()} bags
+                </span>
+                <ChevronRight className="h-4 w-4 text-zinc-500" />
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

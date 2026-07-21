@@ -18,16 +18,16 @@ export function GodownSelector({
 }: GodownSelectorProps) {
   const options: DropdownOption[] = godowns.map((g) => ({
     value: g.id,
-    label: `${g.location_name} (cap. ${g.capacity.toLocaleString()} bags)`,
+    label: g.location_name,
   }));
 
   return (
     <Dropdown
-      label="Active Godown"
+      label="Warehouse"
       options={options}
       value={selectedId}
       onChange={onChange}
-      placeholder="Where are you standing?"
+      placeholder="Choose warehouse…"
       disabled={disabled}
     />
   );

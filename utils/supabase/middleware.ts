@@ -113,7 +113,7 @@ export const updateSession = async (request: NextRequest) => {
   if (authenticated && role && !isPublicPath(pathname)) {
     if (role === "employee" && pathname === "/") {
       const scanUrl = request.nextUrl.clone();
-      scanUrl.pathname = BILLING_ENABLED ? "/scan" : "/stock-in";
+      scanUrl.pathname = getDefaultRouteForRole(role);
       const redirect = NextResponse.redirect(scanUrl);
       supabaseResponse.cookies.getAll().forEach((c) => {
         redirect.cookies.set(c.name, c.value);
@@ -123,7 +123,7 @@ export const updateSession = async (request: NextRequest) => {
 
     if (!BILLING_ENABLED && pathname === "/scan") {
       const stockInUrl = request.nextUrl.clone();
-      stockInUrl.pathname = "/stock-in";
+      stockInUrl.pathname = getDefaultRouteForRole(role);
       const redirect = NextResponse.redirect(stockInUrl);
       supabaseResponse.cookies.getAll().forEach((c) => {
         redirect.cookies.set(c.name, c.value);

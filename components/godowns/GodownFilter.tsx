@@ -1,6 +1,7 @@
 "use client";
 
 import { Dropdown, type DropdownOption } from "@/components/ui/Dropdown";
+import { ALL_GODOWNS_ID } from "@/lib/constants/inventoryView";
 import type { Godown } from "@/lib/types/database";
 
 interface GodownFilterProps {
@@ -8,6 +9,7 @@ interface GodownFilterProps {
   selectedId: string;
   onChange: (godownId: string) => void;
   className?: string;
+  showAllOption?: boolean;
 }
 
 export function GodownFilter({
@@ -15,15 +17,21 @@ export function GodownFilter({
   selectedId,
   onChange,
   className,
+  showAllOption = false,
 }: GodownFilterProps) {
-  const options: DropdownOption[] = godowns.map((g) => ({
-    value: g.id,
-    label: g.location_name,
-  }));
+  const options: DropdownOption[] = [
+    ...(showAllOption
+      ? [{ value: ALL_GODOWNS_ID, label: "All stock" }]
+      : []),
+    ...godowns.map((g) => ({
+      value: g.id,
+      label: g.location_name,
+    })),
+  ];
 
   return (
     <Dropdown
-      label="Filter by Godown"
+      label="View stock in"
       options={options}
       value={selectedId}
       onChange={onChange}

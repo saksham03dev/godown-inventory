@@ -5,6 +5,30 @@ export function normalizeProductNameKey(name: string): string {
   return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+/** Human-readable variant label: backend code, size, quality. */
+export function formatVariantLabel(item: GodownStockItem): string {
+  const parts = [
+    item.product_code,
+    item.size?.trim() ? `Size ${item.size.trim()}` : null,
+    item.quality?.trim() || null,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+/** Filter stock items by product name or backend code (case-insensitive). */
+export function filterStockItems(
+  items: GodownStockItem[],
+  query: string
+): GodownStockItem[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  return items.filter(
+    (item) =>
+      item.product_name.toLowerCase().includes(q) ||
+      item.product_code.toLowerCase().includes(q)
+  );
+}
+
 export function groupGodownStockByName(
   items: GodownStockItem[]
 ): GodownStockNameGroup[] {

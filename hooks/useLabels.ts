@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchProducts } from "@/lib/services/inventoryService";
+import { useCatalogCache } from "@/contexts/CatalogCacheContext";
 import {
   createStockBatch,
   fetchBatchWithUnits,
@@ -10,42 +10,46 @@ import {
 import type {
   AlertState,
   CreateBatchInput,
-  Product,
   StockBatch,
   StockBatchWithUnits,
 } from "@/lib/types/database";
 
 export function useLabels() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products, productsLoading, catalogError, refreshProducts } =
+    useCatalogCache();
   const [batches, setBatches] = useState<StockBatch[]>([]);
   const [activeBatch, setActiveBatch] = useState<StockBatchWithUnits | null>(
     null
   );
-  const [loading, setLoading] = useState(true);
+  const [batchesLoading, setBatchesLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refreshBatches = useCallback(async () => {
+    setBatchesLoading(true);
     try {
-      const [productsData, batchesData] = await Promise.all([
-        fetchProducts(),
-        fetchBatches(),
-      ]);
-      setProducts(productsData);
+      const batchesData = await fetchBatches(5);
       setBatches(batchesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      setError(err instanceof Error ? err.message : "Failed to load batches");
     } finally {
-      setLoading(false);
+      setBatchesLoading(false);
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    setError(null);
+    await Promise.all([refreshProducts(), refreshBatches()]);
+  }, [refreshProducts, refreshBatches]);
+
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (catalogError) setError(catalogError);
+  }, [catalogError]);
+
+  useEffect(() => {
+    void refreshBatches();
+  }, [refreshBatches]);
 
   const createBatch = useCallback(
     async (input: CreateBatchInput) => {
@@ -85,7 +89,7 @@ export function useLabels() {
     products,
     batches,
     activeBatch,
-    loading,
+    loading: productsLoading || batchesLoading,
     creating,
     error,
     alert,

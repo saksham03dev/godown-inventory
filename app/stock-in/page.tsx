@@ -25,9 +25,9 @@ export default function StockInPage() {
   }
 
   return (
-    <DashboardLayout title="Stock In" subtitle="Scan labelled bales into warehouse">
+    <DashboardLayout title="Stock In" subtitle="Scan bundle labels into a warehouse">
       {loading ? (
-        <LoadingSpinner label="Loading godowns…" />
+        <LoadingSpinner label="Loading warehouses…" />
       ) : error ? (
         <AlertBanner alert={{ type: "error", message: error }} />
       ) : (

@@ -1,26 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { GodownFilter } from "@/components/godowns/GodownFilter";
-import { InventoryTable } from "@/components/godowns/InventoryTable";
-import { GodownInventoryCharts } from "@/components/inventory/GodownInventoryCharts";
-import { ProductInventoryDetail } from "@/components/inventory/ProductInventoryDetail";
-import { AlertBanner } from "@/components/ui/AlertBanner";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useEffect, useState } from "react";
+import { ALL_GODOWNS_ID } from "@/lib/constants/inventoryView";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInventory } from "@/hooks/useInventory";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { GodownStockItem } from "@/lib/types/database";
+import { RefreshCw, Search } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { GodownFilter } from "@/components/godowns/GodownFilter";
+import { InventoryBarChart } from "@/components/inventory/InventoryBarChart";
+import { InventoryProductGroups } from "@/components/inventory/InventoryProductGroups";
+import { InventorySummary } from "@/components/inventory/InventorySummary";
+import { ProductInventoryDetail } from "@/components/inventory/ProductInventoryDetail";
+import { AlertBanner } from "@/components/ui/AlertBanner";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export default function InventoryPage() {
   const { can } = useAuth();
   const canEditBatch = can("labels");
   const canRelocate = can("inventory.relocate");
-  const [selectedGodownId, setSelectedGodownId] = useState("");
+  const [selectedGodownId, setSelectedGodownId] = useState(ALL_GODOWNS_ID);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] =
     useState<GodownStockItem | null>(null);
+  const [detailGodownId, setDetailGodownId] = useState("");
+  const [detailGodownName, setDetailGodownName] = useState("");
 
   const {
     godowns,
@@ -30,20 +35,43 @@ export default function InventoryPage() {
     refreshGodownInventory,
   } = useInventory(selectedGodownId || null);
 
-  const selectedGodown = useMemo(
-    () => godowns.find((g) => g.id === selectedGodownId),
-    [godowns, selectedGodownId]
-  );
+  const isAllStock = selectedGodownId === ALL_GODOWNS_ID;
+  const selectedGodown = godowns.find((g) => g.id === selectedGodownId);
 
-  useEffect(() => {
-    if (godowns.length > 0 && !selectedGodownId) {
-      setSelectedGodownId(godowns[0].id);
-    }
-  }, [godowns, selectedGodownId]);
+  const scopeLabel = isAllStock
+    ? `across ${godowns.length} godown${godowns.length === 1 ? "" : "s"}`
+    : `in ${selectedGodown?.location_name ?? "godown"}`;
 
   useEffect(() => {
     setSelectedProduct(null);
+    setDetailGodownId("");
+    setDetailGodownName("");
+    setSearchQuery("");
   }, [selectedGodownId]);
+
+  const handleProductClick = (item: GodownStockItem) => {
+    if (isAllStock && item.locations && item.locations.length > 1) {
+      setSelectedProduct(item);
+      setDetailGodownId("");
+      setDetailGodownName("");
+      return;
+    }
+
+    const location = item.locations?.[0];
+    setSelectedProduct(item);
+    if (isAllStock && location) {
+      setDetailGodownId(location.godown_id);
+      setDetailGodownName(location.godown_name);
+    } else {
+      setDetailGodownId(selectedGodownId);
+      setDetailGodownName(selectedGodown?.location_name ?? "Godown");
+    }
+  };
+
+  const handleGodownPicked = (godownId: string, godownName: string) => {
+    setDetailGodownId(godownId);
+    setDetailGodownName(godownName);
+  };
 
   if (!isSupabaseConfigured()) {
     return (
@@ -62,7 +90,7 @@ export default function InventoryPage() {
   return (
     <DashboardLayout
       title="View Inventory"
-      subtitle="Select a godown — stock is grouped by product name with variants by backend code and size"
+      subtitle="Browse stock by product — expand to see item codes and sizes"
       actions={
         selectedGodownId ? (
           <button
@@ -76,37 +104,50 @@ export default function InventoryPage() {
       }
     >
       <div className="mx-auto max-w-6xl space-y-6 animate-fade-in">
-        <GodownFilter
-          godowns={godowns}
-          selectedId={selectedGodownId}
-          onChange={setSelectedGodownId}
-          className="max-w-md"
-        />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <GodownFilter
+            godowns={godowns}
+            selectedId={selectedGodownId}
+            onChange={setSelectedGodownId}
+            showAllOption
+            className="max-w-md flex-1"
+          />
+          <div className="relative max-w-md flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search name or item code…"
+              className="w-full rounded-xl border border-surface-border bg-surface-overlay py-3 pl-10 pr-4 text-sm text-zinc-100 outline-none focus:border-accent"
+            />
+          </div>
+        </div>
 
-        {loading && !selectedGodown ? (
-          <LoadingSpinner label="Loading godowns…" />
+        {loading && godowns.length === 0 ? (
+          <LoadingSpinner label="Loading inventory…" />
         ) : error ? (
           <AlertBanner alert={{ type: "error", message: error }} />
         ) : !selectedGodownId ? (
           <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised p-12 text-center">
             <p className="text-sm text-zinc-400">
-              Select a godown to view its inventory.
+              Select a view to browse inventory.
             </p>
           </div>
         ) : loading ? (
-          <LoadingSpinner
-            label={`Loading ${selectedGodown?.location_name}…`}
-          />
+          <LoadingSpinner label="Loading stock…" />
         ) : (
           <>
-            <GodownInventoryCharts
+            <InventorySummary items={godownInventory} scopeLabel={scopeLabel} />
+            <InventoryBarChart items={godownInventory} />
+            <InventoryProductGroups
               items={godownInventory}
-              godownName={selectedGodown?.location_name ?? "Godown"}
-            />
-            <InventoryTable
-              items={godownInventory}
-              godownName={selectedGodown?.location_name}
-              onProductClick={setSelectedProduct}
+              godownId={selectedGodownId}
+              godownName={
+                isAllStock ? "all godowns" : selectedGodown?.location_name
+              }
+              searchQuery={searchQuery}
+              onProductClick={handleProductClick}
             />
           </>
         )}
@@ -114,13 +155,18 @@ export default function InventoryPage() {
 
       <ProductInventoryDetail
         open={Boolean(selectedProduct)}
-        onClose={() => setSelectedProduct(null)}
+        onClose={() => {
+          setSelectedProduct(null);
+          setDetailGodownId("");
+          setDetailGodownName("");
+        }}
         product={selectedProduct}
-        godownId={selectedGodownId}
-        godownName={selectedGodown?.location_name ?? "Godown"}
+        godownId={detailGodownId}
+        godownName={detailGodownName}
         godowns={godowns}
         canEditBatch={canEditBatch}
         canRelocate={canRelocate}
+        onGodownPicked={handleGodownPicked}
         onInventoryChanged={() => refreshGodownInventory(selectedGodownId)}
       />
     </DashboardLayout>

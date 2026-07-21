@@ -23,7 +23,7 @@ export default function StockOutPage() {
   return (
     <DashboardLayout
       title="Stock Out"
-      subtitle="Wholesale full bales or retail by bags"
+      subtitle="Wholesale bundles or retail by bags"
     >
       <StockOutScanPanel />
     </DashboardLayout>

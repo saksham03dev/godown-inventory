@@ -84,6 +84,13 @@ export interface InventoryLogWithRelations extends InventoryLog {
   godowns: Pick<Godown, "id" | "location_name"> | null;
 }
 
+export interface GodownStockLocation {
+  godown_id: string;
+  godown_name: string;
+  quantity: number;
+  open_bales: number;
+}
+
 export interface GodownStockItem {
   product_id: string;
   product_name: string;
@@ -96,6 +103,8 @@ export interface GodownStockItem {
   quantity: number;
   /** Count of partially sold (open) bales for this product at the godown. */
   open_bales: number;
+  /** Per-godown breakdown when viewing all stock. */
+  locations?: GodownStockLocation[];
 }
 
 /** Stock in a godown grouped by similar product name (case-insensitive). */

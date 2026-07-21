@@ -1,52 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchGodowns } from "@/lib/services/inventoryService";
+import { useCatalogGodowns } from "@/contexts/CatalogCacheContext";
 import {
   addUnitsToBill,
   createBillWithUnits,
   fetchBills,
   fetchUnbilledStockedOutUnits,
 } from "@/lib/services/billService";
-import type {
-  AlertState,
-  Bill,
-  Godown,
-  StockUnit,
-} from "@/lib/types/database";
+import type { AlertState, Bill, StockUnit } from "@/lib/types/database";
 
 export function usePendingBilling(godownId?: string | null) {
+  const { godowns, loading: godownsLoading } = useCatalogGodowns();
   const [units, setUnits] = useState<StockUnit[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
   const [draftBills, setDraftBills] = useState<Bill[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    setDataLoading(true);
     setError(null);
     try {
-      const [unitData, godownData, bills] = await Promise.all([
+      const [unitData, bills] = await Promise.all([
         fetchUnbilledStockedOutUnits(godownId || null),
-        fetchGodowns(),
         fetchBills(50),
       ]);
       setUnits(unitData);
-      setGodowns(godownData);
       setDraftBills(bills.filter((b) => b.status === "DRAFT"));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load pending units"
       );
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   }, [godownId]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   const billSelected = useCallback(async (barcodes: string[]) => {
@@ -84,7 +77,7 @@ export function usePendingBilling(godownId?: string | null) {
     units,
     godowns,
     draftBills,
-    loading,
+    loading: godownsLoading || dataLoading,
     mutating,
     error,
     alert,

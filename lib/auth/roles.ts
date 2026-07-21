@@ -99,11 +99,11 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/godowns",
-    label: "Godowns",
+    label: "Warehouses",
     permission: "godowns.manage",
     saleMode: "wholesale",
   },
-  { href: "/inventory", label: "View Inventory", permission: "godowns.view" },
+  { href: "/inventory", label: "Inventory", permission: "godowns.view" },
   {
     href: "/scan",
     label: "Scan Station",
@@ -122,7 +122,7 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/stock-return",
-    label: "Return Stock",
+    label: "Return",
     permission: "inventory.return",
   },
   {
@@ -197,13 +197,8 @@ export function getNavItemsForRole(
   }
 
   if (role === "employee") {
-    if (!billingEnabled) {
-      return items.filter((item) =>
-        ["/stock-in", "/stock-out"].includes(item.href)
-      );
-    }
     return items.filter((item) =>
-      ["/scan", "/stock-out"].includes(item.href)
+      ["/stock-in", "/stock-out"].includes(item.href)
     );
   }
 
@@ -214,7 +209,7 @@ export function getDefaultRouteForRole(
   role: UserRole | null | undefined
 ): string {
   if (role === "employee") {
-    return isBillingNavEnabled() ? "/scan" : "/stock-in";
+    return "/stock-out";
   }
   return "/";
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { processScanTransaction } from "@/lib/services/unitScanService";
+import { friendlyScanMessage } from "@/lib/utils/scanErrors";
 import type {
   AlertState,
   ScanTransactionResult,
@@ -90,7 +91,7 @@ export function useScanTransaction(
           success: false,
           message: "Please select a godown before scanning.",
         };
-        setAlert({ type: "error", message: result.message });
+        setAlert({ type: "error", message: friendlyScanMessage(result.message) });
         setLastResult(result);
         setApproveFlash(false);
         setErrorFlash(true);
@@ -120,7 +121,7 @@ export function useScanTransaction(
         } else {
           setApproveFlash(false);
           setErrorFlash(true);
-          setAlert({ type: "error", message: result.message });
+          setAlert({ type: "error", message: friendlyScanMessage(result.message) });
         }
 
         scheduleFlashClear();
@@ -162,7 +163,7 @@ export function useScanTransaction(
         } else {
           setApproveFlash(false);
           setErrorFlash(true);
-          setAlert({ type: "error", message: result.message });
+          setAlert({ type: "error", message: friendlyScanMessage(result.message) });
         }
 
         scheduleFlashClear();

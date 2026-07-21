@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { CatalogCacheProvider } from "@/contexts/CatalogCacheContext";
 import { SaleModeProvider } from "@/contexts/SaleModeContext";
 import { BusinessDayProvider } from "@/contexts/BusinessDayContext";
 import "./globals.css";
@@ -41,9 +42,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <AuthProvider>
-          <SaleModeProvider>
-            <BusinessDayProvider>{children}</BusinessDayProvider>
-          </SaleModeProvider>
+          <CatalogCacheProvider>
+            <SaleModeProvider>
+              <BusinessDayProvider>{children}</BusinessDayProvider>
+            </SaleModeProvider>
+          </CatalogCacheProvider>
         </AuthProvider>
       </body>
     </html>

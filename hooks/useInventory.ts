@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ALL_GODOWNS_ID } from "@/lib/constants/inventoryView";
+import { useCatalogCache } from "@/contexts/CatalogCacheContext";
 import {
+  fetchAllGodownInventory,
   fetchDashboardMetrics,
   fetchGodownInventory,
-  fetchGodowns,
-  fetchProducts,
 } from "@/lib/services/inventoryService";
 import type {
   DashboardMetrics,
@@ -26,22 +27,42 @@ interface UseInventoryReturn {
   refreshAll: () => Promise<void>;
 }
 
+async function loadInventoryForSelection(
+  godownId: string
+): Promise<GodownStockItem[]> {
+  if (godownId === ALL_GODOWNS_ID) {
+    return fetchAllGodownInventory();
+  }
+  return fetchGodownInventory(godownId);
+}
+
 export function useInventory(
   selectedGodownId?: string | null
 ): UseInventoryReturn {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const {
+    godowns,
+    products,
+    godownsLoading,
+    productsLoading,
+    catalogError,
+    refreshCatalog,
+  } = useCatalogCache();
+
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [godownInventory, setGodownInventory] = useState<GodownStockItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshMetrics = useCallback(async () => {
+    setMetricsLoading(true);
     try {
       const data = await fetchDashboardMetrics();
       setMetrics(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load metrics");
+    } finally {
+      setMetricsLoading(false);
     }
   }, []);
 
@@ -50,46 +71,52 @@ export function useInventory(
       setGodownInventory([]);
       return;
     }
+    setInventoryLoading(true);
     try {
-      const data = await fetchGodownInventory(godownId);
+      const data = await loadInventoryForSelection(godownId);
       setGodownInventory(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load godown inventory"
+        err instanceof Error ? err.message : "Failed to load inventory"
       );
+    } finally {
+      setInventoryLoading(false);
     }
   }, []);
 
   const refreshAll = useCallback(async () => {
-    setLoading(true);
     setError(null);
-    try {
-      const [productsData, godownsData] = await Promise.all([
-        fetchProducts(),
-        fetchGodowns(),
-      ]);
-      setProducts(productsData);
-      setGodowns(godownsData);
-      await refreshMetrics();
-      if (selectedGodownId) {
-        await refreshGodownInventory(selectedGodownId);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load inventory");
-    } finally {
-      setLoading(false);
+    await Promise.all([refreshCatalog(), refreshMetrics()]);
+    if (selectedGodownId) {
+      await refreshGodownInventory(selectedGodownId);
     }
-  }, [selectedGodownId, refreshMetrics, refreshGodownInventory]);
+  }, [
+    selectedGodownId,
+    refreshCatalog,
+    refreshMetrics,
+    refreshGodownInventory,
+  ]);
 
   useEffect(() => {
-    refreshAll();
-  }, [refreshAll]);
+    void refreshMetrics();
+  }, [refreshMetrics]);
 
   useEffect(() => {
     if (selectedGodownId) {
-      refreshGodownInventory(selectedGodownId);
+      void refreshGodownInventory(selectedGodownId);
+    } else {
+      setGodownInventory([]);
     }
   }, [selectedGodownId, refreshGodownInventory]);
+
+  useEffect(() => {
+    if (catalogError) {
+      setError(catalogError);
+    }
+  }, [catalogError]);
+
+  const loading =
+    godownsLoading || productsLoading || metricsLoading || inventoryLoading;
 
   return {
     products,

@@ -14,6 +14,9 @@ import {
 } from "@/components/scan/StockQtyPreset";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { WarehouseSelectModal } from "@/components/scan/WarehouseSelectModal";
+import { WarehouseSelectPrompt } from "@/components/scan/WarehouseSelectPrompt";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import { useScanTransaction } from "@/hooks/useScanTransaction";
@@ -47,6 +50,8 @@ export function StockScanPanel({
   const [customQty, setCustomQty] = useState("");
   const [pendingOut, setPendingOut] = useState<PendingCustomOut | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [scanHint, setScanHint] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const processingRef = useRef(false);
   const selectedGodownIdRef = useRef(selectedGodownId);
@@ -56,7 +61,6 @@ export function StockScanPanel({
   const pendingOutRef = useRef(pendingOut);
 
   const { tally, recordScan, resetTally } = useScanTally();
-
   qtyPresetRef.current = qtyPreset;
   customQtyRef.current = customQty;
   transactionTypeRef.current = transactionType;
@@ -82,12 +86,6 @@ export function StockScanPanel({
   useEffect(() => {
     selectedGodownIdRef.current = selectedGodownId;
   }, [selectedGodownId]);
-
-  useEffect(() => {
-    if (isStockIn && godowns.length > 0 && !selectedGodownId) {
-      setSelectedGodownId(godowns[0].id);
-    }
-  }, [godowns, selectedGodownId, isStockIn]);
 
   useEffect(() => {
     resetTally();
@@ -121,14 +119,20 @@ export function StockScanPanel({
       if (processingRef.current || pendingOutRef.current) return;
 
       const godownId = selectedGodownIdRef.current;
-      if (transactionTypeRef.current === "STOCK_IN" && !godownId) return;
+      if (transactionTypeRef.current === "STOCK_IN" && !godownId) {
+        setScanHint("Pick a warehouse first.");
+        return;
+      }
 
       if (qtyPresetRef.current === "custom") {
         const n = Math.floor(Number(customQtyRef.current));
         if (!Number.isFinite(n) || n < 1) {
+          setScanHint("Enter bag count first.");
           return;
         }
       }
+
+      setScanHint(null);
 
       const bagsQty = resolvePresetBagsQty(
         qtyPresetRef.current,
@@ -242,7 +246,19 @@ export function StockScanPanel({
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
-      {isStockIn && (
+      {isStockIn && isMobile && (
+        <WarehouseSelectModal
+          open={!selectedGodownId}
+          godowns={godowns}
+          selectedId={selectedGodownId}
+          onChange={setSelectedGodownId}
+          disabled={processing || confirmLoading}
+        />
+      )}
+
+      {isStockIn && !isMobile && !selectedGodownId && <WarehouseSelectPrompt />}
+
+      {isStockIn && (!isMobile || selectedGodownId) && (
         <GodownSelector
           godowns={godowns}
           selectedId={selectedGodownId}
@@ -251,12 +267,10 @@ export function StockScanPanel({
         />
       )}
 
-      {isStockIn && !selectedGodownId && (
+      {scanHint && (
         <AlertBanner
-          alert={{
-            type: "info",
-            message: "Select a godown to enable scanning.",
-          }}
+          alert={{ type: "error", message: scanHint }}
+          onDismiss={() => setScanHint(null)}
         />
       )}
 
