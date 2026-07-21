@@ -22,16 +22,10 @@ export async function createStockBatchServer(
   createdBy: string
 ): Promise<MutationResult<StockBatchWithUnits>> {
   try {
-    const source_name = input.source_name.trim();
-    const purchase_no = input.purchase_no.trim();
+    const source_name = input.source_name?.trim() || null;
+    const purchase_no = input.purchase_no?.trim() || null;
     if (!input.product_id) {
       return { success: false, message: "Select a product." };
-    }
-    if (!source_name) {
-      return { success: false, message: "Source / buyer name is required." };
-    }
-    if (!purchase_no) {
-      return { success: false, message: "Purchase no. is required." };
     }
     if (input.quantity < 1 || input.quantity > 500) {
       return {
@@ -103,11 +97,8 @@ export async function updateStockBatchServer(
   input: UpdateBatchInput
 ): Promise<MutationResult<StockBatch>> {
   try {
-    const source_name = input.source_name.trim();
+    const source_name = input.source_name?.trim() || null;
     const purchase_no = input.purchase_no?.trim() ?? null;
-    if (!source_name) {
-      return { success: false, message: "Source / buyer name is required." };
-    }
 
     const { data, error } = await db()
       .from("stock_batches")

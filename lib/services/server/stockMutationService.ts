@@ -1,6 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchBillWithItems } from "@/lib/services/billService.server";
-import { detectSkuMixAfterStockIn } from "@/lib/services/server/skuMixService";
 import { isProductBarcode } from "@/lib/utils/barcode";
 import type {
   MutationResult,
@@ -79,33 +78,7 @@ export async function processUnitStockTransactionServer(input: {
       return { success: false, message: error.message };
     }
 
-    const result = mapRpcScanResult(data);
-
-    if (
-      result.success &&
-      input.transactionType === "STOCK_IN" &&
-      result.product &&
-      input.godownId
-    ) {
-      const skuMixWarning = await detectSkuMixAfterStockIn(
-        supabase,
-        input.godownId,
-        {
-          id: result.product.id,
-          name: result.product.name,
-          quality: result.product.quality ?? null,
-          size: result.product.size ?? null,
-          product_code: result.product.product_code,
-        },
-        result.stockUnit?.stock_batches?.batch_code ?? null
-      );
-
-      if (skuMixWarning) {
-        result.skuMixWarning = skuMixWarning;
-      }
-    }
-
-    return result;
+    return mapRpcScanResult(data);
   } catch (err) {
     return {
       success: false,

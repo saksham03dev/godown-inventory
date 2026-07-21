@@ -9,7 +9,6 @@ import {
   ScanBarcode,
   XCircle,
 } from "lucide-react";
-import { AlertBanner } from "@/components/ui/AlertBanner";
 import type { AlertState, ScanTransactionResult, TransactionType } from "@/lib/types/database";
 
 interface ScannerWindowProps {
@@ -263,22 +262,18 @@ export function ScannerWindow({
 /** Compact last-result strip with reserved height to avoid layout jump */
 interface ScanResultStripProps {
   alert: AlertState | null;
-  warningAlert?: AlertState | null;
   lastResult: ScanTransactionResult | null;
   mode: TransactionType;
   onDismissAlert: () => void;
-  onDismissWarning?: () => void;
 }
 
 export function ScanResultStrip({
   alert,
-  warningAlert,
   lastResult,
   mode,
   onDismissAlert,
-  onDismissWarning,
 }: ScanResultStripProps) {
-  const hasContent = Boolean(lastResult || alert || warningAlert);
+  const hasContent = Boolean(lastResult || alert);
 
   return (
     <div className="min-h-[4.5rem] space-y-2 [overflow-anchor:none]">
@@ -305,12 +300,6 @@ export function ScanResultStrip({
                 : ""}
             </p>
           </div>
-          {warningAlert && (
-            <AlertBanner
-              alert={warningAlert}
-              onDismiss={onDismissWarning}
-            />
-          )}
         </>
       ) : (
         <div className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">

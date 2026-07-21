@@ -9,8 +9,8 @@ interface BatchCreateFormProps {
   loading?: boolean;
   onSubmit: (input: {
     product_id: string;
-    source_name: string;
-    purchase_no: string;
+    source_name?: string | null;
+    purchase_no?: string | null;
     quantity: number;
     notes?: string;
   }) => Promise<unknown>;
@@ -34,11 +34,11 @@ export function BatchCreateForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productId || !sourceName.trim() || !purchaseNo.trim()) return;
+    if (!productId) return;
     await onSubmit({
       product_id: productId,
-      source_name: sourceName.trim(),
-      purchase_no: purchaseNo.trim(),
+      source_name: sourceName.trim() || null,
+      purchase_no: purchaseNo.trim() || null,
       quantity,
       notes: notes.trim() || undefined,
     });
@@ -71,11 +71,10 @@ export function BatchCreateForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Source / Buyer *
+            Source / Buyer
           </label>
           <input
             type="text"
-            required
             value={sourceName}
             onChange={(e) => setSourceName(e.target.value)}
             placeholder="e.g. Anand Traders, Mumbai"
@@ -86,11 +85,10 @@ export function BatchCreateForm({
 
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Purchase No. *
+            Purchase No.
           </label>
           <input
             type="text"
-            required
             value={purchaseNo}
             onChange={(e) => setPurchaseNo(e.target.value)}
             placeholder="e.g. PO-2026-0142"
@@ -135,9 +133,7 @@ export function BatchCreateForm({
 
       <button
         type="submit"
-        disabled={
-          loading || !productId || !sourceName.trim() || !purchaseNo.trim()
-        }
+        disabled={loading || !productId}
         className="w-full rounded-xl bg-labels py-3 text-sm font-medium text-white transition hover:bg-labels-muted disabled:opacity-50"
       >
         {loading ? "Generating…" : "Generate Barcode Labels"}

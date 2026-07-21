@@ -1,5 +1,3 @@
-import type { SkuMixWarning } from "@/lib/utils/skuMix";
-
 export type TransactionType = "STOCK_IN" | "STOCK_OUT";
 export type UserRole = "admin" | "manager" | "employee";
 
@@ -143,8 +141,6 @@ export interface ScanTransactionResult {
   stockUnit?: StockUnit;
   isUnitScan?: boolean;
   bagsMoved?: number;
-  /** Set after stock-in when same product name exists with another backend code in godown. */
-  skuMixWarning?: SkuMixWarning;
   /** dispatch = scanned at source; receive = scanned at destination. */
   transferPhase?: "dispatch" | "receive";
 }
@@ -161,7 +157,7 @@ export interface StockBatch {
   id: string;
   product_id: string;
   batch_code: string;
-  source_name: string;
+  source_name: string | null;
   purchase_no: string | null;
   quantity: number;
   notes: string | null;
@@ -224,14 +220,14 @@ export interface StockBatchWithUnits extends StockBatch {
 
 export interface CreateBatchInput {
   product_id: string;
-  source_name: string;
-  purchase_no: string;
+  source_name?: string | null;
+  purchase_no?: string | null;
   quantity: number;
   notes?: string | null;
 }
 
 export interface UpdateBatchInput {
-  source_name: string;
+  source_name?: string | null;
   purchase_no?: string | null;
   notes?: string | null;
 }

@@ -260,7 +260,7 @@ function SourcesView({
 
   const bySource = new Map<string, ProductGodownBatchGroup[]>();
   for (const group of breakdown.batches) {
-    const key = group.batch.source_name;
+    const key = group.batch.source_name ?? "";
     const list = bySource.get(key) ?? [];
     list.push(group);
     bySource.set(key, list);
@@ -481,21 +481,20 @@ function BatchEditForm({
   onSubmit: (input: UpdateBatchInput) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [sourceName, setSourceName] = useState(batch.source_name);
+  const [sourceName, setSourceName] = useState(batch.source_name ?? "");
   const [purchaseNo, setPurchaseNo] = useState(batch.purchase_no ?? "");
   const [notes, setNotes] = useState(batch.notes ?? "");
 
   useEffect(() => {
-    setSourceName(batch.source_name);
+    setSourceName(batch.source_name ?? "");
     setPurchaseNo(batch.purchase_no ?? "");
     setNotes(batch.notes ?? "");
   }, [batch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sourceName.trim()) return;
     await onSubmit({
-      source_name: sourceName.trim(),
+      source_name: sourceName.trim() || null,
       purchase_no: purchaseNo.trim() || null,
       notes: notes.trim() || null,
     });
@@ -523,11 +522,10 @@ function BatchEditForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Source / Buyer *
+            Source / Buyer
           </label>
           <input
             type="text"
-            required
             value={sourceName}
             onChange={(e) => setSourceName(e.target.value)}
             placeholder="e.g. Anand Traders, Mumbai"
@@ -591,7 +589,7 @@ function BatchEditForm({
         </button>
         <button
           type="submit"
-          disabled={loading || !sourceName.trim()}
+          disabled={loading}
           className="flex-1 rounded-xl bg-accent py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
         >
           {loading ? "Saving…" : "Save Batch"}

@@ -17,7 +17,6 @@ interface UseScanTransactionOptions {
 interface UseScanTransactionReturn {
   processing: boolean;
   alert: AlertState | null;
-  warningAlert: AlertState | null;
   lastResult: ScanTransactionResult | null;
   approveFlash: boolean;
   errorFlash: boolean;
@@ -31,7 +30,6 @@ interface UseScanTransactionReturn {
     action: () => Promise<ScanTransactionResult>
   ) => Promise<ScanTransactionResult>;
   dismissAlert: () => void;
-  dismissWarningAlert: () => void;
   clearApproveFlash: () => void;
 }
 
@@ -44,7 +42,6 @@ export function useScanTransaction(
 
   const [processing, setProcessing] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(null);
-  const [warningAlert, setWarningAlert] = useState<AlertState | null>(null);
   const [lastResult, setLastResult] = useState<ScanTransactionResult | null>(
     null
   );
@@ -62,7 +59,6 @@ export function useScanTransaction(
   }, []);
 
   const dismissAlert = useCallback(() => setAlert(null), []);
-  const dismissWarningAlert = useCallback(() => setWarningAlert(null), []);
 
   const clearApproveFlash = useCallback(() => {
     if (flashTimerRef.current) {
@@ -120,20 +116,11 @@ export function useScanTransaction(
           setApproveFlash(true);
           setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
-          if (result.skuMixWarning) {
-            setWarningAlert({
-              type: "warning",
-              message: result.skuMixWarning.message,
-            });
-          } else {
-            setWarningAlert(null);
-          }
           onSuccessRef.current?.(result);
         } else {
           setApproveFlash(false);
           setErrorFlash(true);
           setAlert({ type: "error", message: result.message });
-          setWarningAlert(null);
         }
 
         scheduleFlashClear();
@@ -171,20 +158,11 @@ export function useScanTransaction(
           setApproveFlash(true);
           setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
-          if (result.skuMixWarning) {
-            setWarningAlert({
-              type: "warning",
-              message: result.skuMixWarning.message,
-            });
-          } else {
-            setWarningAlert(null);
-          }
           onSuccessRef.current?.(result);
         } else {
           setApproveFlash(false);
           setErrorFlash(true);
           setAlert({ type: "error", message: result.message });
-          setWarningAlert(null);
         }
 
         scheduleFlashClear();
@@ -209,14 +187,12 @@ export function useScanTransaction(
   return {
     processing,
     alert,
-    warningAlert,
     lastResult,
     approveFlash,
     errorFlash,
     handleScan,
     runAction,
     dismissAlert,
-    dismissWarningAlert,
     clearApproveFlash,
   };
 }

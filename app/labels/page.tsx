@@ -119,8 +119,8 @@ export default function LabelsPage() {
                           <span className="font-mono text-labels">{b.batch_code}</span>
                           <span className="ml-2 text-zinc-400">
                             · {b.quantity} bale{b.quantity === 1 ? "" : "s"} (
-                            {balesToBags(b.quantity).toLocaleString()} bags) ·{" "}
-                            {b.source_name}
+                            {balesToBags(b.quantity).toLocaleString()} bags)
+                            {b.source_name ? ` · ${b.source_name}` : ""}
                             {b.purchase_no ? ` · PO ${b.purchase_no}` : ""}
                           </span>
                         </button>
@@ -141,7 +141,10 @@ export default function LabelsPage() {
                   Batch {activeBatch.batch_code}
                 </h3>
                 <p className="text-xs text-zinc-500">
-                  {activeBatch.products?.name} · Source: {activeBatch.source_name}
+                  {activeBatch.products?.name}
+                  {activeBatch.source_name
+                    ? ` · Source: ${activeBatch.source_name}`
+                    : ""}
                   {activeBatch.purchase_no
                     ? ` · Purchase no.: ${activeBatch.purchase_no}`
                     : ""}{" "}

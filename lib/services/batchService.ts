@@ -218,7 +218,7 @@ export async function fetchProductGodownBreakdown(
   }
 
   const batches = Array.from(byBatch.values()).sort((a, b) =>
-    a.batch.source_name.localeCompare(b.batch.source_name)
+    (a.batch.source_name ?? "").localeCompare(b.batch.source_name ?? "")
   );
 
   const total_bags = units.reduce(
