@@ -126,4 +126,30 @@ export async function processReturnTransaction(input: {
   }
 }
 
+export async function correctUnitGodown(input: {
+  barcodeId: string;
+  toGodownId: string;
+  reason?: string | null;
+}): Promise<ScanTransactionResult> {
+  if (!input.barcodeId.trim()) {
+    return { success: false, message: "Invalid barcode." };
+  }
+  if (!input.toGodownId) {
+    return { success: false, message: "Select the correct godown." };
+  }
+
+  try {
+    return await postInventoryJson("/api/inventory/correct-godown", {
+      barcodeId: input.barcodeId.trim(),
+      toGodownId: input.toGodownId,
+      reason: input.reason ?? null,
+    });
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Relocation failed.",
+    };
+  }
+}
+
 export type { TransactionType };

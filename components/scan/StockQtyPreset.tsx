@@ -1,6 +1,7 @@
 "use client";
 
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
+import { BagCountNumpad } from "@/components/scan/BagCountNumpad";
 import type { TransactionType } from "@/lib/types/database";
 
 export type QtyPresetMode = "full" | "custom";
@@ -65,21 +66,13 @@ export function StockQtyPreset({
         </button>
       </div>
       {preset === "custom" && (
-        <div className="mt-3">
-          <label className="mb-1.5 block text-xs text-zinc-500">
-            Bags per scan (1–{BAGS_PER_BALE.toLocaleString()})
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
+        <div className="mt-4">
+          <BagCountNumpad
             value={customQty}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "" || /^\d+$/.test(v)) onCustomQtyChange(v);
-            }}
+            onChange={onCustomQtyChange}
             disabled={disabled}
-            placeholder={isIn ? "650" : "200"}
-            className="w-full max-w-xs rounded-xl border border-surface-border bg-surface-overlay px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-50"
+            max={BAGS_PER_BALE}
+            hint={`Bags per scan (1–${BAGS_PER_BALE.toLocaleString()})`}
           />
         </div>
       )}

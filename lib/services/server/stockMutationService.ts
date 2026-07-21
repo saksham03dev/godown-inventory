@@ -285,6 +285,50 @@ export async function processReturnStockInServer(input: {
   }
 }
 
+/** Server-only: correct wrong godown after mistaken stock-in. */
+export async function correctUnitGodownServer(input: {
+  barcodeId: string;
+  toGodownId: string;
+  handledBy: string;
+  reason?: string | null;
+}): Promise<ScanTransactionResult> {
+  const barcode = input.barcodeId.trim();
+  if (!barcode) {
+    return { success: false, message: "Invalid barcode." };
+  }
+  if (!input.toGodownId) {
+    return { success: false, message: "Select the correct godown." };
+  }
+  if (isProductBarcode(barcode)) {
+    return {
+      success: false,
+      message: "Use unit label barcodes (87…).",
+      isUnitScan: false,
+    };
+  }
+
+  try {
+    const supabase = createServiceClient({ requireServiceRole: true });
+    const { data, error } = await supabase.rpc("correct_unit_godown", {
+      p_barcode: barcode,
+      p_to_godown_id: input.toGodownId,
+      p_handled_by: input.handledBy,
+      p_reason: input.reason ?? null,
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return mapRpcScanResult(data);
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Relocation failed.",
+    };
+  }
+}
+
 /** Server-only: claim unit onto draft bill atomically. */
 export async function attachUnitToBillServer(input: {
   billId: string;

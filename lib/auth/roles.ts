@@ -27,6 +27,7 @@ type Permission =
   | "scan.viewLabel"
   | "inventory.transfer"
   | "inventory.return"
+  | "inventory.relocate"
   | "billing.view"
   | "billing.create"
   | "billing.editPrice"
@@ -47,6 +48,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "scan.viewLabel",
     "inventory.transfer",
     "inventory.return",
+    "inventory.relocate",
     "billing.view",
     "billing.create",
     "billing.editPrice",
@@ -63,6 +65,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "scan.viewLabel",
     "inventory.transfer",
     "inventory.return",
+    "inventory.relocate",
     "billing.view",
     "billing.create",
   ],

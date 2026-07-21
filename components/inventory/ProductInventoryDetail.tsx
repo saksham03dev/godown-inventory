@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { LabelDetailCard } from "@/components/scan/LabelDetailCard";
 import { OpenBaleBadge, OpenBaleCountBadge } from "@/components/inventory/OpenBaleBadge";
+import { GodownRelocateDialog } from "@/components/inventory/GodownRelocateDialog";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Modal } from "@/components/ui/Modal";
@@ -20,6 +21,7 @@ import {
 import { isSealedBale } from "@/lib/utils/inventory";
 import type {
   AlertState,
+  Godown,
   GodownStockItem,
   ProductGodownBatchGroup,
   ProductGodownBreakdown,
@@ -40,7 +42,10 @@ interface ProductInventoryDetailProps {
   product: GodownStockItem | null;
   godownId: string;
   godownName: string;
+  godowns: Godown[];
   canEditBatch?: boolean;
+  canRelocate?: boolean;
+  onInventoryChanged?: () => void;
 }
 
 export function ProductInventoryDetail({
@@ -49,7 +54,10 @@ export function ProductInventoryDetail({
   product,
   godownId,
   godownName,
+  godowns,
   canEditBatch = false,
+  canRelocate = false,
+  onInventoryChanged,
 }: ProductInventoryDetailProps) {
   const [breakdown, setBreakdown] = useState<ProductGodownBreakdown | null>(
     null
@@ -59,6 +67,7 @@ export function ProductInventoryDetail({
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [view, setView] = useState<View>({ level: "sources" });
+  const [relocateOpen, setRelocateOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!product || !godownId) return;
@@ -84,6 +93,7 @@ export function ProductInventoryDetail({
     if (!open) return;
     setView({ level: "sources" });
     setAlert(null);
+    setRelocateOpen(false);
     load();
   }, [open, load]);
 
@@ -179,7 +189,20 @@ export function ProductInventoryDetail({
             }
           />
         ) : view.level === "sku" ? (
-          <LabelDetailCard unit={view.unit} showBatchInboundMeta />
+          <div className="space-y-4">
+            <LabelDetailCard unit={view.unit} showBatchInboundMeta />
+            {canRelocate &&
+              view.unit.status === "STOCKED_IN" &&
+              view.unit.godown_id && (
+                <button
+                  type="button"
+                  onClick={() => setRelocateOpen(true)}
+                  className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-200 transition hover:bg-amber-500/15"
+                >
+                  Correct godown location
+                </button>
+              )}
+          </div>
         ) : (
           <BatchEditForm
             batch={view.group.batch}
@@ -192,6 +215,23 @@ export function ProductInventoryDetail({
           />
         )}
       </div>
+
+      <GodownRelocateDialog
+        open={relocateOpen}
+        unit={view.level === "sku" ? view.unit : null}
+        currentGodownId={godownId}
+        currentGodownName={godownName}
+        godowns={godowns}
+        onClose={() => setRelocateOpen(false)}
+        onSuccess={() => {
+          setAlert({
+            type: "success",
+            message: "Bale moved to the correct godown.",
+          });
+          onInventoryChanged?.();
+          onClose();
+        }}
+      />
     </Modal>
   );
 }

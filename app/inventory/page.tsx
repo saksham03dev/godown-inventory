@@ -17,6 +17,7 @@ import type { GodownStockItem } from "@/lib/types/database";
 export default function InventoryPage() {
   const { can } = useAuth();
   const canEditBatch = can("labels");
+  const canRelocate = can("inventory.relocate");
   const [selectedGodownId, setSelectedGodownId] = useState("");
   const [selectedProduct, setSelectedProduct] =
     useState<GodownStockItem | null>(null);
@@ -117,7 +118,10 @@ export default function InventoryPage() {
         product={selectedProduct}
         godownId={selectedGodownId}
         godownName={selectedGodown?.location_name ?? "Godown"}
+        godowns={godowns}
         canEditBatch={canEditBatch}
+        canRelocate={canRelocate}
+        onInventoryChanged={() => refreshGodownInventory(selectedGodownId)}
       />
     </DashboardLayout>
   );
