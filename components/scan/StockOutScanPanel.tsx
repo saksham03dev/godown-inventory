@@ -13,6 +13,7 @@ import { StockOutModeSwitch } from "@/components/scan/StockOutModeSwitch";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
+import { OnScreenTextPad } from "@/components/scan/OnScreenTextPad";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
@@ -23,9 +24,6 @@ import {
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
 import { confirmStockOutSlip } from "@/lib/services/stockOutSlipService";
 import type { AlertState, StockUnit } from "@/lib/types/database";
-
-const inputClass =
-  "w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent disabled:opacity-60 sm:text-sm";
 
 function readStoredMode(): StockOutSaleMode {
   if (typeof window === "undefined") return "wholesale";
@@ -73,6 +71,8 @@ export function StockOutScanPanel() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [billerName, setBillerName] = useState("");
   const [billNo, setBillNo] = useState("");
+  /** Which optional field the on-screen pad is editing. */
+  const [padTarget, setPadTarget] = useState<"biller" | "billNo">("biller");
   const [confirming, setConfirming] = useState(false);
   const [confirmedSlipId, setConfirmedSlipId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
@@ -294,7 +294,13 @@ export function StockOutScanPanel() {
     if (staged.length === 0 || confirming) return;
     setBillerName("");
     setBillNo("");
+    setPadTarget("biller");
     setConfirmOpen(true);
+    // Drop focus so OTG keystrokes cannot land in a text field
+    if (typeof document !== "undefined") {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+    }
   }, [staged.length, confirming]);
 
   const closeConfirmModal = useCallback(() => {
@@ -490,7 +496,7 @@ export function StockOutScanPanel() {
         open={confirmOpen}
         onClose={closeConfirmModal}
         title="Confirm stock out"
-        description="Optional biller details — then commit this session"
+        description="Optional details — use the on-screen pad (OTG-safe)"
         size="md"
       >
         <div className="space-y-4">
@@ -509,35 +515,60 @@ export function StockOutScanPanel() {
             </p>
           </div>
 
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-zinc-400">
-              Biller name{" "}
-              <span className="font-normal text-zinc-600">(optional)</span>
-            </span>
-            <input
-              className={inputClass}
-              value={billerName}
-              onChange={(e) => setBillerName(e.target.value)}
-              placeholder="Person billed"
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
               disabled={confirming}
-              autoComplete="off"
-            />
-          </label>
+              onClick={() => setPadTarget("biller")}
+              className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                padTarget === "biller"
+                  ? "border-accent/50 bg-accent/10"
+                  : "border-surface-border bg-surface-overlay"
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Biller
+              </p>
+              <p className="mt-0.5 truncate text-sm text-zinc-100">
+                {billerName || (
+                  <span className="text-zinc-600">Optional</span>
+                )}
+              </p>
+            </button>
+            <button
+              type="button"
+              disabled={confirming}
+              onClick={() => setPadTarget("billNo")}
+              className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                padTarget === "billNo"
+                  ? "border-accent/50 bg-accent/10"
+                  : "border-surface-border bg-surface-overlay"
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Bill No
+              </p>
+              <p className="mt-0.5 truncate text-sm text-zinc-100">
+                {billNo || <span className="text-zinc-600">Optional</span>}
+              </p>
+            </button>
+          </div>
 
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-zinc-400">
-              Bill No{" "}
-              <span className="font-normal text-zinc-600">(optional)</span>
-            </span>
-            <input
-              className={inputClass}
-              value={billNo}
-              onChange={(e) => setBillNo(e.target.value)}
-              placeholder="External bill / purchase no"
-              disabled={confirming}
-              autoComplete="off"
-            />
-          </label>
+          <OnScreenTextPad
+            key={padTarget}
+            label={
+              padTarget === "biller"
+                ? "Biller name (optional)"
+                : "Bill No (optional)"
+            }
+            value={padTarget === "biller" ? billerName : billNo}
+            onChange={padTarget === "biller" ? setBillerName : setBillNo}
+            placeholder={
+              padTarget === "biller" ? "Person billed" : "Bill / purchase no"
+            }
+            disabled={confirming}
+            defaultMode={padTarget === "billNo" ? "digits" : "letters"}
+          />
 
           <div className="flex justify-end gap-3 pt-1">
             <button
