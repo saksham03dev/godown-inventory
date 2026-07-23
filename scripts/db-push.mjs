@@ -13,18 +13,27 @@
  *   SUPABASE_DB_PASSWORD=...     (from Supabase → Settings → Database)
  *
  * Or set DATABASE_URL directly (takes precedence).
+ *
+ * Direct db.<ref>.supabase.co is often IPv6-only. If your network cannot
+ * reach IPv6, set SUPABASE_DB_REGION (e.g. ap-south-1) or DATABASE_URL to the
+ * Session pooler URI from Supabase → Settings → Database.
  */
 
+import dns from "node:dns";
+import dnsPromises from "node:dns/promises";
 import { readFileSync } from "fs";
 import { createInterface } from "readline";
 import pg from "pg";
 import {
   loadEnvFiles,
   buildDatabaseUrl,
+  buildPoolerDatabaseUrl,
   listMigrationFiles,
   getSchemaFile,
   extractProjectRef,
 } from "./lib/env.mjs";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const { Client } = pg;
 
@@ -36,6 +45,17 @@ const mode = args.includes("--schema")
     : "migrations";
 
 const env = loadEnvFiles();
+
+const POOLER_REGION_CANDIDATES = [
+  env.SUPABASE_DB_REGION,
+  "ap-south-1",
+  "ap-southeast-1",
+  "ap-northeast-1",
+  "eu-west-1",
+  "eu-central-1",
+  "us-east-1",
+  "us-west-1",
+].filter(Boolean);
 
 async function promptPassword() {
   const ref = extractProjectRef(env.NEXT_PUBLIC_SUPABASE_URL);
@@ -77,6 +97,107 @@ async function resolveConnectionString() {
   }
 
   return url;
+}
+
+function createClient(connectionString, { ipv4Only = false } = {}) {
+  return new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15_000,
+    ...(ipv4Only
+      ? {
+          lookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { ...options, family: 4 }, callback);
+          },
+        }
+      : {}),
+  });
+}
+
+async function hostHasIpv4(hostname) {
+  try {
+    await dnsPromises.lookup(hostname, { family: 4 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function tryConnect(connectionString, label, { ipv4Only = false } = {}) {
+  const client = createClient(connectionString, { ipv4Only });
+  try {
+    await client.connect();
+    console.log(`✓ Connected via ${label}`);
+    return client;
+  } catch (err) {
+    try {
+      await client.end();
+    } catch {
+      /* ignore */
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(`✗ ${label}: ${message}`);
+    return null;
+  }
+}
+
+async function connectWithFallback() {
+  const primary = await resolveConnectionString();
+
+  // If caller already set DATABASE_URL / pooler host, try that first (IPv4).
+  if (env.DATABASE_URL || env.SUPABASE_DB_POOLER_HOST || env.SUPABASE_DB_REGION) {
+    const client = await tryConnect(primary, "configured URL", { ipv4Only: true });
+    if (client) return client;
+  }
+
+  const ref = extractProjectRef(env.NEXT_PUBLIC_SUPABASE_URL);
+  const directHost = env.SUPABASE_DB_HOST || `db.${ref}.supabase.co`;
+  const directHasV4 = await hostHasIpv4(directHost);
+
+  if (directHasV4) {
+    const client = await tryConnect(primary, `direct ${directHost}`, {
+      ipv4Only: true,
+    });
+    if (client) return client;
+  } else {
+    console.log(
+      `ℹ Direct host ${directHost} has no IPv4 address — trying Session pooler…`
+    );
+  }
+
+  // Also try direct over default DNS (may work on IPv6-capable networks).
+  if (!directHasV4) {
+    const client = await tryConnect(primary, `direct ${directHost} (IPv6)`, {
+      ipv4Only: false,
+    });
+    if (client) return client;
+  }
+
+  const tried = new Set();
+  for (const region of POOLER_REGION_CANDIDATES) {
+    if (tried.has(region)) continue;
+    tried.add(region);
+    const poolerUrl = buildPoolerDatabaseUrl(env, region);
+    if (!poolerUrl) continue;
+    const client = await tryConnect(
+      poolerUrl,
+      `pooler aws-0-${region}`,
+      { ipv4Only: true }
+    );
+    if (client) {
+      console.log(
+        `ℹ Tip: add SUPABASE_DB_REGION=${region} to .env.local to skip probing.`
+      );
+      return client;
+    }
+  }
+
+  throw new Error(
+    `Could not reach the database (IPv6 direct host unreachable; pooler probes failed).\n\n` +
+      `Fix: In Supabase → Project Settings → Database, copy the Session pooler URI and set:\n\n` +
+      `  DATABASE_URL=postgresql://postgres.${ref}:YOUR_PASSWORD@aws-0-<region>.pooler.supabase.com:5432/postgres\n\n` +
+      `Or set SUPABASE_DB_REGION=<region> (e.g. ap-south-1) in .env.local.`
+  );
 }
 
 async function ensureMigrationsTable(client) {
@@ -143,14 +264,7 @@ async function main() {
     console.log(`Project: ${projectRef}`);
   }
 
-  const connectionString = await resolveConnectionString();
-  const client = new Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  });
-
-  await client.connect();
-  console.log("✓ Connected to database");
+  const client = await connectWithFallback();
 
   await ensureMigrationsTable(client);
   const applied = await getAppliedMigrations(client);

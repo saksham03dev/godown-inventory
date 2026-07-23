@@ -60,12 +60,51 @@ export function buildDatabaseUrl(env) {
 
   if (!ref || !password) return null;
 
-  const host = env.SUPABASE_DB_HOST || `db.${ref}.supabase.co`;
-  const port = env.SUPABASE_DB_PORT || "5432";
+  // Pooler (IPv4) — required when direct db.*.supabase.co is IPv6-only.
+  // Set SUPABASE_DB_REGION (e.g. ap-south-1) or SUPABASE_DB_POOLER_HOST.
+  const poolerHost =
+    env.SUPABASE_DB_POOLER_HOST ||
+    (env.SUPABASE_DB_REGION
+      ? `aws-0-${env.SUPABASE_DB_REGION}.pooler.supabase.com`
+      : null);
+
+  const usePooler =
+    Boolean(poolerHost) ||
+    env.SUPABASE_USE_POOLER === "true" ||
+    env.SUPABASE_USE_POOLER === "1";
+
+  const host =
+    env.SUPABASE_DB_HOST ||
+    (usePooler && poolerHost
+      ? poolerHost
+      : `db.${ref}.supabase.co`);
+
+  const port =
+    env.SUPABASE_DB_PORT ||
+    (usePooler || poolerHost ? "5432" : "5432");
   const database = env.SUPABASE_DB_NAME || "postgres";
-  const user = env.SUPABASE_DB_USER || "postgres";
+  const user =
+    env.SUPABASE_DB_USER ||
+    (usePooler || (env.SUPABASE_DB_HOST || "").includes("pooler.supabase.com")
+      ? `postgres.${ref}`
+      : poolerHost && !env.SUPABASE_DB_HOST
+        ? `postgres.${ref}`
+        : "postgres");
 
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+}
+
+/** Build a Session-mode pooler URL for a known AWS region (IPv4-friendly). */
+export function buildPoolerDatabaseUrl(env, region) {
+  const ref =
+    env.SUPABASE_PROJECT_REF ||
+    extractProjectRef(env.NEXT_PUBLIC_SUPABASE_URL);
+  const password = env.SUPABASE_DB_PASSWORD;
+  if (!ref || !password || !region) return null;
+
+  const host = `aws-0-${region}.pooler.supabase.com`;
+  const user = `postgres.${ref}`;
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:5432/postgres`;
 }
 
 export function listMigrationFiles() {

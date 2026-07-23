@@ -7,13 +7,12 @@ import {
   RetailCutDialog,
   RetailStockOutApproval,
 } from "@/components/scan/RetailCutDialog";
-import {
-  ScannerWindow,
-} from "@/components/scan/ScannerWindow";
+import { ScannerWindow } from "@/components/scan/ScannerWindow";
 import { ScanTallyPanel } from "@/components/scan/ScanTallyPanel";
 import { StockOutModeSwitch } from "@/components/scan/StockOutModeSwitch";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Modal } from "@/components/ui/Modal";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
@@ -66,13 +65,14 @@ function productFromUnit(unit: StockUnit) {
 
 export function StockOutScanPanel() {
   const [saleMode, setSaleMode] = useState<StockOutSaleMode>("wholesale");
-  const [billerName, setBillerName] = useState("");
-  const [billNo, setBillNo] = useState("");
   const [staged, setStaged] = useState<StagedStockOutItem[]>([]);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [approveFlash, setApproveFlash] = useState(false);
   const [errorFlash, setErrorFlash] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [billerName, setBillerName] = useState("");
+  const [billNo, setBillNo] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [confirmedSlipId, setConfirmedSlipId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
@@ -93,6 +93,7 @@ export function StockOutScanPanel() {
   const processingRef = useRef(false);
   const saleModeRef = useRef(saleMode);
   const retailOpenRef = useRef(false);
+  const confirmOpenRef = useRef(false);
   const stagedRef = useRef(staged);
   const manualInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,6 +102,7 @@ export function StockOutScanPanel() {
 
   saleModeRef.current = saleMode;
   retailOpenRef.current = Boolean(retailUnit);
+  confirmOpenRef.current = confirmOpen;
   stagedRef.current = staged;
 
   useEffect(() => {
@@ -116,6 +118,9 @@ export function StockOutScanPanel() {
     setRetailApproval(null);
     setLastMessage(null);
     setAlert(null);
+    setConfirmOpen(false);
+    setBillerName("");
+    setBillNo("");
   }, [resetTally]);
 
   useEffect(() => {
@@ -180,9 +185,7 @@ export function StockOutScanPanel() {
         size: meta.size,
         bags: bagsQty,
       });
-      flashSuccess(
-        `Staged bale #${unit.unit_number} · ${bagsQty} bags`
-      );
+      flashSuccess(`Staged bale #${unit.unit_number} · ${bagsQty} bags`);
       return true;
     },
     [flashError, flashSuccess, recordBags]
@@ -190,7 +193,14 @@ export function StockOutScanPanel() {
 
   const onBarcodeDetected = useCallback(
     async (barcode: string) => {
-      if (processingRef.current || retailOpenRef.current || confirming) return;
+      if (
+        processingRef.current ||
+        retailOpenRef.current ||
+        confirmOpenRef.current ||
+        confirming
+      ) {
+        return;
+      }
 
       setConfirmedSlipId(null);
       setRetailApproval(null);
@@ -280,6 +290,19 @@ export function StockOutScanPanel() {
     [retailBarcode, retailUnit, retailLoading, stageItem, focusScanner]
   );
 
+  const openConfirmModal = useCallback(() => {
+    if (staged.length === 0 || confirming) return;
+    setBillerName("");
+    setBillNo("");
+    setConfirmOpen(true);
+  }, [staged.length, confirming]);
+
+  const closeConfirmModal = useCallback(() => {
+    if (confirming) return;
+    setConfirmOpen(false);
+    focusScanner();
+  }, [confirming, focusScanner]);
+
   const handleConfirmStockOut = useCallback(async () => {
     if (staged.length === 0 || confirming) return;
     setConfirming(true);
@@ -307,9 +330,7 @@ export function StockOutScanPanel() {
       setApproveFlash(true);
       setTimeout(() => setApproveFlash(false), 1200);
     } catch (err) {
-      flashError(
-        err instanceof Error ? err.message : "Confirm failed."
-      );
+      flashError(err instanceof Error ? err.message : "Confirm failed.");
     } finally {
       setConfirming(false);
       focusScanner();
@@ -326,7 +347,7 @@ export function StockOutScanPanel() {
   ]);
 
   const scannerEnabled =
-    !retailUnit && !retailLoading && !confirming;
+    !retailUnit && !retailLoading && !confirming && !confirmOpen;
 
   const {
     isScanning,
@@ -341,6 +362,7 @@ export function StockOutScanPanel() {
   });
 
   const busy = confirming || retailLoading;
+  const totalBags = staged.reduce((sum, s) => sum + s.bagsQty, 0);
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -349,37 +371,6 @@ export function StockOutScanPanel() {
         onChange={setSaleMode}
         disabled={busy || staged.length > 0 || Boolean(retailUnit)}
       />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-zinc-400">
-            Biller name{" "}
-            <span className="font-normal text-zinc-600">(optional)</span>
-          </span>
-          <input
-            className={inputClass}
-            value={billerName}
-            onChange={(e) => setBillerName(e.target.value)}
-            placeholder="Person billed"
-            disabled={confirming}
-            autoComplete="off"
-          />
-        </label>
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-zinc-400">
-            Bill No{" "}
-            <span className="font-normal text-zinc-600">(optional)</span>
-          </span>
-          <input
-            className={inputClass}
-            value={billNo}
-            onChange={(e) => setBillNo(e.target.value)}
-            placeholder="External bill / purchase no"
-            disabled={confirming}
-            autoComplete="off"
-          />
-        </label>
-      </div>
 
       {saleMode === "wholesale" ? (
         <div className="rounded-2xl border border-wholesale/30 bg-wholesale/5 p-4 text-center ring-1 ring-wholesale/10">
@@ -403,11 +394,9 @@ export function StockOutScanPanel() {
           cameraError={cameraError}
           onStart={startScanning}
           onStop={stopScanning}
-          disabled={busy || Boolean(retailUnit)}
+          disabled={busy || Boolean(retailUnit) || confirmOpen}
           contextLabel={
-            saleMode === "wholesale"
-              ? "Wholesale stock out"
-              : "Scan bale"
+            saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale"
           }
           hardwareListening={hardwareListening && scannerEnabled}
           onManualSubmit={onBarcodeDetected}
@@ -462,7 +451,7 @@ export function StockOutScanPanel() {
         <button
           type="button"
           onClick={() => {
-            if (staged.length > 0 || billerName || billNo) setResetOpen(true);
+            if (staged.length > 0) setResetOpen(true);
             else clearSession();
           }}
           disabled={busy}
@@ -473,21 +462,19 @@ export function StockOutScanPanel() {
         </button>
         <button
           type="button"
-          onClick={() => void handleConfirmStockOut()}
+          onClick={openConfirmModal}
           disabled={busy || staged.length === 0}
           className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
-          {confirming
-            ? "Confirming…"
-            : `Confirm stock out · ${staged.length}`}
+          {`Confirm stock out · ${staged.length}`}
         </button>
       </div>
 
       <p className="text-center text-xs text-zinc-600">
         {isRetail
-          ? "Scan a bale, enter bags in the popup, then confirm the session."
-          : `Wholesale stages full remaining bags (usually ${BAGS_PER_BALE.toLocaleString()}) per scan. Confirm to commit.`}
+          ? "Scan a bale, enter bags in the popup, then confirm. Optional biller details are asked at confirm."
+          : `Wholesale stages full remaining bags (usually ${BAGS_PER_BALE.toLocaleString()}) per scan. Optional biller / bill no at confirm.`}
       </p>
 
       <RetailCutDialog
@@ -499,18 +486,91 @@ export function StockOutScanPanel() {
         errorMessage={retailDialogError}
       />
 
+      <Modal
+        open={confirmOpen}
+        onClose={closeConfirmModal}
+        title="Confirm stock out"
+        description="Optional biller details — then commit this session"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-surface-border bg-surface-overlay/40 px-4 py-3 text-sm text-zinc-300">
+            <p>
+              <span className="text-zinc-500">Labels: </span>
+              <span className="font-semibold tabular-nums text-zinc-100">
+                {staged.length}
+              </span>
+            </p>
+            <p className="mt-1">
+              <span className="text-zinc-500">Bags: </span>
+              <span className="font-semibold tabular-nums text-zinc-100">
+                {Math.round(totalBags)}
+              </span>
+            </p>
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-400">
+              Biller name{" "}
+              <span className="font-normal text-zinc-600">(optional)</span>
+            </span>
+            <input
+              className={inputClass}
+              value={billerName}
+              onChange={(e) => setBillerName(e.target.value)}
+              placeholder="Person billed"
+              disabled={confirming}
+              autoComplete="off"
+            />
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-400">
+              Bill No{" "}
+              <span className="font-normal text-zinc-600">(optional)</span>
+            </span>
+            <input
+              className={inputClass}
+              value={billNo}
+              onChange={(e) => setBillNo(e.target.value)}
+              placeholder="External bill / purchase no"
+              disabled={confirming}
+              autoComplete="off"
+            />
+          </label>
+
+          <div className="flex justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={closeConfirmModal}
+              disabled={confirming}
+              className="rounded-xl border border-surface-border px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirmStockOut()}
+              disabled={confirming || staged.length === 0}
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
+            >
+              <Check className="h-4 w-4" />
+              {confirming ? "Confirming…" : "Confirm stock out"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <ConfirmDialog
         open={resetOpen}
         onClose={() => setResetOpen(false)}
         onConfirm={() => {
           clearSession();
-          setBillerName("");
-          setBillNo("");
           setConfirmedSlipId(null);
           setResetOpen(false);
         }}
         title="Reset session?"
-        message="Clear staged scans and optional biller / bill fields. Nothing has been stocked out yet."
+        message="Clear staged scans. Nothing has been stocked out yet."
         confirmLabel="Reset"
         destructive
       />
