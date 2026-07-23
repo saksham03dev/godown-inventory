@@ -21,7 +21,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!authLoading && role === "employee") {
-      router.replace("/scan");
+      router.replace("/stock-out");
     }
   }, [authLoading, role, router]);
 
@@ -115,7 +115,7 @@ export default function DashboardPage() {
           </section>
 
           <section>
-            <ActivityFeed logs={metrics?.recentLogs ?? []} />
+            <ActivityFeed items={metrics?.recentActivity ?? []} />
           </section>
         </div>
       )}

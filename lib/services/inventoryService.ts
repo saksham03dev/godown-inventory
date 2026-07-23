@@ -5,6 +5,7 @@ import {
   isMissingColumnError,
 } from "@/lib/utils/schemaErrors";
 import type {
+  ActivityFeedItem,
   DashboardMetrics,
   Godown,
   GodownDistribution,
@@ -13,6 +14,7 @@ import type {
   Product,
   TransactionType,
 } from "@/lib/types/database";
+import { groupInventoryLogsForActivity } from "@/lib/utils/activityGrouping";
 
 type ProductRelation = {
   id: string;
@@ -347,26 +349,53 @@ export async function fetchAllGodownInventory(): Promise<GodownStockItem[]> {
   return aggregateStockUnits(units, true);
 }
 
-/** Recent audit activity only — always bounded. */
+/** Recent audit activity only — always bounded. Pulls extra rows so slip groups can collapse. */
 export async function fetchRecentLogs(
   limit = 5
 ): Promise<InventoryLogWithRelations[]> {
   const supabase = getSupabaseClient();
   const safeLimit = Math.min(Math.max(limit, 1), 50);
-  const { data, error } = await supabase
+  const fetchLimit = Math.min(safeLimit * 8, 80);
+
+  let { data, error } = await supabase
     .from("inventory_logs")
     .select(
       `
       *,
-      products ( id, name, barcode_id ),
-      godowns!godown_id ( id, location_name )
+      products ( id, name, barcode_id, product_code, size ),
+      godowns!godown_id ( id, location_name ),
+      stock_out_slips ( biller_name )
     `
     )
     .order("timestamp", { ascending: false })
-    .limit(safeLimit);
+    .limit(fetchLimit);
+
+  if (error && /stock_out_slip/i.test(error.message)) {
+    ({ data, error } = await supabase
+      .from("inventory_logs")
+      .select(
+        `
+      *,
+      products ( id, name, barcode_id, product_code, size ),
+      godowns!godown_id ( id, location_name )
+    `
+      )
+      .order("timestamp", { ascending: false })
+      .limit(fetchLimit));
+  }
 
   if (error) throw new Error(error.message);
   return (data ?? []) as InventoryLogWithRelations[];
+}
+
+export async function fetchRecentActivity(
+  limit = 5
+): Promise<ActivityFeedItem[]> {
+  const logs = await fetchRecentLogs(limit);
+  return groupInventoryLogsForActivity(
+    logs as Parameters<typeof groupInventoryLogsForActivity>[0],
+    limit
+  );
 }
 
 /**
@@ -390,6 +419,10 @@ export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
 
   const godowns = godownsResult.data ?? [];
   const units = unitsResult.data ?? [];
+  const recentActivity = groupInventoryLogsForActivity(
+    recentLogs as Parameters<typeof groupInventoryLogsForActivity>[0],
+    5
+  );
 
   const productIds = new Set<string>();
   const godownTotals = new Map<string, number>();
@@ -429,6 +462,7 @@ export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
       a.location_name.localeCompare(b.location_name)
     ),
     recentLogs,
+    recentActivity,
   };
 }
 

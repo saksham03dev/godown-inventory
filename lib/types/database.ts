@@ -77,11 +77,30 @@ export interface InventoryLog {
   handled_by: string;
   timestamp: string;
   sale_channel?: "STOCK_IN" | "WHOLESALE" | "RETAIL" | null;
+  stock_unit_id?: string | null;
+  stock_out_slip_id?: string | null;
 }
 
 export interface InventoryLogWithRelations extends InventoryLog {
-  products: Pick<Product, "id" | "name" | "barcode_id" | "product_code"> | null;
+  products: Pick<Product, "id" | "name" | "barcode_id" | "product_code" | "size"> | null;
   godowns: Pick<Godown, "id" | "location_name"> | null;
+}
+
+/** Grouped dashboard activity item (slip stock-outs clubbed by product). */
+export interface ActivityFeedItem {
+  id: string;
+  transaction_type: TransactionType;
+  product_name: string;
+  product_code: string | null;
+  godown_name: string | null;
+  /** Bags moved (primary qty). */
+  bag_count: number;
+  /** Distinct bale/unit scans in this group. */
+  bale_count: number;
+  sale_channel?: InventoryLog["sale_channel"];
+  biller_name?: string | null;
+  timestamp: string;
+  stock_out_slip_id?: string | null;
 }
 
 export interface GodownStockLocation {
@@ -130,6 +149,8 @@ export interface DashboardMetrics {
   totalStockBags: number;
   godownDistribution: GodownDistribution[];
   recentLogs: InventoryLogWithRelations[];
+  /** Clubbed activity for the dashboard feed. */
+  recentActivity: ActivityFeedItem[];
 }
 
 export interface ScanTransactionInput {
@@ -356,6 +377,53 @@ export interface RetailBillLineResult {
 export interface AlertState {
   type: "success" | "error" | "info" | "warning";
   message: string;
+}
+
+export type StockOutSlipChannel = "WHOLESALE" | "RETAIL";
+
+export interface StockOutSlip {
+  id: string;
+  biller_name: string | null;
+  bill_no: string | null;
+  sale_channel: StockOutSlipChannel;
+  status: "CONFIRMED";
+  created_by: string | null;
+  created_by_label: string | null;
+  confirmed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockOutSlipLine {
+  id: string;
+  slip_id: string;
+  product_id: string;
+  bag_count: number;
+  bale_count: number;
+  created_at: string;
+  products?: Pick<Product, "id" | "name" | "product_code" | "size"> | null;
+}
+
+export interface StockOutSlipUnit {
+  id: string;
+  slip_id: string;
+  stock_unit_id: string;
+  product_id: string;
+  unit_number: number;
+  bags_moved: number;
+  created_at: string;
+}
+
+export interface StockOutSlipWithDetails extends StockOutSlip {
+  stock_out_slip_lines: StockOutSlipLine[];
+  stock_out_slip_units: StockOutSlipUnit[];
+  total_bags: number;
+  total_bales: number;
+}
+
+export interface StockOutSlipConfirmItem {
+  barcode: string;
+  bagsQty: number;
 }
 
 export interface AsyncState<T> {

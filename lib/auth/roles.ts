@@ -10,7 +10,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full access — products, godowns, pricing, billing, and all operations",
   manager:
     "Add & edit products (no price changes), stock in/out, labels, billing — no godown management",
-  employee: "Stock in and stock out via barcode scanning only",
+  employee: "Stock in/out scanning and view stock-out slips",
 };
 
 type Permission =
@@ -31,6 +31,8 @@ type Permission =
   | "billing.view"
   | "billing.create"
   | "billing.editPrice"
+  | "slips.view"
+  | "slips.edit"
   | "users.manage";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -52,6 +54,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "billing.view",
     "billing.create",
     "billing.editPrice",
+    "slips.view",
+    "slips.edit",
     "users.manage",
   ],
   manager: [
@@ -68,8 +72,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "inventory.relocate",
     "billing.view",
     "billing.create",
+    "slips.view",
+    "slips.edit",
   ],
-  employee: ["scan"],
+  employee: ["scan", "slips.view"],
 };
 
 export function hasPermission(
@@ -119,6 +125,11 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     href: "/stock-out",
     label: "Stock Out",
     permission: "scan",
+  },
+  {
+    href: "/stock-out-slips",
+    label: "Stock Out Slips",
+    permission: "slips.view",
   },
   {
     href: "/stock-return",
@@ -198,7 +209,7 @@ export function getNavItemsForRole(
 
   if (role === "employee") {
     return items.filter((item) =>
-      ["/stock-in", "/stock-out"].includes(item.href)
+      ["/stock-in", "/stock-out", "/stock-out-slips"].includes(item.href)
     );
   }
 
@@ -223,6 +234,7 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/scan": "scan",
   "/stock-in": "scan",
   "/stock-out": "scan",
+  "/stock-out-slips": "slips.view",
   "/stock-return": "inventory.return",
   "/stock-transfer": "inventory.transfer",
   "/pending-billing": "billing.view",

@@ -1,27 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Check, RotateCcw } from "lucide-react";
 import {
   RetailCutDialog,
   RetailStockOutApproval,
 } from "@/components/scan/RetailCutDialog";
 import {
   ScannerWindow,
-  ScanResultStrip,
 } from "@/components/scan/ScannerWindow";
 import { ScanTallyPanel } from "@/components/scan/ScanTallyPanel";
 import { StockOutModeSwitch } from "@/components/scan/StockOutModeSwitch";
 import { AlertBanner } from "@/components/ui/AlertBanner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
-import { useScanTransaction } from "@/hooks/useScanTransaction";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import {
   STOCK_OUT_MODE_STORAGE_KEY,
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
-import type { ScanTransactionResult, StockUnit } from "@/lib/types/database";
+import { confirmStockOutSlip } from "@/lib/services/stockOutSlipService";
+import type { AlertState, StockUnit } from "@/lib/types/database";
+
+const inputClass =
+  "w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-base text-zinc-100 outline-none focus:border-accent disabled:opacity-60 sm:text-sm";
 
 function readStoredMode(): StockOutSaleMode {
   if (typeof window === "undefined") return "wholesale";
@@ -29,94 +34,182 @@ function readStoredMode(): StockOutSaleMode {
   return stored === "retail" ? "retail" : "wholesale";
 }
 
-function productMetaFromUnit(unit: StockUnit | undefined | null) {
-  const p = unit?.products;
+interface StagedStockOutItem {
+  barcode: string;
+  bagsQty: number;
+  productId: string;
+  productName: string;
+  productCode: string;
+  size: string | null;
+  unitNumber: number;
+  stockUnitId: string;
+}
+
+function productFromUnit(unit: StockUnit) {
+  const p = unit.products;
   if (p && typeof p === "object" && !Array.isArray(p) && "name" in p) {
     return {
+      productId: unit.product_id,
+      productName: String(p.name ?? "Product"),
       productCode:
-        "product_code" in p ? String(p.product_code ?? "") || null : null,
+        "product_code" in p ? String(p.product_code ?? "") : unit.unit_barcode,
       size: "size" in p && p.size ? String(p.size) : null,
     };
   }
-  return { productCode: null, size: null };
-}
-
-function productMetaFromResult(result: ScanTransactionResult | null) {
-  if (!result) return { productCode: null, size: null };
-  const fromUnit = productMetaFromUnit(result.stockUnit);
-  if (fromUnit.productCode || fromUnit.size) return fromUnit;
   return {
-    productCode: result.product?.product_code ?? null,
-    size: result.product?.size ?? null,
+    productId: unit.product_id,
+    productName: "Product",
+    productCode: unit.unit_barcode,
+    size: null as string | null,
   };
 }
 
 export function StockOutScanPanel() {
   const [saleMode, setSaleMode] = useState<StockOutSaleMode>("wholesale");
+  const [billerName, setBillerName] = useState("");
+  const [billNo, setBillNo] = useState("");
+  const [staged, setStaged] = useState<StagedStockOutItem[]>([]);
+  const [alert, setAlert] = useState<AlertState | null>(null);
+  const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [approveFlash, setApproveFlash] = useState(false);
+  const [errorFlash, setErrorFlash] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmedSlipId, setConfirmedSlipId] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+
   const [retailUnit, setRetailUnit] = useState<StockUnit | null>(null);
   const [retailBarcode, setRetailBarcode] = useState("");
   const [retailLoading, setRetailLoading] = useState(false);
   const [retailDialogError, setRetailDialogError] = useState<string | null>(
     null
   );
-  const [retailApproval, setRetailApproval] =
-    useState<ScanTransactionResult | null>(null);
+  const [retailApproval, setRetailApproval] = useState<{
+    productCode: string | null;
+    size: string | null;
+    bagsRemaining: number;
+    baleNumber?: number;
+  } | null>(null);
 
   const processingRef = useRef(false);
   const saleModeRef = useRef(saleMode);
   const retailOpenRef = useRef(false);
+  const stagedRef = useRef(staged);
   const manualInputRef = useRef<HTMLInputElement>(null);
 
-  const { tally, recordScan, resetTally } = useScanTally();
+  const { tally, recordBags, resetTally } = useScanTally();
   const isRetail = saleMode === "retail";
 
   saleModeRef.current = saleMode;
   retailOpenRef.current = Boolean(retailUnit);
+  stagedRef.current = staged;
 
   useEffect(() => {
     setSaleMode(readStoredMode());
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(STOCK_OUT_MODE_STORAGE_KEY, saleMode);
+  const clearSession = useCallback(() => {
+    setStaged([]);
     resetTally();
     setRetailUnit(null);
     setRetailBarcode("");
     setRetailDialogError(null);
     setRetailApproval(null);
-  }, [saleMode, resetTally]);
+    setLastMessage(null);
+    setAlert(null);
+  }, [resetTally]);
 
-  const {
-    processing,
-    alert,
-    lastResult,
-    approveFlash,
-    errorFlash,
-    handleScan,
-    dismissAlert,
-  } = useScanTransaction({
-    onSuccess: (result) => {
-      if (
-        saleModeRef.current === "wholesale" &&
-        result.isUnitScan !== false
-      ) {
-        recordScan(result);
-      }
-    },
-  });
+  useEffect(() => {
+    localStorage.setItem(STOCK_OUT_MODE_STORAGE_KEY, saleMode);
+    clearSession();
+    setConfirmedSlipId(null);
+  }, [saleMode, clearSession]);
 
   const focusScanner = useCallback(() => {
     setTimeout(() => manualInputRef.current?.focus(), 50);
   }, []);
 
+  const flashSuccess = useCallback((message: string) => {
+    setApproveFlash(true);
+    setErrorFlash(false);
+    setLastMessage(message);
+    setAlert({ type: "success", message });
+    setTimeout(() => setApproveFlash(false), 900);
+  }, []);
+
+  const flashError = useCallback((message: string) => {
+    setErrorFlash(true);
+    setApproveFlash(false);
+    setLastMessage(message);
+    setAlert({ type: "error", message });
+    setTimeout(() => setErrorFlash(false), 900);
+  }, []);
+
+  const stageItem = useCallback(
+    (unit: StockUnit, bagsQty: number) => {
+      if (stagedRef.current.some((s) => s.barcode === unit.unit_barcode)) {
+        flashError("This bale is already in the session.");
+        return false;
+      }
+      if (unit.status !== "STOCKED_IN" || unit.remaining_bags < 1) {
+        flashError("Bale is not available for stock out.");
+        return false;
+      }
+      if (bagsQty < 1 || bagsQty > unit.remaining_bags) {
+        flashError(
+          `Cannot stage ${bagsQty} bags — only ${unit.remaining_bags} remaining.`
+        );
+        return false;
+      }
+
+      const meta = productFromUnit(unit);
+      const item: StagedStockOutItem = {
+        barcode: unit.unit_barcode,
+        bagsQty,
+        productId: meta.productId,
+        productName: meta.productName,
+        productCode: meta.productCode,
+        size: meta.size,
+        unitNumber: unit.unit_number,
+        stockUnitId: unit.id,
+      };
+      setStaged((prev) => [...prev, item]);
+      recordBags({
+        productId: meta.productId,
+        productName: meta.productName,
+        productCode: meta.productCode,
+        size: meta.size,
+        bags: bagsQty,
+      });
+      flashSuccess(
+        `Staged bale #${unit.unit_number} · ${bagsQty} bags`
+      );
+      return true;
+    },
+    [flashError, flashSuccess, recordBags]
+  );
+
   const onBarcodeDetected = useCallback(
     async (barcode: string) => {
-      if (processingRef.current || retailOpenRef.current) return;
+      if (processingRef.current || retailOpenRef.current || confirming) return;
+
+      setConfirmedSlipId(null);
+      setRetailApproval(null);
 
       if (saleModeRef.current === "wholesale") {
         processingRef.current = true;
         try {
-          await handleScan(barcode, "", "STOCK_OUT", null);
+          const unit = await fetchStockUnitByBarcode(barcode);
+          if (!unit) {
+            flashError("Unknown barcode.");
+            return;
+          }
+          const bags =
+            unit.remaining_bags > 0 ? unit.remaining_bags : BAGS_PER_BALE;
+          stageItem(unit, bags);
+        } catch (err) {
+          flashError(
+            err instanceof Error ? err.message : "Could not look up bale."
+          );
         } finally {
           processingRef.current = false;
           focusScanner();
@@ -124,33 +217,34 @@ export function StockOutScanPanel() {
         return;
       }
 
-      setRetailApproval(null);
-      setRetailDialogError(null);
       processingRef.current = true;
       setRetailLoading(true);
+      setRetailDialogError(null);
       try {
         const unit = await fetchStockUnitByBarcode(barcode);
         if (!unit) {
-          const result = await handleScan(barcode, "", "STOCK_OUT", 1);
-          if (!result.success) focusScanner();
+          flashError("Unknown barcode.");
+          focusScanner();
           return;
         }
         if (unit.status !== "STOCKED_IN" || unit.remaining_bags < 1) {
-          const result = await handleScan(barcode, "", "STOCK_OUT", 1);
-          if (!result.success) focusScanner();
+          flashError("Bale is not available for stock out.");
+          focusScanner();
           return;
         }
         setRetailBarcode(barcode);
         setRetailUnit(unit);
-      } catch {
-        await handleScan(barcode, "", "STOCK_OUT", 1);
+      } catch (err) {
+        flashError(
+          err instanceof Error ? err.message : "Could not look up bale."
+        );
         focusScanner();
       } finally {
         processingRef.current = false;
         setRetailLoading(false);
       }
     },
-    [handleScan, focusScanner]
+    [confirming, flashError, focusScanner, stageItem]
   );
 
   const closeRetailDialog = useCallback(() => {
@@ -162,7 +256,7 @@ export function StockOutScanPanel() {
   }, [retailLoading, focusScanner]);
 
   const confirmRetailCut = useCallback(
-    async (bagsQty: number) => {
+    (bagsQty: number) => {
       if (!retailBarcode || !retailUnit || retailLoading) return;
       if (bagsQty > retailUnit.remaining_bags) {
         setRetailDialogError(
@@ -170,34 +264,69 @@ export function StockOutScanPanel() {
         );
         return;
       }
-
-      setRetailLoading(true);
-      setRetailDialogError(null);
-      processingRef.current = true;
-      try {
-        const result = await handleScan(
-          retailBarcode,
-          "",
-          "STOCK_OUT",
-          bagsQty
-        );
-        if (result.success) {
-          setRetailUnit(null);
-          setRetailBarcode("");
-          setRetailApproval(result);
-          focusScanner();
-        } else {
-          setRetailDialogError(result.message);
-        }
-      } finally {
-        processingRef.current = false;
-        setRetailLoading(false);
+      const ok = stageItem(retailUnit, bagsQty);
+      if (ok) {
+        setRetailApproval({
+          productCode: productFromUnit(retailUnit).productCode,
+          size: productFromUnit(retailUnit).size,
+          bagsRemaining: retailUnit.remaining_bags - bagsQty,
+          baleNumber: retailUnit.unit_number,
+        });
+        setRetailUnit(null);
+        setRetailBarcode("");
+        focusScanner();
       }
     },
-    [retailBarcode, retailUnit, retailLoading, handleScan, focusScanner]
+    [retailBarcode, retailUnit, retailLoading, stageItem, focusScanner]
   );
 
-  const scannerEnabled = !retailUnit && !retailLoading;
+  const handleConfirmStockOut = useCallback(async () => {
+    if (staged.length === 0 || confirming) return;
+    setConfirming(true);
+    setAlert(null);
+    try {
+      const result = await confirmStockOutSlip({
+        billerName,
+        billNo,
+        saleChannel: saleMode === "retail" ? "RETAIL" : "WHOLESALE",
+        items: staged.map((s) => ({
+          barcode: s.barcode,
+          bagsQty: s.bagsQty,
+        })),
+      });
+      if (!result.success) {
+        flashError(result.message);
+        return;
+      }
+      setConfirmedSlipId(result.data?.id ?? null);
+      clearSession();
+      setAlert({
+        type: "success",
+        message: result.message,
+      });
+      setApproveFlash(true);
+      setTimeout(() => setApproveFlash(false), 1200);
+    } catch (err) {
+      flashError(
+        err instanceof Error ? err.message : "Confirm failed."
+      );
+    } finally {
+      setConfirming(false);
+      focusScanner();
+    }
+  }, [
+    staged,
+    confirming,
+    billerName,
+    billNo,
+    saleMode,
+    flashError,
+    clearSession,
+    focusScanner,
+  ]);
+
+  const scannerEnabled =
+    !retailUnit && !retailLoading && !confirming;
 
   const {
     isScanning,
@@ -211,21 +340,46 @@ export function StockOutScanPanel() {
     enabled: scannerEnabled,
   });
 
-  const overlayDetail = lastResult?.stockUnit
-    ? `Bale #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
-    : (lastResult?.product?.name ?? null);
-
-  const approvalMeta = productMetaFromResult(retailApproval);
-  const remainingAfter =
-    retailApproval?.stockUnit?.remaining_bags ?? null;
+  const busy = confirming || retailLoading;
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
       <StockOutModeSwitch
         mode={saleMode}
         onChange={setSaleMode}
-        disabled={processing || retailLoading || Boolean(retailUnit)}
+        disabled={busy || staged.length > 0 || Boolean(retailUnit)}
       />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-zinc-400">
+            Biller name{" "}
+            <span className="font-normal text-zinc-600">(optional)</span>
+          </span>
+          <input
+            className={inputClass}
+            value={billerName}
+            onChange={(e) => setBillerName(e.target.value)}
+            placeholder="Person billed"
+            disabled={confirming}
+            autoComplete="off"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-zinc-400">
+            Bill No{" "}
+            <span className="font-normal text-zinc-600">(optional)</span>
+          </span>
+          <input
+            className={inputClass}
+            value={billNo}
+            onChange={(e) => setBillNo(e.target.value)}
+            placeholder="External bill / purchase no"
+            disabled={confirming}
+            autoComplete="off"
+          />
+        </label>
+      </div>
 
       {saleMode === "wholesale" ? (
         <div className="rounded-2xl border border-wholesale/30 bg-wholesale/5 p-4 text-center ring-1 ring-wholesale/10">
@@ -237,7 +391,7 @@ export function StockOutScanPanel() {
             <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Scan a sealed bale — instant stock out
+            Scan to stage, then confirm to stock out
           </p>
         </div>
       ) : null}
@@ -249,74 +403,116 @@ export function StockOutScanPanel() {
           cameraError={cameraError}
           onStart={startScanning}
           onStop={stopScanning}
-          disabled={processing || retailLoading || Boolean(retailUnit)}
+          disabled={busy || Boolean(retailUnit)}
           contextLabel={
-            saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale"
+            saleMode === "wholesale"
+              ? "Wholesale stock out"
+              : "Scan bale"
           }
           hardwareListening={hardwareListening && scannerEnabled}
           onManualSubmit={onBarcodeDetected}
           manualInputRef={manualInputRef}
           manualInputMode="none"
           overlay={{
-            processing: processing || retailLoading,
+            processing: busy,
             flash: approveFlash ? "success" : errorFlash ? "error" : null,
-            message:
-              isRetail && retailApproval
-                ? null
-                : alert?.message ?? lastResult?.message ?? null,
-            detail: isRetail && retailApproval ? null : overlayDetail,
+            message: lastMessage,
+            detail: null,
           }}
         />
       </div>
 
-      {isRetail ? (
-        <>
-          {retailApproval && remainingAfter != null && (
-            <RetailStockOutApproval
-              productCode={approvalMeta.productCode}
-              size={approvalMeta.size}
-              bagsRemaining={remainingAfter}
-              baleNumber={retailApproval.stockUnit?.unit_number}
-              onDismiss={() => setRetailApproval(null)}
-            />
-          )}
-          {!retailApproval && alert?.type === "error" && (
-            <AlertBanner alert={alert} onDismiss={dismissAlert} />
-          )}
-          {!retailApproval && !alert && (
-            <p className="text-center text-xs text-zinc-600">
-              Scan a bale, then enter bags to stock out in the popup.
-            </p>
-          )}
-        </>
-      ) : (
-        <>
-          <ScanResultStrip
-            alert={alert}
-            lastResult={lastResult}
-            mode="STOCK_OUT"
-            onDismissAlert={dismissAlert}
-          />
-          <ScanTallyPanel
-            tally={tally}
-            mode="STOCK_OUT"
-            stockOutSaleMode={saleMode}
-            onReset={resetTally}
-          />
-          <p className="text-center text-xs text-zinc-600">
-            Wholesale removes full bales ({BAGS_PER_BALE.toLocaleString()} bags)
-            per scan.
-          </p>
-        </>
+      {alert && (
+        <AlertBanner alert={alert} onDismiss={() => setAlert(null)} />
       )}
+
+      {confirmedSlipId && (
+        <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+          Slip created.{" "}
+          <Link
+            href="/stock-out-slips"
+            className="font-medium underline underline-offset-2"
+          >
+            View stock-out slips
+          </Link>
+        </div>
+      )}
+
+      {isRetail && retailApproval && (
+        <RetailStockOutApproval
+          productCode={retailApproval.productCode}
+          size={retailApproval.size}
+          bagsRemaining={retailApproval.bagsRemaining}
+          baleNumber={retailApproval.baleNumber}
+          onDismiss={() => setRetailApproval(null)}
+        />
+      )}
+
+      <ScanTallyPanel
+        tally={tally}
+        mode="STOCK_OUT"
+        stockOutSaleMode={saleMode}
+        onReset={() => {
+          if (staged.length > 0) setResetOpen(true);
+          else clearSession();
+        }}
+      />
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (staged.length > 0 || billerName || billNo) setResetOpen(true);
+            else clearSession();
+          }}
+          disabled={busy}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border px-4 py-3 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleConfirmStockOut()}
+          disabled={busy || staged.length === 0}
+          className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
+        >
+          <Check className="h-4 w-4" />
+          {confirming
+            ? "Confirming…"
+            : `Confirm stock out · ${staged.length}`}
+        </button>
+      </div>
+
+      <p className="text-center text-xs text-zinc-600">
+        {isRetail
+          ? "Scan a bale, enter bags in the popup, then confirm the session."
+          : `Wholesale stages full remaining bags (usually ${BAGS_PER_BALE.toLocaleString()}) per scan. Confirm to commit.`}
+      </p>
 
       <RetailCutDialog
         open={Boolean(retailUnit)}
         unit={retailUnit}
         loading={retailLoading}
         onClose={closeRetailDialog}
-        onConfirm={(qty) => void confirmRetailCut(qty)}
+        onConfirm={(qty) => confirmRetailCut(qty)}
         errorMessage={retailDialogError}
+      />
+
+      <ConfirmDialog
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        onConfirm={() => {
+          clearSession();
+          setBillerName("");
+          setBillNo("");
+          setConfirmedSlipId(null);
+          setResetOpen(false);
+        }}
+        title="Reset session?"
+        message="Clear staged scans and optional biller / bill fields. Nothing has been stocked out yet."
+        confirmLabel="Reset"
+        destructive
       />
     </div>
   );

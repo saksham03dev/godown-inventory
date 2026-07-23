@@ -1,10 +1,18 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { formatBagCount } from "@/lib/utils/inventory";
 import type { StockOutSaleMode } from "@/lib/constants/stockOut";
 import type { ScanTallyState } from "@/lib/types/scan";
 import type { TransactionType } from "@/lib/types/database";
+
+function wholeBags(count: number): string {
+  return String(Math.round(count));
+}
+
+function secondaryLabel(size: string | null, productName: string): string {
+  const sizePart = size?.trim() ? `Size ${size.trim()}` : null;
+  return [sizePart, productName].filter(Boolean).join(" · ");
+}
 
 interface ScanTallyPanelProps {
   tally: ScanTallyState;
@@ -76,12 +84,12 @@ export function ScanTallyPanel({
             {accent.title}
           </p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums text-zinc-100">
-            {formatBagCount(tally.sessionTotal)}
+            {wholeBags(tally.sessionTotal)}
             <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
           </p>
           <p className="text-xs text-zinc-500">
-            {tally.sessionBales} bale label{tally.sessionBales === 1 ? "" : "s"}{" "}
-            this session
+            {tally.sessionBales} label{tally.sessionBales === 1 ? "" : "s"} this
+            session
           </p>
         </div>
         <button
@@ -104,18 +112,17 @@ export function ScanTallyPanel({
               className="flex items-center justify-between gap-3 text-sm"
             >
               <div className="min-w-0">
-                <p className="truncate font-medium text-zinc-200">
-                  {item.productName}
+                <p className="truncate font-semibold tabular-nums text-zinc-100">
+                  {item.productCode}
                 </p>
-                <p className="text-xs text-zinc-500">
-                  {item.productCode} · {item.baleCount} bale
-                  {item.baleCount === 1 ? "" : "s"}
+                <p className="truncate text-xs text-zinc-500">
+                  {secondaryLabel(item.size, item.productName)}
                 </p>
               </div>
               <span
                 className={`shrink-0 rounded-lg px-2.5 py-1 font-semibold tabular-nums ${accent.chip}`}
               >
-                {formatBagCount(item.bagCount)}
+                {wholeBags(item.bagCount)}
               </span>
             </li>
           ))}

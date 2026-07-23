@@ -4,6 +4,8 @@ export interface ScanProductTally {
   productId: string;
   productName: string;
   productCode: string;
+  /** Product size label, if set. */
+  size: string | null;
   /** Bags added this session for this product. */
   bagCount: number;
   /** Bale labels scanned this session. */

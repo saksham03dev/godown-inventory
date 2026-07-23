@@ -1,7 +1,6 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { formatBagCount } from "@/lib/utils/inventory";
 import type { StockInTallyState } from "@/lib/types/scan";
 
 interface StockInTallyPanelProps {
@@ -19,7 +18,7 @@ export function StockInTallyPanel({ tally, onReset }: StockInTallyPanelProps) {
             Stock In Tally
           </p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums text-zinc-100">
-            {formatBagCount(tally.sessionTotal)}
+            {Math.round(tally.sessionTotal)}
             <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
           </p>
         </div>
@@ -41,13 +40,20 @@ export function StockInTallyPanel({ tally, onReset }: StockInTallyPanelProps) {
               className="flex items-center justify-between gap-3 text-sm"
             >
               <div className="min-w-0">
-                <p className="truncate font-medium text-zinc-200">
-                  {item.productName}
+                <p className="truncate font-semibold tabular-nums text-zinc-100">
+                  {item.productCode}
                 </p>
-                <p className="text-xs text-zinc-500">{item.productCode}</p>
+                <p className="truncate text-xs text-zinc-500">
+                  {[
+                    item.size?.trim() ? `Size ${item.size.trim()}` : null,
+                    item.productName,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
               </div>
               <span className="shrink-0 rounded-lg bg-success/15 px-2.5 py-1 font-semibold tabular-nums text-success">
-                {formatBagCount(item.bagCount)}
+                {Math.round(item.bagCount)}
               </span>
             </li>
           ))}

@@ -33,6 +33,7 @@ const NAV_ICONS = {
   "/scan": ScanLine,
   "/stock-in": ScanLine,
   "/stock-out": ScanLine,
+  "/stock-out-slips": ClipboardList,
   "/stock-return": RotateCcw,
   "/stock-transfer": ArrowLeftRight,
   "/pending-billing": ClipboardList,
