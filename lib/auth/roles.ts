@@ -96,6 +96,7 @@ export interface NavItem {
 
 export const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", permission: "dashboard" },
+  { href: "/daily-reports", label: "Daily Reports", permission: "dashboard" },
   { href: "/products", label: "Products", permission: "products.view" },
   {
     href: "/labels",
@@ -227,6 +228,7 @@ export function getDefaultRouteForRole(
 
 const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/": "dashboard",
+  "/daily-reports": "dashboard",
   "/products": "products.view",
   "/labels": "labels",
   "/godowns": "godowns.manage",

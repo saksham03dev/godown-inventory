@@ -426,6 +426,39 @@ export interface StockOutSlipConfirmItem {
   bagsQty: number;
 }
 
+/** Clubbed stock-in scans for daily purchase-bill matching. */
+export interface StockInReportBatch {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_code: string | null;
+  godown_id: string;
+  godown_name: string | null;
+  bag_count: number;
+  scan_count: number;
+  started_at: string;
+  ended_at: string;
+  handled_by: string | null;
+  logs: InventoryLogWithRelations[];
+}
+
+export interface DailyReportSummary {
+  bags_in: number;
+  bags_out: number;
+  stock_in_batch_count: number;
+  slip_count: number;
+  bill_count: number;
+  bill_total: number;
+}
+
+export interface DailyReport {
+  date: string;
+  summary: DailyReportSummary;
+  stockInBatches: StockInReportBatch[];
+  slips: StockOutSlipWithDetails[];
+  bills: Bill[];
+}
+
 export interface AsyncState<T> {
   data: T | null;
   loading: boolean;

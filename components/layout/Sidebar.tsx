@@ -17,6 +17,7 @@ import {
   UserCog,
   Warehouse,
   Boxes,
+  CalendarDays,
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +27,7 @@ import { getNavItemsForRole, ROLE_LABELS } from "@/lib/auth/roles";
 
 const NAV_ICONS = {
   "/": LayoutDashboard,
+  "/daily-reports": CalendarDays,
   "/products": PackageSearch,
   "/labels": Tags,
   "/godowns": Warehouse,
