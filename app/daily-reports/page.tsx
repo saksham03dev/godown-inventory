@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
-  FileText,
   Package,
   Printer,
   RefreshCw,
@@ -18,7 +17,6 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { BILLING_ENABLED } from "@/lib/constants/features";
 import { fetchDailyReport } from "@/lib/services/dailyReportService";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { DailyReport, StockInReportBatch } from "@/lib/types/database";
@@ -41,14 +39,6 @@ function formatDateTime(ts: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(ts));
-}
-
-function formatInr(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function StockInBatchRow({ batch }: { batch: StockInReportBatch }) {
@@ -254,19 +244,39 @@ export default function DailyReportsPage() {
           <LoadingSpinner label="Loading day pack…" />
         ) : report && summary ? (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 print:grid-cols-3">
-              <StatCard
-                label="Bags in"
-                value={summary.bags_in.toLocaleString("en-IN")}
-                icon={ArrowDownLeft}
-                accent="green"
-              />
-              <StatCard
-                label="Bags out"
-                value={summary.bags_out.toLocaleString("en-IN")}
-                icon={ArrowUpRight}
-                accent="amber"
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-success/30 bg-success/10 p-6 print:border-zinc-300 print:bg-white">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-success print:text-zinc-600">
+                      Bags in
+                    </p>
+                    <p className="mt-2 text-4xl font-bold tabular-nums text-zinc-50 print:text-black sm:text-5xl">
+                      {summary.bags_in.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/20 text-success print:bg-zinc-100 print:text-zinc-700">
+                    <ArrowDownLeft className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 print:border-zinc-300 print:bg-white">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-400 print:text-zinc-600">
+                      Bags out
+                    </p>
+                    <p className="mt-2 text-4xl font-bold tabular-nums text-zinc-50 print:text-black sm:text-5xl">
+                      {summary.bags_out.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 print:bg-zinc-100 print:text-zinc-700">
+                    <ArrowUpRight className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <StatCard
                 label="Stock-in batches"
                 value={summary.stock_in_batch_count}
@@ -276,18 +286,6 @@ export default function DailyReportsPage() {
                 label="Stock-out slips"
                 value={summary.slip_count}
                 icon={ClipboardList}
-              />
-              <StatCard
-                label="Finalized bills"
-                value={summary.bill_count}
-                icon={FileText}
-                accent="purple"
-              />
-              <StatCard
-                label="Bill total"
-                value={formatInr(summary.bill_total)}
-                icon={FileText}
-                accent="green"
               />
             </div>
 
@@ -340,98 +338,57 @@ export default function DailyReportsPage() {
                 <ul className="divide-y divide-surface-border print:divide-zinc-200">
                   {report.slips.map((slip) => (
                     <li key={slip.id} className="px-5 py-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-medium text-zinc-100 print:text-black">
-                            {slip.biller_name?.trim() || "No biller"}
-                            {slip.bill_no?.trim()
-                              ? ` · Bill ${slip.bill_no.trim()}`
-                              : ""}
-                          </p>
-                          <p className="text-xs text-zinc-500 print:text-zinc-600">
-                            {formatDateTime(slip.confirmed_at)} ·{" "}
-                            {slip.sale_channel === "RETAIL"
-                              ? "Retail"
-                              : "Wholesale"}
-                            {slip.created_by_label
-                              ? ` · ${slip.created_by_label}`
-                              : ""}
-                          </p>
-                        </div>
-                        <p className="text-sm font-semibold text-zinc-100 print:text-black">
-                          {slip.total_bags.toLocaleString("en-IN")} bags ·{" "}
-                          {slip.total_bales} bale
-                          {slip.total_bales === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                      {slip.stock_out_slip_lines.length > 0 && (
-                        <ul className="mt-2 space-y-1">
-                          {slip.stock_out_slip_lines.map((line) => (
-                            <li
-                              key={line.id}
-                              className="flex justify-between gap-3 text-xs text-zinc-400 print:text-zinc-700"
-                            >
-                              <span>
-                                {line.products?.product_code?.trim() ||
-                                  line.products?.name ||
-                                  "Product"}
-                                {line.products?.name && line.products?.product_code
-                                  ? ` · ${line.products.name}`
-                                  : ""}
-                              </span>
-                              <span>
-                                {line.bag_count.toLocaleString("en-IN")} bags ·{" "}
-                                {line.bale_count} label
-                                {line.bale_count === 1 ? "" : "s"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-surface-border bg-surface-raised print:border-zinc-300 print:bg-white">
-              <div className="border-b border-surface-border px-5 py-4 print:border-zinc-300">
-                <h2 className="font-medium text-zinc-100 print:text-black">
-                  Sales — finalized bills
-                </h2>
-                <p className="text-xs text-zinc-500 print:text-zinc-600">
-                  {BILLING_ENABLED
-                    ? "Finalized invoices stamped to this business day."
-                    : "Finalized bills for this day (billing UI may be off)."}
-                </p>
-              </div>
-              {report.bills.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-zinc-500">
-                  No finalized bills this day.
-                </p>
-              ) : (
-                <ul className="divide-y divide-surface-border print:divide-zinc-200">
-                  {report.bills.map((bill) => (
-                    <li
-                      key={bill.id}
-                      className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-zinc-100 print:text-black">
-                          {bill.bill_number}
-                          {bill.customer_name
-                            ? ` · ${bill.customer_name}`
-                            : ""}
-                        </p>
-                        <p className="text-xs text-zinc-500 print:text-zinc-600">
-                          {bill.finalized_at
-                            ? formatDateTime(bill.finalized_at)
-                            : "—"}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-zinc-100 print:text-black">
-                        {formatInr(Number(bill.total))}
+                      <p className="mb-3 text-xs text-zinc-500 print:text-zinc-600">
+                        {[
+                          formatDateTime(slip.confirmed_at),
+                          slip.sale_channel === "RETAIL"
+                            ? "Retail"
+                            : "Wholesale",
+                          slip.biller_name?.trim() || null,
+                          slip.bill_no?.trim()
+                            ? `Bill ${slip.bill_no.trim()}`
+                            : null,
+                          slip.created_by_label || null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
+                      {slip.stock_out_slip_lines.length > 0 ? (
+                        <ul className="space-y-2">
+                          {slip.stock_out_slip_lines.map((line) => {
+                            const code =
+                              line.products?.product_code?.trim() ||
+                              line.products?.name ||
+                              "Product";
+                            return (
+                              <li
+                                key={line.id}
+                                className="flex items-baseline justify-between gap-4"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-lg font-semibold tabular-nums tracking-wide text-zinc-50 print:text-black">
+                                    {code}
+                                  </p>
+                                  {line.products?.name &&
+                                  line.products?.product_code?.trim() ? (
+                                    <p className="truncate text-xs text-zinc-500 print:text-zinc-600">
+                                      {line.products.name}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <p className="shrink-0 text-xl font-bold tabular-nums text-zinc-50 print:text-black">
+                                  {line.bag_count.toLocaleString("en-IN")}
+                                  <span className="ml-1 text-sm font-medium text-zinc-400 print:text-zinc-600">
+                                    bags
+                                  </span>
+                                </p>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-zinc-500">No lines on this slip.</p>
+                      )}
                     </li>
                   ))}
                 </ul>
