@@ -18,6 +18,7 @@ import {
   Warehouse,
   Boxes,
   CalendarDays,
+  Eye,
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +33,7 @@ const NAV_ICONS = {
   "/labels": Tags,
   "/godowns": Warehouse,
   "/inventory": Boxes,
+  "/view-label": Eye,
   "/scan": ScanLine,
   "/stock-in": ScanLine,
   "/stock-out": ScanLine,

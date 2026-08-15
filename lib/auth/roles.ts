@@ -66,7 +66,6 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "godowns.view",
     "labels",
     "scan",
-    "scan.viewLabel",
     "inventory.transfer",
     "inventory.return",
     "inventory.relocate",
@@ -111,6 +110,11 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     saleMode: "wholesale",
   },
   { href: "/inventory", label: "Inventory", permission: "godowns.view" },
+  {
+    href: "/view-label",
+    label: "View Label",
+    permission: "scan.viewLabel",
+  },
   {
     href: "/scan",
     label: "Scan Station",
@@ -233,6 +237,7 @@ const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/labels": "labels",
   "/godowns": "godowns.manage",
   "/inventory": "godowns.view",
+  "/view-label": "scan.viewLabel",
   "/scan": "scan",
   "/stock-in": "scan",
   "/stock-out": "scan",

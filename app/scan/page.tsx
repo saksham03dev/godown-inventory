@@ -262,7 +262,9 @@ export default function ScanPage() {
               {labelError && !labelLoading && (
                 <AlertBanner alert={{ type: "error", message: labelError }} />
               )}
-              {labelUnit && <LabelDetailCard unit={labelUnit} />}
+              {labelUnit && (
+                <LabelDetailCard unit={labelUnit} showBatchInboundMeta />
+              )}
               {!labelUnit && !labelError && !labelLoading && (
                 <div className="rounded-xl border border-dashed border-surface-border px-4 py-6 text-center text-xs text-zinc-600">
                   Scan a unit barcode to view label details

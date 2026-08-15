@@ -131,11 +131,22 @@ export function LabelDetailCard({
             <>
               <DetailRow label="Source (inbound)" value={batch?.source_name} />
               <DetailRow label="Purchase no." value={batch?.purchase_no} />
+              <DetailRow label="Batch notes" value={batch?.notes} />
+              <DetailRow
+                label="Batch size"
+                value={
+                  batch?.quantity != null
+                    ? `${batch.quantity} bale${batch.quantity === 1 ? "" : "s"}`
+                    : null
+                }
+              />
             </>
           ) : null}
         </div>
 
-        {unit.status === "STOCKED_OUT" && (
+        {(unit.status === "STOCKED_OUT" ||
+          Boolean(unit.sold_to_customer_name?.trim()) ||
+          Boolean(billLink)) && (
           <div className="space-y-2 py-3">
             <p className="text-xs font-semibold text-zinc-400">Sold to</p>
             {unit.sold_to_customer_name ? (
@@ -158,6 +169,20 @@ export function LabelDetailCard({
                 <DetailRow label="Customer" value={billLink.customer_name} />
                 <DetailRow label="Phone" value={billLink.customer_phone} />
                 <DetailRow label="Bill" value={billLink.bill_number} mono />
+              </>
+            ) : billLink && billLink.status === "FINALIZED" ? (
+              <>
+                <DetailRow label="Customer" value={billLink.customer_name} />
+                <DetailRow label="Phone" value={billLink.customer_phone} />
+                <DetailRow label="Bill" value={billLink.bill_number} mono />
+                <DetailRow
+                  label="Finalized"
+                  value={
+                    billLink.finalized_at
+                      ? new Date(billLink.finalized_at).toLocaleString()
+                      : null
+                  }
+                />
               </>
             ) : (
               <p className="text-sm text-zinc-500">
