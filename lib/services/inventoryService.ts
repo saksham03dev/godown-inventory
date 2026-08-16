@@ -202,36 +202,41 @@ async function fetchStockedInUnits(options?: { godownId?: string }) {
       godowns!godown_id ( id, location_name )
     `;
 
-  let query = supabase
-    .from("stock_units")
-    .select(selectWithQuality)
-    .eq("status", "STOCKED_IN");
+  const pageSize = 1000;
+  const all: UnitRow[] = [];
+  let from = 0;
+  let useQuality = true;
 
-  if (options?.godownId) {
-    query = query.eq("godown_id", options.godownId);
-  }
-
-  let result = await query;
-  let units = result.data as UnitRow[] | null;
-  let error = result.error;
-
-  if (error && isMissingColumnError(error.message, "quality")) {
-    let fallbackQuery = supabase
+  for (;;) {
+    const select = useQuality ? selectWithQuality : selectWithoutQuality;
+    let query = supabase
       .from("stock_units")
-      .select(selectWithoutQuality)
-      .eq("status", "STOCKED_IN");
+      .select(select)
+      .eq("status", "STOCKED_IN")
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
 
     if (options?.godownId) {
-      fallbackQuery = fallbackQuery.eq("godown_id", options.godownId);
+      query = query.eq("godown_id", options.godownId);
     }
 
-    const fallback = await fallbackQuery;
-    units = fallback.data as UnitRow[] | null;
-    error = fallback.error;
+    const result = await query;
+    let error = result.error;
+    let rows = (result.data ?? []) as UnitRow[];
+
+    if (error && useQuality && isMissingColumnError(error.message, "quality")) {
+      useQuality = false;
+      continue;
+    }
+
+    if (error) throw new Error(formatSchemaError(error.message));
+
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
   }
 
-  if (error) throw new Error(formatSchemaError(error.message));
-  return units ?? [];
+  return all;
 }
 
 function aggregateStockUnits(
@@ -241,6 +246,9 @@ function aggregateStockUnits(
   const stockMap = new Map<string, StockAccumulator>();
 
   for (const unit of units) {
+    // Match get_inventory_stock_summary: only bags assigned to a godown.
+    if (!unit.godown_id) continue;
+
     const product = normalizeRelation(
       unit.products as ProductRelation | ProductRelation[] | null
     );
@@ -269,7 +277,7 @@ function aggregateStockUnits(
       existing.open_bales += 1;
     }
 
-    if (includeLocations && unit.godown_id && godown) {
+    if (includeLocations && godown) {
       const loc = existing.locations.get(unit.godown_id) ?? {
         godown_name: godown.location_name,
         quantity: 0,
@@ -399,26 +407,16 @@ export async function fetchRecentActivity(
 }
 
 /**
- * Dashboard metrics from stock_units (STOCKED_IN bag totals).
- * Does not load the full inventory_logs history.
+ * Dashboard metrics from the same inventory aggregate as All Godowns
+ * (SQL summary RPC, not a capped client fetch of every stock_unit row).
  */
 export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
-  const supabase = getSupabaseClient();
-
-  const [godownsResult, unitsResult, recentLogs] = await Promise.all([
-    supabase.from("godowns").select("id, location_name"),
-    supabase
-      .from("stock_units")
-      .select("godown_id, product_id, remaining_bags")
-      .eq("status", "STOCKED_IN"),
+  const [godowns, inventory, recentLogs] = await Promise.all([
+    fetchGodowns(),
+    fetchAllGodownInventory(),
     fetchRecentLogs(5),
   ]);
 
-  if (godownsResult.error) throw new Error(godownsResult.error.message);
-  if (unitsResult.error) throw new Error(formatSchemaError(unitsResult.error.message));
-
-  const godowns = godownsResult.data ?? [];
-  const units = unitsResult.data ?? [];
   const recentActivity = groupInventoryLogsForActivity(
     recentLogs as Parameters<typeof groupInventoryLogsForActivity>[0],
     5
@@ -431,15 +429,18 @@ export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
   }
 
   let totalStockBags = 0;
-  for (const unit of units) {
-    const bags = Number(unit.remaining_bags ?? 0);
-    totalStockBags += bags;
-    if (unit.product_id) productIds.add(unit.product_id);
-    if (!unit.godown_id) continue;
-    godownTotals.set(
-      unit.godown_id,
-      (godownTotals.get(unit.godown_id) ?? 0) + bags
-    );
+  for (const item of inventory) {
+    productIds.add(item.product_id);
+    totalStockBags += Number(item.quantity);
+
+    if (item.locations?.length) {
+      for (const loc of item.locations) {
+        godownTotals.set(
+          loc.godown_id,
+          (godownTotals.get(loc.godown_id) ?? 0) + Number(loc.quantity)
+        );
+      }
+    }
   }
 
   const godownDistribution: GodownDistribution[] = godowns.map((g) => {
