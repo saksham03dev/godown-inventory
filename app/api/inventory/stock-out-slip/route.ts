@@ -56,6 +56,7 @@ export async function PATCH(request: Request) {
     const result = await updateStockOutSlipServer(id, {
       billerName: body.billerName,
       billNo: body.billNo,
+      units: Array.isArray(body.units) ? body.units : undefined,
     });
 
     return NextResponse.json(result, {

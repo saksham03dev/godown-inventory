@@ -37,6 +37,7 @@ export default function StockOutSlipsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editBiller, setEditBiller] = useState("");
   const [editBillNo, setEditBillNo] = useState("");
+  const [editBags, setEditBags] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
@@ -67,6 +68,14 @@ export default function StockOutSlipsPage() {
     if (!selected) return;
     setEditBiller(selected.biller_name ?? "");
     setEditBillNo(selected.bill_no ?? "");
+    setEditBags(
+      Object.fromEntries(
+        selected.stock_out_slip_units.map((u) => [
+          u.id,
+          String(Math.round(u.bags_moved)),
+        ])
+      )
+    );
     setSaveMessage(null);
   }, [selected]);
 
@@ -75,10 +84,19 @@ export default function StockOutSlipsPage() {
     setSaving(true);
     setSaveMessage(null);
     try {
+      const unitEdits = selected.stock_out_slip_units
+        .map((u) => {
+          const next = Math.floor(Number(editBags[u.id]));
+          return { id: u.id, bagsMoved: next, prev: Math.round(u.bags_moved) };
+        })
+        .filter((u) => Number.isFinite(u.bagsMoved) && u.bagsMoved !== u.prev)
+        .map(({ id, bagsMoved }) => ({ id, bagsMoved }));
+
       const result = await updateStockOutSlip({
         id: selected.id,
         billerName: editBiller,
         billNo: editBillNo,
+        units: unitEdits.length > 0 ? unitEdits : undefined,
       });
       if (!result.success || !result.data) {
         setSaveMessage(result.message);
@@ -244,6 +262,10 @@ export default function StockOutSlipsPage() {
                           />
                         </label>
                       </div>
+                      <p className="text-[11px] text-zinc-500">
+                        Fix a wrong bag qty on a bale below (e.g. 1000 → 500). Extra
+                        bags go back to warehouse stock.
+                      </p>
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
@@ -276,10 +298,9 @@ export default function StockOutSlipsPage() {
 
                   <ul className="space-y-3">
                     {selected.stock_out_slip_lines.map((line) => {
-                      const unitNos = selected.stock_out_slip_units
+                      const lineUnits = selected.stock_out_slip_units
                         .filter((u) => u.product_id === line.product_id)
-                        .map((u) => u.unit_number)
-                        .sort((a, b) => a - b);
+                        .sort((a, b) => a.unit_number - b.unit_number);
                       return (
                         <li
                           key={line.id}
@@ -300,16 +321,51 @@ export default function StockOutSlipsPage() {
                                   .filter(Boolean)
                                   .join(" · ")}
                               </p>
-                              {unitNos.length > 0 && (
-                                <p className="mt-1 text-[11px] text-zinc-600">
-                                  Bales: {unitNos.join(", ")}
-                                </p>
-                              )}
                             </div>
                             <span className="shrink-0 rounded-lg bg-danger/15 px-2.5 py-1 text-sm font-semibold tabular-nums text-danger">
                               {Math.round(line.bag_count)}
                             </span>
                           </div>
+                          {lineUnits.length > 0 && (
+                            <ul className="mt-3 space-y-2 border-t border-surface-border pt-3">
+                              {lineUnits.map((u) => (
+                                <li
+                                  key={u.id}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <span className="text-xs text-zinc-500">
+                                    Bale #{u.unit_number}
+                                  </span>
+                                  {canEdit ? (
+                                    <label className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={1000}
+                                        inputMode="numeric"
+                                        className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1.5 text-right text-sm tabular-nums text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
+                                        value={editBags[u.id] ?? ""}
+                                        onChange={(e) =>
+                                          setEditBags((prev) => ({
+                                            ...prev,
+                                            [u.id]: e.target.value,
+                                          }))
+                                        }
+                                        disabled={saving}
+                                      />
+                                      <span className="text-xs text-zinc-500">
+                                        bags
+                                      </span>
+                                    </label>
+                                  ) : (
+                                    <span className="text-sm tabular-nums text-zinc-200">
+                                      {Math.round(u.bags_moved)} bags
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </li>
                       );
                     })}
