@@ -37,7 +37,7 @@ interface UseScanTransactionReturn {
 export function useScanTransaction(
   options: UseScanTransactionOptions = {}
 ): UseScanTransactionReturn {
-  const { flashMs = 1400 } = options;
+  const { flashMs = 1000 } = options;
   const onSuccessRef = useRef(options.onSuccess);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
