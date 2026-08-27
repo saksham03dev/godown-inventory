@@ -87,18 +87,43 @@ function StockInBatchRow({ batch }: { batch: StockInReportBatch }) {
       </button>
       {open && (
         <ul className="space-y-1 border-t border-surface-border bg-surface-overlay/40 px-4 py-3 sm:px-5">
-          {batch.logs.map((log) => (
-            <li
-              key={log.id}
-              className="flex justify-between gap-3 text-xs text-zinc-400"
-            >
-              <span>{formatDateTime(log.timestamp)}</span>
-              <span>
-                {Math.round(Number(log.quantity)).toLocaleString("en-IN")} bags
-                {log.handled_by ? ` · ${log.handled_by}` : ""}
-              </span>
-            </li>
-          ))}
+          {[...batch.logs]
+            .sort((a, b) => {
+              const an = a.stock_units?.unit_number;
+              const bn = b.stock_units?.unit_number;
+              if (an == null && bn == null) {
+                return (
+                  new Date(a.timestamp).getTime() -
+                  new Date(b.timestamp).getTime()
+                );
+              }
+              if (an == null) return 1;
+              if (bn == null) return -1;
+              if (an !== bn) return an - bn;
+              return (
+                new Date(a.timestamp).getTime() -
+                new Date(b.timestamp).getTime()
+              );
+            })
+            .map((log) => {
+            const unitNumber = log.stock_units?.unit_number;
+            return (
+              <li
+                key={log.id}
+                className="flex justify-between gap-3 text-xs text-zinc-400"
+              >
+                <span className="min-w-0 truncate">
+                  {unitNumber != null ? `Bale #${unitNumber}` : "Bale —"}
+                  <span className="text-zinc-600"> · </span>
+                  {formatDateTime(log.timestamp)}
+                </span>
+                <span className="shrink-0">
+                  {Math.round(Number(log.quantity)).toLocaleString("en-IN")} bags
+                  {log.handled_by ? ` · ${log.handled_by}` : ""}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </li>

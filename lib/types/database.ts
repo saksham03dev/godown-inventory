@@ -84,6 +84,7 @@ export interface InventoryLog {
 export interface InventoryLogWithRelations extends InventoryLog {
   products: Pick<Product, "id" | "name" | "barcode_id" | "product_code" | "size"> | null;
   godowns: Pick<Godown, "id" | "location_name"> | null;
+  stock_units?: Pick<StockUnit, "id" | "unit_number"> | null;
 }
 
 /** Grouped dashboard activity item (slip stock-outs clubbed by product). */
