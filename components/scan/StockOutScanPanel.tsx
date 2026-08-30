@@ -22,6 +22,7 @@ import {
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
+import { playScanOkay, playScanReject } from "@/lib/utils/scanFeedbackAudio";
 import { confirmStockOutSlip } from "@/lib/services/stockOutSlipService";
 import type { AlertState, StockUnit } from "@/lib/types/database";
 
@@ -138,6 +139,7 @@ export function StockOutScanPanel() {
     setErrorFlash(false);
     setLastMessage(message);
     setAlert({ type: "success", message });
+    playScanOkay();
     setTimeout(() => setApproveFlash(false), 900);
   }, []);
 
@@ -146,6 +148,7 @@ export function StockOutScanPanel() {
     setApproveFlash(false);
     setLastMessage(message);
     setAlert({ type: "error", message });
+    playScanReject();
     setTimeout(() => setErrorFlash(false), 900);
   }, []);
 
@@ -334,6 +337,7 @@ export function StockOutScanPanel() {
         message: result.message,
       });
       setApproveFlash(true);
+      playScanOkay();
       setTimeout(() => setApproveFlash(false), 1200);
     } catch (err) {
       flashError(err instanceof Error ? err.message : "Confirm failed.");

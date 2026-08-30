@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ScanModeToggle } from "@/components/scan/ScanModeToggle";
+import { ScanSoundToggle } from "@/components/scan/ScanSoundToggle";
 import { GodownSelector } from "@/components/scan/GodownSelector";
 import {
   ScannerWindow,
@@ -214,6 +215,8 @@ export default function ScanPage() {
               disabled={processing}
             />
           )}
+
+          {mode === "STOCK_IN" && <ScanSoundToggle />}
 
           {!isViewLabel && !selectedGodownId && (
             <AlertBanner

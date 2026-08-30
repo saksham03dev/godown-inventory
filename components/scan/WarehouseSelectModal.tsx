@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Check, MapPin } from "lucide-react";
 import type { Godown } from "@/lib/types/database";
+import { unlockScanFeedback } from "@/lib/utils/scanFeedbackAudio";
 
 interface WarehouseSelectModalProps {
   open: boolean;
@@ -72,7 +73,10 @@ export function WarehouseSelectModal({
                     <button
                       type="button"
                       disabled={disabled}
-                      onClick={() => onChange(godown.id)}
+                      onClick={() => {
+                        unlockScanFeedback();
+                        onChange(godown.id);
+                      }}
                       className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition disabled:opacity-50 ${
                         active
                           ? "border-accent/50 bg-accent/15 text-zinc-100"

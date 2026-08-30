@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { processScanTransaction } from "@/lib/services/unitScanService";
+import { playScanOkay, playScanReject } from "@/lib/utils/scanFeedbackAudio";
 import { friendlyScanMessage } from "@/lib/utils/scanErrors";
 import type {
   AlertState,
@@ -95,6 +96,7 @@ export function useScanTransaction(
         setLastResult(result);
         setApproveFlash(false);
         setErrorFlash(true);
+        playScanReject();
         scheduleFlashClear();
         return result;
       }
@@ -117,11 +119,13 @@ export function useScanTransaction(
           setApproveFlash(true);
           setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
+          playScanOkay();
           onSuccessRef.current?.(result);
         } else {
           setApproveFlash(false);
           setErrorFlash(true);
           setAlert({ type: "error", message: friendlyScanMessage(result.message) });
+          playScanReject();
         }
 
         scheduleFlashClear();
@@ -134,6 +138,7 @@ export function useScanTransaction(
         setLastResult(result);
         setApproveFlash(false);
         setErrorFlash(true);
+        playScanReject();
         scheduleFlashClear();
         return result;
       } finally {
@@ -159,11 +164,13 @@ export function useScanTransaction(
           setApproveFlash(true);
           setErrorFlash(false);
           setAlert({ type: "success", message: result.message });
+          playScanOkay();
           onSuccessRef.current?.(result);
         } else {
           setApproveFlash(false);
           setErrorFlash(true);
           setAlert({ type: "error", message: friendlyScanMessage(result.message) });
+          playScanReject();
         }
 
         scheduleFlashClear();
@@ -176,6 +183,7 @@ export function useScanTransaction(
         setLastResult(result);
         setApproveFlash(false);
         setErrorFlash(true);
+        playScanReject();
         scheduleFlashClear();
         return result;
       } finally {
