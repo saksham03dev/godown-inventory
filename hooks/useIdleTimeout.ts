@@ -5,6 +5,7 @@ import {
   ACTIVITY_PING_INTERVAL_MS,
   INACTIVITY_TIMEOUT_MS,
 } from "@/lib/auth/idle-timeout";
+import { subscribeUserActivity } from "@/lib/auth/userActivity";
 
 const ACTIVITY_EVENTS = [
   "mousedown",
@@ -36,7 +37,10 @@ export function useIdleTimeout({ enabled, onIdle }: UseIdleTimeoutOptions) {
       const now = Date.now();
       if (now - lastPingRef.current < ACTIVITY_PING_INTERVAL_MS) return;
       lastPingRef.current = now;
-      void fetch("/api/auth/activity", { method: "POST" });
+      void fetch("/api/auth/activity", {
+        method: "POST",
+        credentials: "include",
+      });
     };
 
     const resetIdleTimer = () => {
@@ -63,6 +67,7 @@ export function useIdleTimeout({ enabled, onIdle }: UseIdleTimeoutOptions) {
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
+    const unsubscribeScans = subscribeUserActivity(handleActivity);
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -70,6 +75,7 @@ export function useIdleTimeout({ enabled, onIdle }: UseIdleTimeoutOptions) {
         window.removeEventListener(event, handleActivity);
       }
       document.removeEventListener("visibilitychange", handleVisibility);
+      unsubscribeScans();
     };
   }, [enabled]);
 }

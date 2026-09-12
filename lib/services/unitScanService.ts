@@ -10,6 +10,7 @@ async function postInventoryJson<T extends ScanTransactionResult>(
 ): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });

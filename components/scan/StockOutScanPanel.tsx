@@ -21,6 +21,8 @@ import {
   STOCK_OUT_MODE_STORAGE_KEY,
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
+import { refreshSessionCookies } from "@/lib/auth/ensureSession";
+import { ACTIVITY_PING_INTERVAL_MS } from "@/lib/auth/idle-timeout";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
 import { playScanOkay, playScanReject } from "@/lib/utils/scanFeedbackAudio";
 import { confirmStockOutSlip } from "@/lib/services/stockOutSlipService";
@@ -129,6 +131,15 @@ export function StockOutScanPanel() {
     clearSession();
     setConfirmedSlipId(null);
   }, [saleMode, clearSession]);
+
+  useEffect(() => {
+    if (staged.length === 0 && !confirmOpen) return;
+    void refreshSessionCookies();
+    const timer = window.setInterval(() => {
+      void refreshSessionCookies();
+    }, ACTIVITY_PING_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [staged.length, confirmOpen]);
 
   const focusScanner = useCallback(() => {
     setTimeout(() => manualInputRef.current?.focus(), 50);
@@ -317,6 +328,14 @@ export function StockOutScanPanel() {
     setConfirming(true);
     setAlert(null);
     try {
+      const sessionOk = await refreshSessionCookies();
+      if (!sessionOk) {
+        flashError(
+          "Session expired. Log in again, then restage these bales — nothing was stocked out."
+        );
+        return;
+      }
+
       const result = await confirmStockOutSlip({
         billerName,
         billNo,

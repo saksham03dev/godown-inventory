@@ -1,7 +1,9 @@
 "use client";
 
+import { useCallback } from "react";
 import { useBarcodeScan } from "@/hooks/useBarcodeScan";
 import { useHardwareScanner } from "@/hooks/useHardwareScanner";
+import { reportUserActivity } from "@/lib/auth/userActivity";
 
 interface UseBarcodeInputOptions {
   onScan: (barcode: string) => void;
@@ -19,14 +21,22 @@ export function useBarcodeInput({
   enabled = true,
   scannerElementId,
 }: UseBarcodeInputOptions) {
+  const handleScan = useCallback(
+    (barcode: string) => {
+      reportUserActivity();
+      onScan(barcode);
+    },
+    [onScan]
+  );
+
   const camera = useBarcodeScan({
-    onScan,
+    onScan: handleScan,
     enabled,
     scannerElementId,
   });
 
   const hardware = useHardwareScanner({
-    onScan,
+    onScan: handleScan,
     enabled,
   });
 
