@@ -81,7 +81,7 @@ export default function ViewLabelPage() {
         <AlertBanner
           alert={{
             type: "error",
-            message: "Only admins can look up label details.",
+            message: "You do not have access to look up label details.",
           }}
         />
       </DashboardLayout>

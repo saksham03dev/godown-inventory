@@ -153,7 +153,7 @@ export default function DailyReportsPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !can("dashboard")) return;
+    if (authLoading || !can("reports.view")) return;
     setLoading(true);
     void load(date);
   }, [authLoading, can, date, load]);
@@ -175,7 +175,7 @@ export default function DailyReportsPage() {
     );
   }
 
-  if (!can("dashboard")) {
+  if (!can("reports.view")) {
     return (
       <DashboardLayout title="Daily Reports" subtitle="Business day pack">
         <AlertBanner

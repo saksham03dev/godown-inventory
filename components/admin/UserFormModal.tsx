@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { ROLE_LABELS, type UserRole } from "@/lib/auth/roles";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, type UserRole } from "@/lib/auth/roles";
 import type { PortalUser } from "@/lib/types/database";
 
 interface UserFormModalProps {
@@ -116,6 +116,9 @@ export function UserFormModal({
               </option>
             ))}
           </select>
+          <p className="mt-1.5 text-xs text-zinc-500">
+            {ROLE_DESCRIPTIONS[form.role]}
+          </p>
         </div>
 
         {!isEdit && (

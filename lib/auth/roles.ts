@@ -9,12 +9,13 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full access — products, godowns, pricing, billing, and all operations",
   manager:
-    "Add & edit products (no price changes), stock in/out, labels, billing — no godown management",
+    "Floor ops like employee (stock in/out, slips, returns, transfers) plus daily reports, pending bills, open bales, and view label — no inventory or product admin",
   employee: "Stock in/out scanning and view stock-out slips",
 };
 
 type Permission =
   | "dashboard"
+  | "reports.view"
   | "products.view"
   | "products.create"
   | "products.edit"
@@ -57,22 +58,16 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "slips.view",
     "slips.edit",
     "users.manage",
+    "reports.view",
   ],
   manager: [
-    "dashboard",
-    "products.view",
-    "products.create",
-    "products.edit",
-    "godowns.view",
-    "labels",
+    "reports.view",
     "scan",
+    "scan.viewLabel",
     "inventory.transfer",
     "inventory.return",
-    "inventory.relocate",
     "billing.view",
-    "billing.create",
     "slips.view",
-    "slips.edit",
   ],
   employee: ["scan", "slips.view"],
 };
@@ -95,7 +90,7 @@ export interface NavItem {
 
 export const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", permission: "dashboard" },
-  { href: "/daily-reports", label: "Daily Reports", permission: "dashboard" },
+  { href: "/daily-reports", label: "Daily Reports", permission: "reports.view" },
   { href: "/products", label: "Products", permission: "products.view" },
   {
     href: "/labels",
@@ -218,13 +213,29 @@ export function getNavItemsForRole(
     );
   }
 
+  if (role === "manager") {
+    return items.filter((item) =>
+      [
+        "/daily-reports",
+        "/view-label",
+        "/stock-in",
+        "/stock-out",
+        "/stock-out-slips",
+        "/stock-return",
+        "/stock-transfer",
+        "/pending-billing",
+        "/open-bales",
+      ].includes(item.href)
+    );
+  }
+
   return items;
 }
 
 export function getDefaultRouteForRole(
   role: UserRole | null | undefined
 ): string {
-  if (role === "employee") {
+  if (role === "employee" || role === "manager") {
     return "/stock-out";
   }
   return "/";
@@ -232,7 +243,7 @@ export function getDefaultRouteForRole(
 
 const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/": "dashboard",
-  "/daily-reports": "dashboard",
+  "/daily-reports": "reports.view",
   "/products": "products.view",
   "/labels": "labels",
   "/godowns": "godowns.manage",

@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && role === "employee") {
+    if (!authLoading && (role === "employee" || role === "manager")) {
       router.replace("/stock-out");
     }
   }, [authLoading, role, router]);
@@ -36,7 +36,7 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [refreshMetrics]);
 
-  if (authLoading || role === "employee") {
+  if (authLoading || role === "employee" || role === "manager") {
     return (
       <DashboardLayout title="Dashboard" subtitle="Overview">
         <LoadingSpinner label="Redirecting…" />

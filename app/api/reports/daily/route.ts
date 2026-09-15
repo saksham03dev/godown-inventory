@@ -4,7 +4,7 @@ import { fetchDailyReportServer } from "@/lib/services/server/dailyReportService
 import { isValidBusinessDate } from "@/lib/utils/businessDay";
 
 export async function GET(request: Request) {
-  const auth = await requireSession({ permission: "dashboard" });
+  const auth = await requireSession({ permission: "reports.view" });
   if (auth.error) return auth.error;
 
   try {
