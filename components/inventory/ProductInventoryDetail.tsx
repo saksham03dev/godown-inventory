@@ -129,6 +129,10 @@ export function ProductInventoryDetail({
 
   const sizeLabel = product?.size?.trim() || null;
   const title = product?.product_name ?? "Product";
+  const godownBagTotal =
+    product?.locations?.find((loc) => loc.godown_id === godownId)?.quantity ??
+    product?.quantity ??
+    0;
   const description =
     view.level === "pick_godown"
       ? [
@@ -143,7 +147,7 @@ export function ProductInventoryDetail({
           product?.product_code,
           sizeLabel ? `Size ${sizeLabel}` : null,
           godownName,
-          `${(product?.quantity ?? 0).toLocaleString()} bags · by source`,
+          `${godownBagTotal.toLocaleString()} bags · by source`,
         ]
           .filter(Boolean)
           .join(" · ")
