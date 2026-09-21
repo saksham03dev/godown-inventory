@@ -262,9 +262,8 @@ export async function confirmStockOutSlipServer(input: {
   if (slipId) {
     const existingSlip = await fetchStockOutSlipByIdServer(slipId);
     if (!existingSlip) {
-      return { success: false, message: "The open slip could not be found. Confirm again to start a new one." };
-    }
-    if (existingSlip.sale_channel !== input.saleChannel) {
+      slipId = null;
+    } else if (existingSlip.sale_channel !== input.saleChannel) {
       return { success: false, message: "That slip does not match this sale mode." };
     }
   }
@@ -335,20 +334,17 @@ export async function confirmStockOutSlipServer(input: {
     } else {
       const recovered = await recoverOrphanStockOut(supabase, item.barcode, item.bagsQty);
       if (recovered.kind === "already_on_slip") {
-        if (slipId && recovered.slipId === slipId) {
-          processed.push({
-            barcode: item.barcode,
-            stockUnitId: "",
-            productId: "",
-            unitNumber: 0,
-            bagsMoved: item.bagsQty,
-            logId: null,
-          });
-          continue;
-        }
-        return failWithProgress(
-          `${item.barcode} is already on another slip. ${processed.length} bale(s) on this slip were registered.`
-        );
+        // Same slip or a prior chunk: skip so the rest of the list can still confirm.
+        processed.push({
+          barcode: item.barcode,
+          stockUnitId: "",
+          productId: "",
+          unitNumber: 0,
+          bagsMoved: item.bagsQty,
+          logId: null,
+        });
+        if (!slipId) slipId = recovered.slipId;
+        continue;
       }
       if (recovered.kind === "orphan") {
         row = recovered.row;
