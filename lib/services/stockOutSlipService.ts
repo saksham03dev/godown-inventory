@@ -11,6 +11,7 @@ export async function confirmStockOutSlip(input: {
   billNo: string;
   saleChannel: StockOutSlipChannel;
   items: StockOutSlipConfirmItem[];
+  existingSlipId?: string | null;
 }): Promise<MutationResult<StockOutSlipWithDetails>> {
   return apiMutation<StockOutSlipWithDetails>(
     "/api/inventory/stock-out-slip/confirm",

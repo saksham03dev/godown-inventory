@@ -2,7 +2,14 @@ import type { MutationResult } from "@/lib/types/database";
 import { refreshSessionCookies } from "@/lib/auth/ensureSession";
 
 const SIGNED_IN_HINT =
-  "Session expired. Confirm again — if it still fails, log in and restage the bales.";
+  "Session expired. Confirm again — staged bales stay on this screen. If it still fails, log in (do not reset).";
+
+const NETWORK_HINT =
+  "Network or server timeout. Staged bales stay on this screen. Open Stock Out Slips to see which labels already registered — those will not be in this list.";
+
+function isGatewayTimeout(status: number): boolean {
+  return status === 502 || status === 503 || status === 504 || status === 520 || status === 522 || status === 524;
+}
 
 function isUnauthorizedPayload(data: unknown): boolean {
   if (!data || typeof data !== "object") return false;
@@ -68,15 +75,32 @@ export async function apiMutation<T = void>(
       return { success: false, message: SIGNED_IN_HINT };
     }
 
+    if (isGatewayTimeout(res.status) || res.status === 408) {
+      return { success: false, message: NETWORK_HINT };
+    }
+
     const result = data as MutationResult<T>;
-    if (!result.message && !result.success) {
-      return { success: false, message: SIGNED_IN_HINT };
+    if (typeof result.success !== "boolean") {
+      return {
+        success: false,
+        message: res.ok ? "Unexpected server response. Staged bales were not cleared." : NETWORK_HINT,
+      };
+    }
+    if (!result.success && !result.message) {
+      return { success: false, message: NETWORK_HINT };
     }
     return result;
   } catch (err) {
+    const raw = err instanceof Error ? err.message : "Request failed.";
+    const offline =
+      typeof navigator !== "undefined" && navigator.onLine === false;
     return {
       success: false,
-      message: err instanceof Error ? err.message : "Request failed.",
+      message: offline
+        ? "No network. Staged bales stay on this device until you confirm again."
+        : /fail|network|fetch|timeout|abort/i.test(raw)
+          ? NETWORK_HINT
+          : raw,
     };
   }
 }

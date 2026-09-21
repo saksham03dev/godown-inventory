@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useBarcodeScan } from "@/hooks/useBarcodeScan";
 import { useHardwareScanner } from "@/hooks/useHardwareScanner";
 import { reportUserActivity } from "@/lib/auth/userActivity";
+import { unlockScanFeedback } from "@/lib/utils/scanFeedbackAudio";
 
 interface UseBarcodeInputOptions {
   onScan: (barcode: string) => void;
@@ -24,6 +25,7 @@ export function useBarcodeInput({
   const handleScan = useCallback(
     (barcode: string) => {
       reportUserActivity();
+      unlockScanFeedback();
       onScan(barcode);
     },
     [onScan]

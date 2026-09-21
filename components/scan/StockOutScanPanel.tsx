@@ -18,7 +18,9 @@ import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import {
+  STOCK_OUT_CONFIRM_CHUNK_SIZE,
   STOCK_OUT_MODE_STORAGE_KEY,
+  STOCK_OUT_STAGED_STORAGE_KEY,
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
 import { refreshSessionCookies } from "@/lib/auth/ensureSession";
@@ -32,6 +34,42 @@ function readStoredMode(): StockOutSaleMode {
   if (typeof window === "undefined") return "wholesale";
   const stored = localStorage.getItem(STOCK_OUT_MODE_STORAGE_KEY);
   return stored === "retail" ? "retail" : "wholesale";
+}
+
+function readStagedSnapshot(): {
+  mode: StockOutSaleMode;
+  items: StagedStockOutItem[];
+  slipId: string | null;
+} | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(STOCK_OUT_STAGED_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      mode?: StockOutSaleMode;
+      items?: StagedStockOutItem[];
+      slipId?: string | null;
+    };
+    if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
+      return parsed.slipId
+        ? {
+            mode: parsed.mode === "retail" ? "retail" : "wholesale",
+            items: [],
+            slipId: parsed.slipId,
+          }
+        : null;
+    }
+    const items = parsed.items.filter(
+      (item) => item && typeof item.barcode === "string" && item.barcode.trim()
+    );
+    return {
+      mode: parsed.mode === "retail" ? "retail" : "wholesale",
+      items,
+      slipId: parsed.slipId ? String(parsed.slipId) : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface StagedStockOutItem {
@@ -78,7 +116,11 @@ export function StockOutScanPanel() {
   const [padTarget, setPadTarget] = useState<"biller" | "billNo">("biller");
   const [confirming, setConfirming] = useState(false);
   const [confirmedSlipId, setConfirmedSlipId] = useState<string | null>(null);
+  const [openSlipId, setOpenSlipId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [confirmProgress, setConfirmProgress] = useState<string | null>(null);
+  const [sessionHydrated, setSessionHydrated] = useState(false);
 
   const [retailUnit, setRetailUnit] = useState<StockUnit | null>(null);
   const [retailBarcode, setRetailBarcode] = useState("");
@@ -100,7 +142,7 @@ export function StockOutScanPanel() {
   const stagedRef = useRef(staged);
   const manualInputRef = useRef<HTMLInputElement>(null);
 
-  const { tally, recordBags, resetTally } = useScanTally();
+  const { tally, recordBags, resetTally, replaceTallyFromBags } = useScanTally();
   const isRetail = saleMode === "retail";
 
   saleModeRef.current = saleMode;
@@ -109,7 +151,42 @@ export function StockOutScanPanel() {
   stagedRef.current = staged;
 
   useEffect(() => {
-    setSaleMode(readStoredMode());
+    const mode = readStoredMode();
+    setSaleMode(mode);
+    const snapshot = readStagedSnapshot();
+    if (snapshot && snapshot.mode === mode) {
+      if (snapshot.items.length > 0) {
+        setStaged(snapshot.items);
+        replaceTallyFromBags(
+          snapshot.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            productCode: item.productCode,
+            size: item.size,
+            bags: item.bagsQty,
+          }))
+        );
+      }
+      if (snapshot.slipId) setOpenSlipId(snapshot.slipId);
+      if (snapshot.items.length > 0) {
+        setAlert({
+          type: "info",
+          message: `${snapshot.items.length} staged bale(s) restored on this device. They are not stocked out until Confirm succeeds.`,
+        });
+      }
+    }
+    setSessionHydrated(true);
+  }, [replaceTallyFromBags]);
+
+  useEffect(() => {
+    const sync = () => setOffline(typeof navigator !== "undefined" && !navigator.onLine);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
   }, []);
 
   const clearSession = useCallback(() => {
@@ -124,13 +201,32 @@ export function StockOutScanPanel() {
     setConfirmOpen(false);
     setBillerName("");
     setBillNo("");
+    setOpenSlipId(null);
+    setConfirmProgress(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STOCK_OUT_STAGED_STORAGE_KEY);
+    }
   }, [resetTally]);
 
   useEffect(() => {
     localStorage.setItem(STOCK_OUT_MODE_STORAGE_KEY, saleMode);
-    clearSession();
-    setConfirmedSlipId(null);
-  }, [saleMode, clearSession]);
+  }, [saleMode]);
+
+  useEffect(() => {
+    if (!sessionHydrated || typeof window === "undefined") return;
+    if (staged.length === 0 && !openSlipId) {
+      localStorage.removeItem(STOCK_OUT_STAGED_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      STOCK_OUT_STAGED_STORAGE_KEY,
+      JSON.stringify({
+        mode: saleMode,
+        items: staged,
+        slipId: openSlipId,
+      })
+    );
+  }, [staged, saleMode, openSlipId, sessionHydrated]);
 
   useEffect(() => {
     if (staged.length === 0 && !confirmOpen) return;
@@ -323,45 +419,93 @@ export function StockOutScanPanel() {
     focusScanner();
   }, [confirming, focusScanner]);
 
+  const applyRemaining = useCallback(
+    (remaining: StagedStockOutItem[]) => {
+      setStaged(remaining);
+      replaceTallyFromBags(
+        remaining.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          productCode: item.productCode,
+          size: item.size,
+          bags: item.bagsQty,
+        }))
+      );
+    },
+    [replaceTallyFromBags]
+  );
+
   const handleConfirmStockOut = useCallback(async () => {
     if (staged.length === 0 || confirming) return;
     setConfirming(true);
     setAlert(null);
     try {
-      const sessionOk = await refreshSessionCookies();
-      if (!sessionOk) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
         flashError(
-          "Session expired. Log in again, then restage these bales — nothing was stocked out."
+          "No network. Staged bales stay on this screen. Confirm again when you are online — nothing was registered just now."
         );
         return;
       }
 
-      const result = await confirmStockOutSlip({
-        billerName,
-        billNo,
-        saleChannel: saleMode === "retail" ? "RETAIL" : "WHOLESALE",
-        items: staged.map((s) => ({
-          barcode: s.barcode,
-          bagsQty: s.bagsQty,
-        })),
-      });
-      if (!result.success) {
-        flashError(result.message);
+      const sessionOk = await refreshSessionCookies();
+      if (!sessionOk) {
+        flashError(
+          "Session expired. Log in again, then tap Confirm — staged bales stay on this device. Nothing new was stocked out."
+        );
         return;
       }
-      setConfirmedSlipId(result.data?.id ?? null);
+
+      let remaining = [...staged];
+      let slipId = openSlipId;
+      const channel = saleMode === "retail" ? "RETAIL" : "WHOLESALE";
+
+      while (remaining.length > 0) {
+        const chunk = remaining.slice(0, STOCK_OUT_CONFIRM_CHUNK_SIZE);
+        setConfirmProgress(
+          `Registering ${chunk.length} of ${remaining.length} remaining…`
+        );
+        const result = await confirmStockOutSlip({
+          billerName,
+          billNo,
+          saleChannel: channel,
+          items: chunk.map((s) => ({
+            barcode: s.barcode,
+            bagsQty: s.bagsQty,
+          })),
+          existingSlipId: slipId,
+        });
+
+        if (result.data?.id) {
+          slipId = result.data.id;
+          setOpenSlipId(result.data.id);
+        }
+
+        const done = new Set(result.processedBarcodes ?? []);
+        remaining = remaining.filter((item) => !done.has(item.barcode));
+
+        if (!result.success) {
+          applyRemaining(remaining);
+          flashError(result.message);
+          return;
+        }
+
+        applyRemaining(remaining);
+      }
+
+      setConfirmedSlipId(slipId);
       clearSession();
       setAlert({
         type: "success",
-        message: result.message,
+        message: `Stock out registered · slip saved.`,
       });
       setApproveFlash(true);
       playScanOkay();
       setTimeout(() => setApproveFlash(false), 1200);
     } catch (err) {
-      flashError(err instanceof Error ? err.message : "Confirm failed.");
+      flashError(err instanceof Error ? err.message : "Confirm failed. Staged bales were not cleared.");
     } finally {
       setConfirming(false);
+      setConfirmProgress(null);
       focusScanner();
     }
   }, [
@@ -370,9 +514,11 @@ export function StockOutScanPanel() {
     billerName,
     billNo,
     saleMode,
+    openSlipId,
     flashError,
     clearSession,
     focusScanner,
+    applyRemaining,
   ]);
 
   const scannerEnabled =
@@ -397,7 +543,11 @@ export function StockOutScanPanel() {
     <div className="mx-auto max-w-lg space-y-4">
       <StockOutModeSwitch
         mode={saleMode}
-        onChange={setSaleMode}
+        onChange={(mode) => {
+          setSaleMode(mode);
+          clearSession();
+          setConfirmedSlipId(null);
+        }}
         disabled={busy || staged.length > 0 || Boolean(retailUnit)}
       />
 
@@ -411,7 +561,7 @@ export function StockOutScanPanel() {
             <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Scan to stage, then confirm to stock out
+            Scan to stage (saved on this device). Confirm registers stock out.
           </p>
         </div>
       ) : null}
@@ -439,6 +589,17 @@ export function StockOutScanPanel() {
           }}
         />
       </div>
+
+      {offline && (
+        <AlertBanner
+          alert={{
+            type: "warning",
+            message:
+              "No network. Keep scanning — this list stays on the device. Confirm when you are online. If Confirm fails, the list is not cleared.",
+          }}
+          onDismiss={() => setOffline(false)}
+        />
+      )}
 
       {alert && (
         <AlertBanner alert={alert} onDismiss={() => setAlert(null)} />
@@ -609,7 +770,9 @@ export function StockOutScanPanel() {
               className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
             >
               <Check className="h-4 w-4" />
-              {confirming ? "Confirming…" : "Confirm stock out"}
+              {confirming
+                ? confirmProgress || "Confirming…"
+                : "Confirm stock out"}
             </button>
           </div>
         </div>
@@ -624,7 +787,7 @@ export function StockOutScanPanel() {
           setResetOpen(false);
         }}
         title="Reset session?"
-        message="Clear staged scans. Nothing has been stocked out yet."
+        message="Clear staged scans on this device. Bales already registered on a slip stay stocked out."
         confirmLabel="Reset"
         destructive
       />

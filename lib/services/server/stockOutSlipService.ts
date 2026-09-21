@@ -33,6 +33,185 @@ function mapSlipWithDetails(row: Record<string, unknown>): StockOutSlipWithDetai
   };
 }
 
+type ProcessedSlipUnit = {
+  barcode: string;
+  stockUnitId: string;
+  productId: string;
+  unitNumber: number;
+  bagsMoved: number;
+  logId: string | null;
+};
+
+type ConfirmServiceClient = ReturnType<typeof createServiceClient>;
+
+async function stampStockOutMeta(
+  supabase: ConfirmServiceClient,
+  input: {
+    stockUnitId: string;
+    saleChannel: StockOutSlipChannel;
+    billerName: string | null;
+    billNo: string | null;
+  }
+): Promise<string | null> {
+  const { data: logRow } = await supabase
+    .from("inventory_logs")
+    .select("id")
+    .eq("stock_unit_id", input.stockUnitId)
+    .eq("transaction_type", "STOCK_OUT")
+    .is("stock_out_slip_id", null)
+    .order("timestamp", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (logRow?.id) {
+    await supabase
+      .from("inventory_logs")
+      .update({ sale_channel: input.saleChannel })
+      .eq("id", logRow.id);
+  }
+
+  if (input.billerName || input.billNo) {
+    await supabase
+      .from("stock_units")
+      .update({
+        sold_to_customer_name: input.billerName,
+        sold_bill_number: input.billNo,
+        sold_at: new Date().toISOString(),
+      })
+      .eq("id", input.stockUnitId);
+  }
+
+  return logRow?.id ?? null;
+}
+
+async function attachProcessedUnitToSlip(
+  supabase: ConfirmServiceClient,
+  slipId: string,
+  row: ProcessedSlipUnit
+): Promise<MutationResult> {
+  const { data: existingLine, error: lineLookupError } = await supabase
+    .from("stock_out_slip_lines")
+    .select("id, bag_count, bale_count")
+    .eq("slip_id", slipId)
+    .eq("product_id", row.productId)
+    .maybeSingle();
+  if (lineLookupError) {
+    return { success: false, message: lineLookupError.message };
+  }
+
+  if (existingLine) {
+    const { error: lineUpdateError } = await supabase
+      .from("stock_out_slip_lines")
+      .update({
+        bag_count: existingLine.bag_count + row.bagsMoved,
+        bale_count: existingLine.bale_count + 1,
+      })
+      .eq("id", existingLine.id);
+    if (lineUpdateError) {
+      return { success: false, message: lineUpdateError.message };
+    }
+  } else {
+    const { error: lineInsertError } = await supabase.from("stock_out_slip_lines").insert({
+      slip_id: slipId,
+      product_id: row.productId,
+      bag_count: row.bagsMoved,
+      bale_count: 1,
+    });
+    if (lineInsertError) {
+      return { success: false, message: lineInsertError.message };
+    }
+  }
+
+  const { error: unitError } = await supabase.from("stock_out_slip_units").insert({
+    slip_id: slipId,
+    stock_unit_id: row.stockUnitId,
+    product_id: row.productId,
+    unit_number: row.unitNumber,
+    bags_moved: row.bagsMoved,
+  });
+  if (unitError) {
+    if (unitError.code === "23505") {
+      return { success: true, message: "Already on slip." };
+    }
+    return { success: false, message: unitError.message };
+  }
+
+  if (row.logId) {
+    await supabase
+      .from("inventory_logs")
+      .update({ stock_out_slip_id: slipId })
+      .eq("id", row.logId);
+  } else {
+    await supabase
+      .from("inventory_logs")
+      .update({ stock_out_slip_id: slipId })
+      .eq("transaction_type", "STOCK_OUT")
+      .eq("stock_unit_id", row.stockUnitId)
+      .is("stock_out_slip_id", null);
+  }
+
+  return { success: true, message: "Attached." };
+}
+
+async function findUnitOnAnySlip(
+  supabase: ConfirmServiceClient,
+  stockUnitId: string
+): Promise<{ id: string; slip_id: string } | null> {
+  const { data } = await supabase
+    .from("stock_out_slip_units")
+    .select("id, slip_id")
+    .eq("stock_unit_id", stockUnitId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Recover a bale that already went out (timeout) but never landed on a slip. */
+async function recoverOrphanStockOut(
+  supabase: ConfirmServiceClient,
+  barcode: string,
+  bagsQty: number
+): Promise<
+  | { kind: "orphan"; row: ProcessedSlipUnit }
+  | { kind: "already_on_slip"; slipId: string }
+  | { kind: "none" }
+> {
+  const { data: unit } = await supabase
+    .from("stock_units")
+    .select("id, product_id, unit_number, remaining_bags, status, unit_barcode")
+    .eq("unit_barcode", barcode)
+    .maybeSingle();
+
+  if (!unit || unit.status !== "STOCKED_OUT") {
+    return { kind: "none" };
+  }
+
+  const existing = await findUnitOnAnySlip(supabase, unit.id);
+  if (existing) {
+    return { kind: "already_on_slip", slipId: existing.slip_id };
+  }
+
+  const { data: logRow } = await supabase
+    .from("inventory_logs")
+    .select("id, quantity")
+    .eq("stock_unit_id", unit.id)
+    .eq("transaction_type", "STOCK_OUT")
+    .order("timestamp", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    kind: "orphan",
+    row: {
+      barcode,
+      stockUnitId: unit.id,
+      productId: unit.product_id,
+      unitNumber: unit.unit_number,
+      bagsMoved: Math.round(Number(logRow?.quantity ?? bagsQty)),
+      logId: logRow?.id ?? null,
+    },
+  };
+}
+
 export async function confirmStockOutSlipServer(input: {
   billerName?: string | null;
   billNo?: string | null;
@@ -40,6 +219,7 @@ export async function confirmStockOutSlipServer(input: {
   items: StockOutSlipConfirmItem[];
   createdBy: string;
   createdByLabel: string;
+  existingSlipId?: string | null;
 }): Promise<MutationResult<StockOutSlipWithDetails>> {
   if (input.saleChannel !== "WHOLESALE" && input.saleChannel !== "RETAIL") {
     return { success: false, message: "Invalid sale channel." };
@@ -76,14 +256,53 @@ export async function confirmStockOutSlipServer(input: {
   const billerName = nullIfEmpty(input.billerName);
   const billNo = nullIfEmpty(input.billNo);
 
-  const processed: Array<{
-    barcode: string;
-    stockUnitId: string;
-    productId: string;
-    unitNumber: number;
-    bagsMoved: number;
-    logId: string | null;
-  }> = [];
+  const processed: ProcessedSlipUnit[] = [];
+  let slipId = nullIfEmpty(input.existingSlipId);
+
+  if (slipId) {
+    const existingSlip = await fetchStockOutSlipByIdServer(slipId);
+    if (!existingSlip) {
+      return { success: false, message: "The open slip could not be found. Confirm again to start a new one." };
+    }
+    if (existingSlip.sale_channel !== input.saleChannel) {
+      return { success: false, message: "That slip does not match this sale mode." };
+    }
+  }
+
+  const failWithProgress = async (message: string): Promise<MutationResult<StockOutSlipWithDetails>> => {
+    const detail = slipId ? await fetchStockOutSlipByIdServer(slipId) : null;
+    return {
+      success: false,
+      message,
+      data: detail ?? undefined,
+      processedBarcodes: processed.map((row) => row.barcode),
+    };
+  };
+
+  const createSlipIfNeeded = async (): Promise<MutationResult<{ id: string }>> => {
+    if (slipId) return { success: true, message: "Slip ready.", data: { id: slipId } };
+    const { data: slip, error: slipError } = await supabase
+      .from("stock_out_slips")
+      .insert({
+        biller_name: billerName,
+        bill_no: billNo,
+        sale_channel: input.saleChannel,
+        status: "CONFIRMED",
+        created_by: input.createdBy,
+        created_by_label: input.createdByLabel,
+        confirmed_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (slipError || !slip) {
+      return {
+        success: false,
+        message: slipError?.message ?? "Could not create the stock-out slip.",
+      };
+    }
+    slipId = slip.id;
+    return { success: true, message: "Slip created.", data: { id: slip.id } };
+  };
 
   for (const item of normalized) {
     const result = await processUnitStockTransactionServer({
@@ -94,137 +313,85 @@ export async function confirmStockOutSlipServer(input: {
       bagsQty: item.bagsQty,
     });
 
-    if (!result.success || !result.stockUnit || !result.product) {
-      return {
-        success: false,
-        message:
-          processed.length > 0
-            ? `${result.message} (${processed.length} unit(s) already stocked out — fix remaining and confirm a new slip.)`
-            : result.message || `Failed to stock out ${item.barcode}.`,
-      };
-    }
+    let row: ProcessedSlipUnit | null = null;
 
-    const stockUnitId = result.stockUnit.id;
-    const bagsMoved = Math.round(result.bagsMoved ?? item.bagsQty);
-
-    // Stamp newest STOCK_OUT log for this unit with sale channel; slip id later
-    const { data: logRow } = await supabase
-      .from("inventory_logs")
-      .select("id")
-      .eq("stock_unit_id", stockUnitId)
-      .eq("transaction_type", "STOCK_OUT")
-      .is("stock_out_slip_id", null)
-      .order("timestamp", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (logRow?.id) {
-      await supabase
-        .from("inventory_logs")
-        .update({ sale_channel: input.saleChannel })
-        .eq("id", logRow.id);
-    }
-
-    if (billerName || billNo) {
-      await supabase
-        .from("stock_units")
-        .update({
-          sold_to_customer_name: billerName,
-          sold_bill_number: billNo,
-          sold_at: new Date().toISOString(),
-        })
-        .eq("id", stockUnitId);
-    }
-
-    processed.push({
-      barcode: item.barcode,
-      stockUnitId,
-      productId: result.product.id,
-      unitNumber: result.stockUnit.unit_number,
-      bagsMoved,
-      logId: logRow?.id ?? null,
-    });
-  }
-
-  const { data: slip, error: slipError } = await supabase
-    .from("stock_out_slips")
-    .insert({
-      biller_name: billerName,
-      bill_no: billNo,
-      sale_channel: input.saleChannel,
-      status: "CONFIRMED",
-      created_by: input.createdBy,
-      created_by_label: input.createdByLabel,
-      confirmed_at: new Date().toISOString(),
-    })
-    .select("*")
-    .single();
-
-  if (slipError || !slip) {
-    return {
-      success: false,
-      message:
-        slipError?.message ??
-        "Stock out succeeded but slip could not be saved. Contact admin.",
-    };
-  }
-
-  const lineMap = new Map<
-    string,
-    { product_id: string; bag_count: number; bale_count: number }
-  >();
-  for (const row of processed) {
-    const existing = lineMap.get(row.productId);
-    if (existing) {
-      existing.bag_count += row.bagsMoved;
-      existing.bale_count += 1;
-    } else {
-      lineMap.set(row.productId, {
-        product_id: row.productId,
-        bag_count: row.bagsMoved,
-        bale_count: 1,
+    if (result.success && result.stockUnit && result.product) {
+      const stockUnitId = result.stockUnit.id;
+      const bagsMoved = Math.round(result.bagsMoved ?? item.bagsQty);
+      const logId = await stampStockOutMeta(supabase, {
+        stockUnitId,
+        saleChannel: input.saleChannel,
+        billerName,
+        billNo,
       });
+      row = {
+        barcode: item.barcode,
+        stockUnitId,
+        productId: result.product.id,
+        unitNumber: result.stockUnit.unit_number,
+        bagsMoved,
+        logId,
+      };
+    } else {
+      const recovered = await recoverOrphanStockOut(supabase, item.barcode, item.bagsQty);
+      if (recovered.kind === "already_on_slip") {
+        if (slipId && recovered.slipId === slipId) {
+          processed.push({
+            barcode: item.barcode,
+            stockUnitId: "",
+            productId: "",
+            unitNumber: 0,
+            bagsMoved: item.bagsQty,
+            logId: null,
+          });
+          continue;
+        }
+        return failWithProgress(
+          `${item.barcode} is already on another slip. ${processed.length} bale(s) on this slip were registered.`
+        );
+      }
+      if (recovered.kind === "orphan") {
+        row = recovered.row;
+        await stampStockOutMeta(supabase, {
+          stockUnitId: row.stockUnitId,
+          saleChannel: input.saleChannel,
+          billerName,
+          billNo,
+        });
+      } else {
+        return failWithProgress(
+          `${result.message || `Could not stock out ${item.barcode}.`} ${processed.length} bale(s) already registered on the slip. The rest were not registered.`
+        );
+      }
     }
+
+    const slipResult = await createSlipIfNeeded();
+    if (!slipResult.success || !slipResult.data || !slipId || !row) {
+      return failWithProgress(slipResult.message || "Could not create the stock-out slip.");
+    }
+
+    const attached = await attachProcessedUnitToSlip(supabase, slipId, row);
+    if (!attached.success) {
+      return failWithProgress(
+        attached.message ||
+          `Bale ${item.barcode} went out but could not be attached to the slip. Check Stock Out Slips.`
+      );
+    }
+    processed.push(row);
   }
 
-  const { error: linesError } = await supabase.from("stock_out_slip_lines").insert(
-    Array.from(lineMap.values()).map((line) => ({
-      slip_id: slip.id,
-      product_id: line.product_id,
-      bag_count: line.bag_count,
-      bale_count: line.bale_count,
-    }))
-  );
-  if (linesError) {
-    return { success: false, message: linesError.message };
+  const detail = slipId ? await fetchStockOutSlipByIdServer(slipId) : null;
+  if (!detail) {
+    return failWithProgress(
+      "Bales were stocked out but the slip could not be reloaded. Open Stock Out Slips."
+    );
   }
 
-  const { error: unitsError } = await supabase.from("stock_out_slip_units").insert(
-    processed.map((row) => ({
-      slip_id: slip.id,
-      stock_unit_id: row.stockUnitId,
-      product_id: row.productId,
-      unit_number: row.unitNumber,
-      bags_moved: row.bagsMoved,
-    }))
-  );
-  if (unitsError) {
-    return { success: false, message: unitsError.message };
-  }
-
-  const logIds = processed.map((p) => p.logId).filter(Boolean) as string[];
-  if (logIds.length > 0) {
-    await supabase
-      .from("inventory_logs")
-      .update({ stock_out_slip_id: slip.id })
-      .in("id", logIds);
-  }
-
-  const detail = await fetchStockOutSlipByIdServer(slip.id);
   return {
     success: true,
-    message: `Stock out slip confirmed · ${processed.length} label(s).`,
-    data: detail ?? undefined,
+    message: `Stock out slip confirmed · ${detail.total_bales} label(s) on slip.`,
+    data: detail,
+    processedBarcodes: processed.map((row) => row.barcode),
   };
 }
 

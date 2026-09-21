@@ -89,14 +89,21 @@ function speakOkayFallback(): void {
 export function playScanOkay(): void {
   if (typeof window === "undefined" || !isScanSoundEnabled()) return;
 
-  const audio = getOkayAudio();
-  audio.muted = false;
   try {
-    audio.currentTime = 0;
+    window.speechSynthesis?.cancel();
   } catch {
-    /* ignore unseekable state */
+    /* ignore */
   }
-  void audio.play().catch(() => speakOkayFallback());
+
+  // Clone per play: a single HTMLAudioElement often stops after many rapid scanner plays.
+  const audio = getOkayAudio().cloneNode(true) as HTMLAudioElement;
+  audio.muted = false;
+  audio.volume = 1;
+  void audio.play().catch(() => {
+    primed = false;
+    void getAudioCtx()?.resume();
+    speakOkayFallback();
+  });
 }
 
 function tone(

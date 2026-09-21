@@ -77,7 +77,50 @@ export function useScanTally() {
 
   const resetTally = useCallback(() => setTally(emptyTally), []);
 
-  return { tally, recordScan, recordBags, resetTally };
+  const replaceTallyFromBags = useCallback(
+    (
+      items: Array<{
+        productId: string;
+        productName: string;
+        productCode: string;
+        size: string | null;
+        bags: number;
+      }>
+    ) => {
+      let next = emptyTally;
+      for (const item of items) {
+        const bags = Math.round(item.bags);
+        if (bags < 1) continue;
+        const existing = next.byProduct.find((p) => p.productId === item.productId);
+        const byProduct = existing
+          ? next.byProduct.map((p) =>
+              p.productId === item.productId
+                ? { ...p, bagCount: p.bagCount + bags, baleCount: p.baleCount + 1 }
+                : p
+            )
+          : [
+              ...next.byProduct,
+              {
+                productId: item.productId,
+                productName: item.productName,
+                productCode: item.productCode,
+                size: item.size?.trim() || null,
+                bagCount: bags,
+                baleCount: 1,
+              },
+            ];
+        next = {
+          sessionTotal: next.sessionTotal + bags,
+          sessionBales: next.sessionBales + 1,
+          byProduct: byProduct.sort((a, b) => b.bagCount - a.bagCount),
+        };
+      }
+      setTally(next);
+    },
+    []
+  );
+
+  return { tally, recordScan, recordBags, resetTally, replaceTallyFromBags };
 }
 
 /** @deprecated Use useScanTally */

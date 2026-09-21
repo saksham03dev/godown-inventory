@@ -362,6 +362,8 @@ export interface MutationResult<T = void> {
   success: boolean;
   message: string;
   data?: T;
+  /** Barcodes that were actually registered on this request (partial confirms). */
+  processedBarcodes?: string[];
 }
 
 export type RetailBaleEvent = "FIRST_OPEN" | "DEDUCT_OPEN" | "BALE_EMPTY";
