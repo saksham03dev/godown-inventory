@@ -69,6 +69,8 @@ function StockInBatchRow({ batch }: { batch: StockInReportBatch }) {
             {[
               batch.product_code?.trim() ? batch.product_name : null,
               batch.godown_name,
+              batch.purchase_no ? `PO ${batch.purchase_no}` : null,
+              batch.source_name,
               timeRange,
               batch.handled_by ? `By ${batch.handled_by}` : null,
             ]
@@ -248,7 +250,7 @@ export default function DailyReportsPage() {
           />
           <p className="mt-1.5 text-xs text-zinc-500">
             Day runs midnight–midnight Asia/Kolkata. Stock-in batches club same
-            product + warehouse within 15 minutes.
+            product + warehouse + purchase no (or similar source).
           </p>
         </div>
 
@@ -320,8 +322,9 @@ export default function DailyReportsPage() {
                   Stock in — purchase match
                 </h2>
                 <p className="text-xs text-zinc-500 print:text-zinc-600">
-                  Clubbed by product + warehouse (≤15 min gap). Match to physical
-                  purchase bills.
+                  Clubbed by product + warehouse + purchase no, or similar
+                  source when purchase no is blank. Match to physical purchase
+                  bills.
                 </p>
               </div>
               {report.stockInBatches.length === 0 ? (

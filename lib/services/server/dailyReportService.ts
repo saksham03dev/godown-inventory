@@ -54,7 +54,12 @@ async function fetchLogsInRange(
         *,
         products ( id, name, barcode_id, product_code, size ),
         godowns!godown_id ( id, location_name ),
-        stock_units ( id, unit_number )
+        stock_units (
+          id,
+          unit_number,
+          batch_id,
+          stock_batches ( id, source_name, purchase_no, batch_code )
+        )
       `
       )
       .gte("timestamp", startIso)
