@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   ChevronDown,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { TransferReportSection } from "@/components/reports/TransferReportSection";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,6 +42,8 @@ function formatDateTime(ts: string): string {
     minute: "2-digit",
   }).format(new Date(ts));
 }
+
+type ReportTab = "stock-in" | "stock-out" | "transfer";
 
 function StockInBatchRow({ batch }: { batch: StockInReportBatch }) {
   const [open, setOpen] = useState(false);
@@ -139,6 +143,7 @@ export default function DailyReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<ReportTab>("stock-in");
 
   const load = useCallback(async (day: string) => {
     setError(null);
@@ -250,7 +255,8 @@ export default function DailyReportsPage() {
           />
           <p className="mt-1.5 text-xs text-zinc-500">
             Day runs midnight–midnight Asia/Kolkata. Stock-in batches club same
-            product + warehouse + purchase no (or similar source).
+            product + warehouse + purchase no (or similar source). Transfer
+            shows bales scanned out of one godown and not stocked in the other.
           </p>
         </div>
 
@@ -303,7 +309,7 @@ export default function DailyReportsPage() {
                 </div>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <StatCard
                 label="Stock-in batches"
                 value={summary.stock_in_batch_count}
@@ -314,8 +320,60 @@ export default function DailyReportsPage() {
                 value={summary.slip_count}
                 icon={ClipboardList}
               />
+              <StatCard
+                label="Transfers"
+                value={summary.transfer_count}
+                icon={ArrowLeftRight}
+                trend={
+                  summary.transfer_count === 0
+                    ? "None this day"
+                    : summary.transfer_unstocked_count > 0
+                      ? `${summary.transfer_unstocked_count} not stocked in`
+                      : "All stocked in"
+                }
+              />
             </div>
 
+            <div
+              className="flex gap-1 rounded-2xl border border-surface-border bg-surface-raised p-1 print:hidden"
+              role="tablist"
+              aria-label="Daily report sections"
+            >
+              {(
+                [
+                  ["stock-in", "Stock in"],
+                  ["stock-out", "Stock out"],
+                  ["transfer", "Transfer"],
+                ] as const
+              ).map(([id, label]) => {
+                const active = tab === id;
+                const alert =
+                  id === "transfer" && summary.transfer_unstocked_count > 0;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(id)}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                      active
+                        ? "bg-accent/15 text-zinc-50"
+                        : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                    }`}
+                  >
+                    {label}
+                    {alert ? (
+                      <span className="rounded-full bg-danger/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-danger">
+                        {summary.transfer_unstocked_count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={tab === "stock-in" ? "block" : "hidden print:block"}>
             <section className="rounded-2xl border border-surface-border bg-surface-raised print:border-zinc-300 print:bg-white">
               <div className="border-b border-surface-border px-5 py-4 print:border-zinc-300">
                 <h2 className="font-medium text-zinc-100 print:text-black">
@@ -339,7 +397,9 @@ export default function DailyReportsPage() {
                 </ul>
               )}
             </section>
+            </div>
 
+            <div className={tab === "stock-out" ? "block" : "hidden print:block"}>
             <section className="rounded-2xl border border-surface-border bg-surface-raised print:border-zinc-300 print:bg-white">
               <div className="flex items-start justify-between gap-3 border-b border-surface-border px-5 py-4 print:border-zinc-300">
                 <div>
@@ -422,6 +482,11 @@ export default function DailyReportsPage() {
                 </ul>
               )}
             </section>
+            </div>
+
+            <div className={tab === "transfer" ? "block" : "hidden print:block"}>
+              <TransferReportSection records={report.transfers ?? []} />
+            </div>
           </>
         ) : null}
       </div>
@@ -442,6 +507,9 @@ export default function DailyReportsPage() {
             width: 100%;
             background: white;
             color: black;
+          }
+          #daily-report-print-area .hidden {
+            display: block !important;
           }
         }
       `}</style>

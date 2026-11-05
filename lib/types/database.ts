@@ -68,6 +68,14 @@ export interface GodownInput {
   notes?: string | null;
 }
 
+export type InventorySaleChannel =
+  | "STOCK_IN"
+  | "WHOLESALE"
+  | "RETAIL"
+  | "TRANSFER"
+  | "RETURN"
+  | "CORRECTION";
+
 export interface InventoryLog {
   id: string;
   product_id: string;
@@ -76,7 +84,7 @@ export interface InventoryLog {
   quantity: number;
   handled_by: string;
   timestamp: string;
-  sale_channel?: "STOCK_IN" | "WHOLESALE" | "RETAIL" | null;
+  sale_channel?: InventorySaleChannel | null;
   stock_unit_id?: string | null;
   stock_out_slip_id?: string | null;
 }
@@ -84,7 +92,16 @@ export interface InventoryLog {
 export interface InventoryLogWithRelations extends InventoryLog {
   products: Pick<Product, "id" | "name" | "barcode_id" | "product_code" | "size"> | null;
   godowns: Pick<Godown, "id" | "location_name"> | null;
-  stock_units?: (Pick<StockUnit, "id" | "unit_number"> & {
+  stock_units?: (Pick<
+    StockUnit,
+    | "id"
+    | "unit_number"
+    | "unit_barcode"
+    | "status"
+    | "godown_id"
+    | "transfer_from_godown_id"
+    | "transfer_to_godown_id"
+  > & {
     batch_id?: string;
     stock_batches?: Pick<
       StockBatch,
@@ -460,6 +477,36 @@ export interface DailyReportSummary {
   slip_count: number;
   bill_count: number;
   bill_total: number;
+  transfer_count: number;
+  /** Bales dispatched this day that are still not stocked in the destination. */
+  transfer_unstocked_count: number;
+}
+
+/** One godown-to-godown bale transfer that touched the business day. */
+export interface TransferReportRecord {
+  id: string;
+  stock_unit_id: string;
+  unit_number: number | null;
+  unit_barcode: string | null;
+  product_name: string;
+  product_code: string | null;
+  from_godown_name: string | null;
+  to_godown_name: string | null;
+  bags: number;
+  dispatched_at: string | null;
+  received_at: string | null;
+  dispatched_by: string | null;
+  received_by: string | null;
+  /** Dispatch scan exists. */
+  scanned_out: boolean;
+  /** Receive scan exists. */
+  scanned_in: boolean;
+  /** Dispatched on this business day with no receive scan. */
+  missing_receive_scan: boolean;
+  /** Dispatched on this day and not currently stocked in the destination godown. */
+  not_stocked_in_destination: boolean;
+  unit_status: StockUnitStatus | null;
+  current_godown_name: string | null;
 }
 
 export interface DailyReport {
@@ -468,6 +515,7 @@ export interface DailyReport {
   stockInBatches: StockInReportBatch[];
   slips: StockOutSlipWithDetails[];
   bills: Bill[];
+  transfers: TransferReportRecord[];
 }
 
 export interface AsyncState<T> {
