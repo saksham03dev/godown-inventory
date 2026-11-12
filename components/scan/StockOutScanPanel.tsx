@@ -16,85 +16,27 @@ import { Modal } from "@/components/ui/Modal";
 import { OnScreenTextPad } from "@/components/scan/OnScreenTextPad";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
+import {
+  clubStockOutByCode,
+  useStockOutQueue,
+  type StockOutQueueItem,
+  type StockOutSession,
+} from "@/hooks/useStockOutQueue";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import {
   STOCK_OUT_MODE_STORAGE_KEY,
-  STOCK_OUT_STAGED_STORAGE_KEY,
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
 import { refreshSessionCookies } from "@/lib/auth/ensureSession";
 import { ACTIVITY_PING_INTERVAL_MS } from "@/lib/auth/idle-timeout";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
 import { playScanOkay, playScanReject } from "@/lib/utils/scanFeedbackAudio";
-import { confirmStockOutSlip } from "@/lib/services/stockOutSlipService";
 import type { AlertState, StockUnit } from "@/lib/types/database";
 
 function readStoredMode(): StockOutSaleMode {
   if (typeof window === "undefined") return "wholesale";
   const stored = localStorage.getItem(STOCK_OUT_MODE_STORAGE_KEY);
   return stored === "retail" ? "retail" : "wholesale";
-}
-
-function newUploadSessionId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-function readStagedSnapshot(): {
-  mode: StockOutSaleMode;
-  items: StagedStockOutItem[];
-  slipId: string | null;
-  submissionId: string | null;
-} | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(STOCK_OUT_STAGED_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as {
-      mode?: StockOutSaleMode;
-      items?: StagedStockOutItem[];
-      slipId?: string | null;
-      submissionId?: string | null;
-    };
-    const submissionId =
-      typeof parsed.submissionId === "string" && parsed.submissionId.trim()
-        ? parsed.submissionId.trim()
-        : null;
-    if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
-      return parsed.slipId
-        ? {
-            mode: parsed.mode === "retail" ? "retail" : "wholesale",
-            items: [],
-            slipId: parsed.slipId,
-            submissionId,
-          }
-        : null;
-    }
-    const items = parsed.items.filter(
-      (item) => item && typeof item.barcode === "string" && item.barcode.trim()
-    );
-    return {
-      mode: parsed.mode === "retail" ? "retail" : "wholesale",
-      items,
-      slipId: parsed.slipId ? String(parsed.slipId) : null,
-      submissionId: submissionId ?? (items.length > 0 ? newUploadSessionId() : null),
-    };
-  } catch {
-    return null;
-  }
-}
-
-interface StagedStockOutItem {
-  barcode: string;
-  bagsQty: number;
-  productId: string;
-  productName: string;
-  productCode: string;
-  size: string | null;
-  unitNumber: number;
-  stockUnitId: string;
 }
 
 function productFromUnit(unit: StockUnit) {
@@ -116,34 +58,37 @@ function productFromUnit(unit: StockUnit) {
   };
 }
 
+function billDate(openedAt: string): string {
+  const date = new Date(openedAt);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function StockOutScanPanel() {
+  const queue = useStockOutQueue();
+  const { tally, replaceTallyFromBags, resetTally } = useScanTally();
   const [saleMode, setSaleMode] = useState<StockOutSaleMode>("wholesale");
-  const [staged, setStaged] = useState<StagedStockOutItem[]>([]);
-  const [alert, setAlert] = useState<AlertState | null>(null);
+  const [notice, setNotice] = useState<AlertState | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [approveFlash, setApproveFlash] = useState(false);
   const [errorFlash, setErrorFlash] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [billerName, setBillerName] = useState("");
   const [billNo, setBillNo] = useState("");
-  /** Which optional field the on-screen pad is editing. */
   const [padTarget, setPadTarget] = useState<"biller" | "billNo">("biller");
-  const [confirming, setConfirming] = useState(false);
-  const [confirmedSlipId, setConfirmedSlipId] = useState<string | null>(null);
-  const [openSlipId, setOpenSlipId] = useState<string | null>(null);
-  /** Stable upload id for idempotent confirm (persisted with staged list). */
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [billOpen, setBillOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [offline, setOffline] = useState(false);
-  const [confirmProgress, setConfirmProgress] = useState<string | null>(null);
-  const [sessionHydrated, setSessionHydrated] = useState(false);
 
   const [retailUnit, setRetailUnit] = useState<StockUnit | null>(null);
-  const [retailBarcode, setRetailBarcode] = useState("");
+  const [checkingLabel, setCheckingLabel] = useState(false);
   const [retailLoading, setRetailLoading] = useState(false);
-  const [retailDialogError, setRetailDialogError] = useState<string | null>(
-    null
-  );
+  const [retailDialogError, setRetailDialogError] = useState<string | null>(null);
   const [retailApproval, setRetailApproval] = useState<{
     productCode: string | null;
     size: string | null;
@@ -154,46 +99,40 @@ export function StockOutScanPanel() {
   const processingRef = useRef(false);
   const saleModeRef = useRef(saleMode);
   const retailOpenRef = useRef(false);
-  const confirmOpenRef = useRef(false);
-  const stagedRef = useRef(staged);
+  const billOpenRef = useRef(false);
   const manualInputRef = useRef<HTMLInputElement>(null);
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
 
-  const { tally, recordBags, resetTally, replaceTallyFromBags } = useScanTally();
-  const isRetail = saleMode === "retail";
-
-  saleModeRef.current = saleMode;
-  retailOpenRef.current = Boolean(retailUnit);
-  confirmOpenRef.current = confirmOpen;
-  stagedRef.current = staged;
+  const session = queue.active;
+  const ready = queue.ready;
+  const items = queue.items;
 
   useEffect(() => {
-    const mode = readStoredMode();
-    setSaleMode(mode);
-    const snapshot = readStagedSnapshot();
-    if (snapshot && snapshot.mode === mode) {
-      if (snapshot.items.length > 0) {
-        setStaged(snapshot.items);
-        replaceTallyFromBags(
-          snapshot.items.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            productCode: item.productCode,
-            size: item.size,
-            bags: item.bagsQty,
-          }))
-        );
-      }
-      if (snapshot.slipId) setOpenSlipId(snapshot.slipId);
-      if (snapshot.submissionId) setSubmissionId(snapshot.submissionId);
-      if (snapshot.items.length > 0) {
-        setAlert({
-          type: "info",
-          message: `${snapshot.items.length} staged bale(s) restored on this device. They are not stocked out until Confirm succeeds.`,
-        });
-      }
+    setSaleMode(readStoredMode());
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    setSaleMode(session.saleMode);
+    if (!ready) {
+      setBillerName(session.billerName);
+      setBillNo(session.billNo);
     }
-    setSessionHydrated(true);
-  }, [replaceTallyFromBags]);
+  }, [session, ready]);
+
+  useEffect(() => {
+    saleModeRef.current = saleMode;
+    if (!session) localStorage.setItem(STOCK_OUT_MODE_STORAGE_KEY, saleMode);
+  }, [saleMode, session]);
+
+  useEffect(() => {
+    retailOpenRef.current = Boolean(retailUnit);
+  }, [retailUnit]);
+
+  useEffect(() => {
+    billOpenRef.current = billOpen;
+  }, [billOpen]);
 
   useEffect(() => {
     const sync = () => setOffline(typeof navigator !== "undefined" && !navigator.onLine);
@@ -206,55 +145,28 @@ export function StockOutScanPanel() {
     };
   }, []);
 
-  const clearSession = useCallback(() => {
-    setStaged([]);
-    resetTally();
-    setRetailUnit(null);
-    setRetailBarcode("");
-    setRetailDialogError(null);
-    setRetailApproval(null);
-    setLastMessage(null);
-    setAlert(null);
-    setConfirmOpen(false);
-    setBillerName("");
-    setBillNo("");
-    setOpenSlipId(null);
-    setSubmissionId(null);
-    setConfirmProgress(null);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(STOCK_OUT_STAGED_STORAGE_KEY);
-    }
-  }, [resetTally]);
-
   useEffect(() => {
-    localStorage.setItem(STOCK_OUT_MODE_STORAGE_KEY, saleMode);
-  }, [saleMode]);
-
-  useEffect(() => {
-    if (!sessionHydrated || typeof window === "undefined") return;
-    if (staged.length === 0 && !openSlipId) {
-      localStorage.removeItem(STOCK_OUT_STAGED_STORAGE_KEY);
-      return;
-    }
-    localStorage.setItem(
-      STOCK_OUT_STAGED_STORAGE_KEY,
-      JSON.stringify({
-        mode: saleMode,
-        items: staged,
-        slipId: openSlipId,
-        submissionId,
-      })
-    );
-  }, [staged, saleMode, openSlipId, submissionId, sessionHydrated]);
-
-  useEffect(() => {
-    if (staged.length === 0 && !confirmOpen) return;
+    if (!ready && queue.recovery.length === 0) return;
     void refreshSessionCookies();
     const timer = window.setInterval(() => {
       void refreshSessionCookies();
     }, ACTIVITY_PING_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [staged.length, confirmOpen]);
+  }, [ready, queue.recovery.length]);
+
+  useEffect(() => {
+    replaceTallyFromBags(
+      items
+        .filter((item) => item.status !== "failed")
+        .map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          productCode: item.productCode,
+          size: item.size,
+          bags: item.bagsQty,
+        }))
+    );
+  }, [items, replaceTallyFromBags]);
 
   const focusScanner = useCallback(() => {
     setTimeout(() => manualInputRef.current?.focus(), 50);
@@ -264,7 +176,7 @@ export function StockOutScanPanel() {
     setApproveFlash(true);
     setErrorFlash(false);
     setLastMessage(message);
-    setAlert({ type: "success", message });
+    setNotice({ type: "success", message });
     playScanOkay();
     setTimeout(() => setApproveFlash(false), 900);
   }, []);
@@ -273,15 +185,15 @@ export function StockOutScanPanel() {
     setErrorFlash(true);
     setApproveFlash(false);
     setLastMessage(message);
-    setAlert({ type: "error", message });
+    setNotice({ type: "error", message });
     playScanReject();
     setTimeout(() => setErrorFlash(false), 900);
   }, []);
 
-  const stageItem = useCallback(
+  const acceptItem = useCallback(
     (unit: StockUnit, bagsQty: number) => {
-      if (stagedRef.current.some((s) => s.barcode === unit.unit_barcode)) {
-        flashError("This bale is already in the session.");
+      if (queueRef.current.containsBarcode(unit.unit_barcode)) {
+        flashError("This bale is already in the list on this phone.");
         return false;
       }
       if (unit.status !== "STOCKED_IN" || unit.remaining_bags < 1) {
@@ -289,268 +201,134 @@ export function StockOutScanPanel() {
         return false;
       }
       if (bagsQty < 1 || bagsQty > unit.remaining_bags) {
-        flashError(
-          `Cannot stage ${bagsQty} bags — only ${unit.remaining_bags} remaining.`
-        );
+        flashError(`Cannot stage ${bagsQty} bags — only ${unit.remaining_bags} remaining.`);
         return false;
       }
-
-      const meta = productFromUnit(unit);
-      const item: StagedStockOutItem = {
+      const added = queueRef.current.enqueue({
         barcode: unit.unit_barcode,
         bagsQty,
-        productId: meta.productId,
-        productName: meta.productName,
-        productCode: meta.productCode,
-        size: meta.size,
+        ...productFromUnit(unit),
         unitNumber: unit.unit_number,
-        stockUnitId: unit.id,
-      };
-      if (stagedRef.current.length === 0) {
-        setSubmissionId((current) => current ?? newUploadSessionId());
-      }
-      setStaged((prev) => [...prev, item]);
-      recordBags({
-        productId: meta.productId,
-        productName: meta.productName,
-        productCode: meta.productCode,
-        size: meta.size,
-        bags: bagsQty,
       });
-      flashSuccess(`Staged bale #${unit.unit_number} · ${bagsQty} bags`);
+      if (!added) {
+        flashError("This bale is already in the list on this phone.");
+        return false;
+      }
+      const left = unit.remaining_bags - bagsQty;
+      if (saleModeRef.current === "retail" && left > 0) {
+        const meta = productFromUnit(unit);
+        setRetailApproval({
+          productCode: meta.productCode,
+          size: meta.size,
+          bagsRemaining: left,
+          baleNumber: unit.unit_number,
+        });
+      }
+      flashSuccess(`Accepted on this phone · bale #${unit.unit_number}. Sending to the slip.`);
       return true;
     },
-    [flashError, flashSuccess, recordBags]
+    [flashError, flashSuccess]
   );
 
   const onBarcodeDetected = useCallback(
     async (barcode: string) => {
-      if (
-        processingRef.current ||
-        retailOpenRef.current ||
-        confirmOpenRef.current ||
-        confirming
-      ) {
-        return;
-      }
-
-      setConfirmedSlipId(null);
-      setRetailApproval(null);
-
-      if (saleModeRef.current === "wholesale") {
-        processingRef.current = true;
-        try {
-          const unit = await fetchStockUnitByBarcode(barcode);
-          if (!unit) {
-            flashError("Unknown barcode.");
-            return;
-          }
-          const bags =
-            unit.remaining_bags > 0 ? unit.remaining_bags : BAGS_PER_BALE;
-          stageItem(unit, bags);
-        } catch (err) {
-          flashError(
-            err instanceof Error ? err.message : "Could not look up bale."
-          );
-        } finally {
-          processingRef.current = false;
-          focusScanner();
-        }
+      if (processingRef.current || retailOpenRef.current || billOpenRef.current) return;
+      if (!queueRef.current.ready) {
+        flashError("Enter the biller and bill number before scanning.");
         return;
       }
 
       processingRef.current = true;
-      setRetailLoading(true);
-      setRetailDialogError(null);
+      setCheckingLabel(true);
+      if (saleModeRef.current === "retail") setRetailLoading(true);
       try {
         const unit = await fetchStockUnitByBarcode(barcode);
         if (!unit) {
           flashError("Unknown barcode.");
-          focusScanner();
+          return;
+        }
+        if (queueRef.current.containsBarcode(unit.unit_barcode)) {
+          flashError("This bale is already in the list on this phone.");
           return;
         }
         if (unit.status !== "STOCKED_IN" || unit.remaining_bags < 1) {
           flashError("Bale is not available for stock out.");
-          focusScanner();
           return;
         }
-        setRetailBarcode(barcode);
-        setRetailUnit(unit);
+        if (saleModeRef.current === "retail") {
+          setRetailUnit(unit);
+          setRetailDialogError(null);
+          return;
+        }
+        const bags = unit.remaining_bags > 0 ? unit.remaining_bags : BAGS_PER_BALE;
+        acceptItem(unit, bags);
       } catch (err) {
-        flashError(
-          err instanceof Error ? err.message : "Could not look up bale."
-        );
-        focusScanner();
+        flashError(err instanceof Error ? err.message : "Could not look up bale.");
       } finally {
         processingRef.current = false;
+        setCheckingLabel(false);
         setRetailLoading(false);
+        focusScanner();
       }
     },
-    [confirming, flashError, focusScanner, stageItem]
+    [acceptItem, flashError, focusScanner]
   );
 
   const closeRetailDialog = useCallback(() => {
     if (retailLoading) return;
     setRetailUnit(null);
-    setRetailBarcode("");
     setRetailDialogError(null);
     focusScanner();
   }, [retailLoading, focusScanner]);
 
   const confirmRetailCut = useCallback(
     (bagsQty: number) => {
-      if (!retailBarcode || !retailUnit || retailLoading) return;
+      if (!retailUnit || retailLoading) return;
       if (bagsQty > retailUnit.remaining_bags) {
         setRetailDialogError(
           `Cannot stock out ${bagsQty.toLocaleString()} bags — only ${retailUnit.remaining_bags.toLocaleString()} remaining.`
         );
         return;
       }
-      const ok = stageItem(retailUnit, bagsQty);
-      if (ok) {
-        setRetailApproval({
-          productCode: productFromUnit(retailUnit).productCode,
-          size: productFromUnit(retailUnit).size,
-          bagsRemaining: retailUnit.remaining_bags - bagsQty,
-          baleNumber: retailUnit.unit_number,
-        });
-        setRetailUnit(null);
-        setRetailBarcode("");
-        focusScanner();
-      }
+      const ok = acceptItem(retailUnit, bagsQty);
+      if (!ok) return;
+      setRetailUnit(null);
+      setRetailDialogError(null);
+      focusScanner();
     },
-    [retailBarcode, retailUnit, retailLoading, stageItem, focusScanner]
+    [retailUnit, retailLoading, acceptItem, focusScanner]
   );
 
-  const openConfirmModal = useCallback(() => {
-    if (staged.length === 0 || confirming) return;
+  const startBill = useCallback(() => {
+    const ok = queue.startSession({ billerName, billNo, saleMode });
+    if (!ok) {
+      flashError("Biller name and bill number are both required.");
+      return;
+    }
+    setNotice({
+      type: "info",
+      message: `Bill ${billNo.trim()} · ${billerName.trim()}. Scans upload while you continue.`,
+    });
+    focusScanner();
+  }, [queue, billerName, billNo, saleMode, flashError, focusScanner]);
+
+  const finishBill = useCallback(() => {
+    queue.closeActive();
+    setBillOpen(false);
     setBillerName("");
     setBillNo("");
-    setPadTarget("biller");
-    setConfirmOpen(true);
-    // Drop focus so OTG keystrokes cannot land in a text field
-    if (typeof document !== "undefined") {
-      const active = document.activeElement;
-      if (active instanceof HTMLElement) active.blur();
-    }
-  }, [staged.length, confirming]);
+    setLastMessage(null);
+    setNotice(null);
+    setRetailApproval(null);
+    resetTally();
+  }, [queue, resetTally]);
 
-  const closeConfirmModal = useCallback(() => {
-    if (confirming) return;
-    setConfirmOpen(false);
-    focusScanner();
-  }, [confirming, focusScanner]);
-
-  const applyRemaining = useCallback(
-    (remaining: StagedStockOutItem[]) => {
-      setStaged(remaining);
-      replaceTallyFromBags(
-        remaining.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          productCode: item.productCode,
-          size: item.size,
-          bags: item.bagsQty,
-        }))
-      );
-    },
-    [replaceTallyFromBags]
-  );
-
-  const handleConfirmStockOut = useCallback(async () => {
-    if (staged.length === 0 || confirming) return;
-    setConfirming(true);
-    setAlert(null);
-    try {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        flashError(
-          "No network. Staged bales stay on this screen. Confirm again when you are online — nothing was registered just now."
-        );
-        return;
-      }
-
-      const sessionOk = await refreshSessionCookies();
-      if (!sessionOk) {
-        flashError(
-          "Session expired. Log in again, then tap Confirm — staged bales stay on this device. Nothing new was stocked out."
-        );
-        return;
-      }
-
-      const uploadId = submissionId ?? newUploadSessionId();
-      if (!submissionId) setSubmissionId(uploadId);
-
-      const channel = saleMode === "retail" ? "RETAIL" : "WHOLESALE";
-      setConfirmProgress(`Registering ${staged.length} bale(s)…`);
-
-      const result = await confirmStockOutSlip({
-        billerName,
-        billNo,
-        saleChannel: channel,
-        items: staged.map((s) => ({
-          barcode: s.barcode,
-          bagsQty: s.bagsQty,
-        })),
-        existingSlipId: openSlipId,
-        submissionId: uploadId,
-      });
-
-      const slipId = result.data?.id ?? result.slipId ?? openSlipId;
-      if (slipId) {
-        setOpenSlipId(slipId);
-      }
-
-      const done = new Set(result.processedBarcodes ?? []);
-      const remaining = staged.filter((item) => !done.has(item.barcode));
-      if (done.size > 0) {
-        applyRemaining(remaining);
-      }
-
-      if (!result.success) {
-        flashError(result.message);
-        return;
-      }
-
-      if (remaining.length > 0) {
-        flashError(
-          result.message ||
-            "Some bales were not registered. Confirm again to retry the rest."
-        );
-        return;
-      }
-
-      setConfirmedSlipId(slipId);
-      clearSession();
-      setAlert({
-        type: "success",
-        message: `Stock out registered · slip saved.`,
-      });
-      setApproveFlash(true);
-      playScanOkay();
-      setTimeout(() => setApproveFlash(false), 1200);
-    } catch (err) {
-      flashError(err instanceof Error ? err.message : "Confirm failed. Staged bales were not cleared.");
-    } finally {
-      setConfirming(false);
-      setConfirmProgress(null);
-      focusScanner();
-    }
-  }, [
-    staged,
-    confirming,
-    billerName,
-    billNo,
-    saleMode,
-    openSlipId,
-    submissionId,
-    flashError,
-    clearSession,
-    focusScanner,
-    applyRemaining,
-  ]);
-
-  const scannerEnabled =
-    !retailUnit && !retailLoading && !confirming && !confirmOpen;
+  const scannerEnabled = ready && !retailUnit && !retailLoading && !billOpen;
+  const failed = items.filter((item) => item.status === "failed");
+  const lines = clubStockOutByCode(items);
+  const totalBags = lines.reduce((sum, line) => sum + line.bags, 0);
+  const totalBales = lines.reduce((sum, line) => sum + line.bales, 0);
+  const waitingForBill = Boolean(session && !ready && session.items.length > 0);
 
   const {
     isScanning,
@@ -564,35 +342,49 @@ export function StockOutScanPanel() {
     enabled: scannerEnabled,
   });
 
-  const busy = confirming || retailLoading;
-  const totalBags = staged.reduce((sum, s) => sum + s.bagsQty, 0);
-
   return (
-    <div className="mx-auto max-w-lg space-y-4">
+    <div className="space-y-4">
       <StockOutModeSwitch
         mode={saleMode}
-        onChange={(mode) => {
-          setSaleMode(mode);
-          clearSession();
-          setConfirmedSlipId(null);
-        }}
-        disabled={busy || staged.length > 0 || Boolean(retailUnit)}
+        onChange={setSaleMode}
+        disabled={ready || waitingForBill}
       />
 
-      {saleMode === "wholesale" ? (
-        <div className="rounded-2xl border border-wholesale/30 bg-wholesale/5 p-4 text-center ring-1 ring-wholesale/10">
-          <p className="text-xs font-medium uppercase tracking-wider text-wholesale">
-            Wholesale · full bale
+      {!ready ? (
+        <BillStartForm
+          billerName={billerName}
+          billNo={billNo}
+          padTarget={padTarget}
+          waitingCount={waitingForBill ? session?.items.length ?? 0 : 0}
+          onPadTarget={setPadTarget}
+          onBiller={setBillerName}
+          onBillNo={setBillNo}
+          onStart={startBill}
+        />
+      ) : (
+        <div className="rounded-2xl border border-surface-border bg-surface-raised px-4 py-3 text-sm">
+          <p className="text-[10px] uppercase tracking-wider text-zinc-500">Current bill</p>
+          <p className="mt-1 font-medium text-zinc-100">
+            {session?.billNo} · {session?.billerName}
           </p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-zinc-100">
-            {BAGS_PER_BALE.toLocaleString()}
-            <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
-          </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Scan to stage (saved on this device). Confirm registers stock out.
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {session?.saleMode === "retail" ? "Retail" : "Wholesale"} · scans send in the background
           </p>
         </div>
-      ) : null}
+      )}
+
+      {offline && (
+        <AlertBanner
+          alert={{
+            type: "warning",
+            message:
+              "No network. Keep scanning — this bill stays on the phone and uploads when the page is open again.",
+          }}
+          onDismiss={() => setOffline(false)}
+        />
+      )}
+
+      {notice && <AlertBanner alert={notice} onDismiss={() => setNotice(null)} />}
 
       <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-2 pt-1 sm:static sm:mx-0 sm:bg-transparent sm:p-0">
         <ScannerWindow
@@ -601,16 +393,14 @@ export function StockOutScanPanel() {
           cameraError={cameraError}
           onStart={startScanning}
           onStop={stopScanning}
-          disabled={busy || Boolean(retailUnit) || confirmOpen}
-          contextLabel={
-            saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale"
-          }
+          disabled={!scannerEnabled}
+          contextLabel={saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale"}
           hardwareListening={hardwareListening && scannerEnabled}
           onManualSubmit={onBarcodeDetected}
           manualInputRef={manualInputRef}
           manualInputMode="none"
           overlay={{
-            processing: busy,
+            processing: checkingLabel,
             flash: approveFlash ? "success" : errorFlash ? "error" : null,
             message: lastMessage,
             detail: null,
@@ -618,34 +408,7 @@ export function StockOutScanPanel() {
         />
       </div>
 
-      {offline && (
-        <AlertBanner
-          alert={{
-            type: "warning",
-            message:
-              "No network. Keep scanning — this list stays on the device. Confirm when you are online. If Confirm fails, the list is not cleared.",
-          }}
-          onDismiss={() => setOffline(false)}
-        />
-      )}
-
-      {alert && (
-        <AlertBanner alert={alert} onDismiss={() => setAlert(null)} />
-      )}
-
-      {confirmedSlipId && (
-        <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-          Slip created.{" "}
-          <Link
-            href="/stock-out-slips"
-            className="font-medium underline underline-offset-2"
-          >
-            View stock-out slips
-          </Link>
-        </div>
-      )}
-
-      {isRetail && retailApproval && (
+      {retailApproval && (
         <RetailStockOutApproval
           productCode={retailApproval.productCode}
           size={retailApproval.size}
@@ -659,20 +422,41 @@ export function StockOutScanPanel() {
         tally={tally}
         mode="STOCK_OUT"
         stockOutSaleMode={saleMode}
+        progressLabel={
+          ready
+            ? `${queue.counts.scanned} scanned · ${queue.counts.stockedOut} stocked out · ${queue.counts.sending} sending`
+            : null
+        }
         onReset={() => {
-          if (staged.length > 0) setResetOpen(true);
-          else clearSession();
+          if (items.length > 0) setResetOpen(true);
         }}
       />
+
+      {failed.length > 0 && (
+        <ul className="space-y-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
+          {failed.map((item) => (
+            <li key={item.barcode} className="text-zinc-200">
+              <span className="font-mono text-xs">{item.barcode}</span>
+              <span className="mt-0.5 block text-xs text-danger">
+                {item.error ?? "Could not stock out this label."}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {queue.recovery.length > 0 && (
+        <RecoveryList sessions={queue.recovery} />
+      )}
 
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => {
-            if (staged.length > 0) setResetOpen(true);
-            else clearSession();
+            if (items.length > 0) setResetOpen(true);
+            else queue.discardActive();
           }}
-          disabled={busy}
+          disabled={!ready}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border px-4 py-3 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
         >
           <RotateCcw className="h-4 w-4" />
@@ -680,19 +464,19 @@ export function StockOutScanPanel() {
         </button>
         <button
           type="button"
-          onClick={openConfirmModal}
-          disabled={busy || staged.length === 0}
+          onClick={() => setBillOpen(true)}
+          disabled={!ready || items.length === 0}
           className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
-          {`Confirm stock out · ${staged.length}`}
+          {`Confirm bill · ${queue.counts.scanned}`}
         </button>
       </div>
 
       <p className="text-center text-xs text-zinc-600">
-        {isRetail
-          ? "Scan a bale, enter bags in the popup, then confirm. Optional biller details are asked at confirm."
-          : `Wholesale stages full remaining bags (usually ${BAGS_PER_BALE.toLocaleString()}) per scan. Optional biller / bill no at confirm.`}
+        {ready
+          ? "Each scan is accepted on this phone and sent to the slip in the background. Confirm shows the bill."
+          : "Enter the biller and bill number first. Scanning stays off until this bill is open."}
       </p>
 
       <RetailCutDialog
@@ -705,120 +489,273 @@ export function StockOutScanPanel() {
       />
 
       <Modal
-        open={confirmOpen}
-        onClose={closeConfirmModal}
-        title="Confirm stock out"
-        description="Optional details — use the on-screen pad (OTG-safe)"
-        size="md"
+        open={billOpen && Boolean(session)}
+        onClose={() => setBillOpen(false)}
+        title="Bill"
+        description="Demo of this stock-out bill. Lines are clubbed by product code."
+        size="lg"
       >
-        <div className="space-y-4">
-          <div className="rounded-xl border border-surface-border bg-surface-overlay/40 px-4 py-3 text-sm text-zinc-300">
-            <p>
-              <span className="text-zinc-500">Labels: </span>
-              <span className="font-semibold tabular-nums text-zinc-100">
-                {staged.length}
-              </span>
-            </p>
-            <p className="mt-1">
-              <span className="text-zinc-500">Bags: </span>
-              <span className="font-semibold tabular-nums text-zinc-100">
-                {Math.round(totalBags)}
-              </span>
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={confirming}
-              onClick={() => setPadTarget("biller")}
-              className={`rounded-xl border px-3 py-2.5 text-left transition ${
-                padTarget === "biller"
-                  ? "border-accent/50 bg-accent/10"
-                  : "border-surface-border bg-surface-overlay"
-              }`}
-            >
-              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
-                Biller
-              </p>
-              <p className="mt-0.5 truncate text-sm text-zinc-100">
-                {billerName || (
-                  <span className="text-zinc-600">Optional</span>
-                )}
-              </p>
-            </button>
-            <button
-              type="button"
-              disabled={confirming}
-              onClick={() => setPadTarget("billNo")}
-              className={`rounded-xl border px-3 py-2.5 text-left transition ${
-                padTarget === "billNo"
-                  ? "border-accent/50 bg-accent/10"
-                  : "border-surface-border bg-surface-overlay"
-              }`}
-            >
-              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
-                Bill No
-              </p>
-              <p className="mt-0.5 truncate text-sm text-zinc-100">
-                {billNo || <span className="text-zinc-600">Optional</span>}
-              </p>
-            </button>
-          </div>
-
-          <OnScreenTextPad
-            key={padTarget}
-            label={
-              padTarget === "biller"
-                ? "Biller name (optional)"
-                : "Bill No (optional)"
-            }
-            value={padTarget === "biller" ? billerName : billNo}
-            onChange={padTarget === "biller" ? setBillerName : setBillNo}
-            placeholder={
-              padTarget === "biller" ? "Person billed" : "Bill / purchase no"
-            }
-            disabled={confirming}
-            defaultMode={padTarget === "billNo" ? "digits" : "letters"}
+        {session && (
+          <BillPreview
+            session={session}
+            lines={lines}
+            totalBags={totalBags}
+            totalBales={totalBales}
+            sending={queue.counts.sending}
+            failedCount={failed.length}
+            onBack={() => setBillOpen(false)}
+            onDone={finishBill}
           />
-
-          <div className="flex justify-end gap-3 pt-1">
-            <button
-              type="button"
-              onClick={closeConfirmModal}
-              disabled={confirming}
-              className="rounded-xl border border-surface-border px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleConfirmStockOut()}
-              disabled={confirming || staged.length === 0}
-              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
-            >
-              <Check className="h-4 w-4" />
-              {confirming
-                ? confirmProgress || "Confirming…"
-                : "Confirm stock out"}
-            </button>
-          </div>
-        </div>
+        )}
       </Modal>
 
       <ConfirmDialog
         open={resetOpen}
         onClose={() => setResetOpen(false)}
         onConfirm={() => {
-          clearSession();
-          setConfirmedSlipId(null);
+          queue.discardActive();
+          setNotice(null);
+          setLastMessage(null);
+          setRetailApproval(null);
+          setBillerName("");
+          setBillNo("");
+          resetTally();
           setResetOpen(false);
         }}
-        title="Reset session?"
-        message="Clear staged scans on this device. Bales already registered on a slip stay stocked out."
+        title="Reset this bill?"
+        message="Clear this bill on the phone. Bales already sent stay stocked out. Scans still waiting are not sent."
         confirmLabel="Reset"
         destructive
       />
+
+      {session?.slipId && (
+        <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+          Slip updating.{" "}
+          <Link href="/stock-out-slips" className="font-medium underline underline-offset-2">
+            View stock-out slips
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BillStartForm({
+  billerName,
+  billNo,
+  padTarget,
+  waitingCount,
+  onPadTarget,
+  onBiller,
+  onBillNo,
+  onStart,
+}: {
+  billerName: string;
+  billNo: string;
+  padTarget: "biller" | "billNo";
+  waitingCount: number;
+  onPadTarget: (target: "biller" | "billNo") => void;
+  onBiller: (value: string) => void;
+  onBillNo: (value: string) => void;
+  onStart: () => void;
+}) {
+  const canStart = Boolean(billerName.trim() && billNo.trim());
+  return (
+    <div className="space-y-4 rounded-2xl border border-surface-border bg-surface-raised p-4">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+          Start stock out
+        </p>
+        <p className="mt-1 text-sm text-zinc-300">
+          Biller and bill number are required before the first scan.
+        </p>
+        {waitingCount > 0 && (
+          <p className="mt-2 text-sm text-amber-300">
+            {waitingCount} bale{waitingCount === 1 ? "" : "s"} stayed on this phone. Enter the same bill to send them.
+          </p>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onPadTarget("biller")}
+          className={`rounded-xl border px-3 py-2.5 text-left transition ${
+            padTarget === "biller"
+              ? "border-accent/50 bg-accent/10"
+              : "border-surface-border bg-surface-overlay"
+          }`}
+        >
+          <p className="text-[10px] uppercase tracking-wider text-zinc-500">Biller</p>
+          <p className="mt-0.5 truncate text-sm text-zinc-100">
+            {billerName || <span className="text-zinc-600">Required</span>}
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => onPadTarget("billNo")}
+          className={`rounded-xl border px-3 py-2.5 text-left transition ${
+            padTarget === "billNo"
+              ? "border-accent/50 bg-accent/10"
+              : "border-surface-border bg-surface-overlay"
+          }`}
+        >
+          <p className="text-[10px] uppercase tracking-wider text-zinc-500">Bill No</p>
+          <p className="mt-0.5 truncate text-sm text-zinc-100">
+            {billNo || <span className="text-zinc-600">Required</span>}
+          </p>
+        </button>
+      </div>
+      <OnScreenTextPad
+        key={padTarget}
+        label={padTarget === "biller" ? "Biller name" : "Bill No"}
+        value={padTarget === "biller" ? billerName : billNo}
+        onChange={padTarget === "biller" ? onBiller : onBillNo}
+        placeholder={padTarget === "biller" ? "Person billed" : "Bill / purchase no"}
+        defaultMode={padTarget === "billNo" ? "digits" : "letters"}
+      />
+      <button
+        type="button"
+        onClick={onStart}
+        disabled={!canStart}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
+      >
+        <Check className="h-4 w-4" />
+        Start scanning
+      </button>
+    </div>
+  );
+}
+
+function BillPreview({
+  session,
+  lines,
+  totalBags,
+  totalBales,
+  sending,
+  failedCount,
+  onBack,
+  onDone,
+}: {
+  session: StockOutSession;
+  lines: ReturnType<typeof clubStockOutByCode>;
+  totalBags: number;
+  totalBales: number;
+  sending: number;
+  failedCount: number;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-surface-border bg-white px-4 py-4 text-black">
+        <p className="text-lg font-bold">STOCK OUT BILL</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-zinc-500">Biller</p>
+            <p className="font-medium">{session.billerName}</p>
+            <p className="mt-2 text-xs uppercase tracking-wider text-zinc-500">Bill No</p>
+            <p className="font-medium">{session.billNo}</p>
+          </div>
+          <div className="text-right">
+            <p>
+              <span className="text-zinc-500">Channel: </span>
+              {session.saleMode === "retail" ? "Retail" : "Wholesale"}
+            </p>
+            <p>
+              <span className="text-zinc-500">Opened: </span>
+              {billDate(session.openedAt)}
+            </p>
+          </div>
+        </div>
+        <table className="mt-4 w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-black text-left">
+              <th className="py-2">Code</th>
+              <th className="py-2">Product</th>
+              <th className="py-2 text-right">Bales</th>
+              <th className="py-2 text-right">Bags</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line) => (
+              <tr key={line.productCode} className="border-b border-zinc-200">
+                <td className="py-2 font-mono text-xs">{line.productCode}</td>
+                <td className="py-2">
+                  {line.productName}
+                  {line.size ? <span className="block text-xs text-zinc-500">Size {line.size}</span> : null}
+                </td>
+                <td className="py-2 text-right tabular-nums">{line.bales}</td>
+                <td className="py-2 text-right font-semibold tabular-nums">{Math.round(line.bags)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-3 flex justify-end gap-4 text-sm font-semibold">
+          <span>Bales {totalBales}</span>
+          <span>Bags {Math.round(totalBags)}</span>
+        </div>
+      </div>
+      {sending > 0 && (
+        <p className="text-sm text-amber-300">
+          {sending} bale{sending === 1 ? "" : "s"} still sending. They stay on this phone until the slip has them.
+        </p>
+      )}
+      {failedCount > 0 && (
+        <p className="text-sm text-danger">
+          {failedCount} label{failedCount === 1 ? "" : "s"} could not be added and are not on this bill.
+        </p>
+      )}
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-xl border border-surface-border px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+        >
+          Back to scanning
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-muted"
+        >
+          <Check className="h-4 w-4" />
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RecoveryList({ sessions }: { sessions: StockOutSession[] }) {
+  return (
+    <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-amber-300">
+          Recovery list
+        </p>
+        <p className="mt-1 text-sm text-zinc-300">
+          These bills stayed on the phone after a close, a power loss, or a failed send. They upload when this page is open.
+        </p>
+      </div>
+      {sessions.map((session) => {
+        const pending = session.items.filter((item) => item.status === "pending");
+        const failed = session.items.filter((item) => item.status === "failed");
+        return (
+          <div key={session.id} className="rounded-xl border border-surface-border bg-surface-overlay/40 px-3 py-3 text-sm">
+            <p className="font-medium text-zinc-100">
+              {session.billNo || "No bill no"} · {session.billerName || "No biller"}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {pending.length} sending · {failed.length} not accepted
+            </p>
+            {failed.map((item: StockOutQueueItem) => (
+              <p key={item.barcode} className="mt-1 text-xs text-danger">
+                <span className="font-mono">{item.barcode}</span> {item.error ?? "Could not stock out this label."}
+              </p>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

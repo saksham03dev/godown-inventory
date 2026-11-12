@@ -293,6 +293,7 @@ export async function confirmStockOutSlipServer(input: {
           ? result.message
           : "Could not upload the staged stock out.",
       processedBarcodes,
+      slipId: slipId ?? undefined,
     };
   }
 
