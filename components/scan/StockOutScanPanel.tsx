@@ -18,7 +18,6 @@ import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import {
-  STOCK_OUT_CONFIRM_CHUNK_SIZE,
   STOCK_OUT_MODE_STORAGE_KEY,
   STOCK_OUT_STAGED_STORAGE_KEY,
   type StockOutSaleMode,
@@ -285,12 +284,6 @@ export function StockOutScanPanel() {
         flashError("This bale is already in the session.");
         return false;
       }
-      if (stagedRef.current.length >= STOCK_OUT_CONFIRM_CHUNK_SIZE) {
-        flashError(
-          `Scan at most ${STOCK_OUT_CONFIRM_CHUNK_SIZE} bales, then confirm before adding more.`
-        );
-        return false;
-      }
       if (unit.status !== "STOCKED_IN" || unit.remaining_bags < 1) {
         flashError("Bale is not available for stock out.");
         return false;
@@ -480,13 +473,6 @@ export function StockOutScanPanel() {
       if (!sessionOk) {
         flashError(
           "Session expired. Log in again, then tap Confirm — staged bales stay on this device. Nothing new was stocked out."
-        );
-        return;
-      }
-
-      if (staged.length > STOCK_OUT_CONFIRM_CHUNK_SIZE) {
-        flashError(
-          `Confirm at most ${STOCK_OUT_CONFIRM_CHUNK_SIZE} bales at a time. Remove extras or split into another session.`
         );
         return;
       }
