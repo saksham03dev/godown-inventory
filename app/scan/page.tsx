@@ -43,13 +43,15 @@ export default function ScanPage() {
   const onSuccessRef = useRef<(result: ScanTransactionResult) => void>(() => {});
 
   const { godowns, loading, error } = useInventory();
-  const { tally, recordScan, resetTally } = useScanTally();
+  const { tally, recordScan, recordStockIn, resetTally } = useScanTally();
 
   onSuccessRef.current = (result) => {
-    if (
-      (modeRef.current === "STOCK_IN" || modeRef.current === "STOCK_OUT") &&
-      result.isUnitScan
-    ) {
+    if (result.isUnitScan === false) return;
+    if (modeRef.current === "STOCK_IN") {
+      recordStockIn(result);
+      return;
+    }
+    if (modeRef.current === "STOCK_OUT") {
       recordScan(result);
     }
   };

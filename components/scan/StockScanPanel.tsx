@@ -61,7 +61,7 @@ export function StockScanPanel({
   const transactionTypeRef = useRef(transactionType);
   const pendingOutRef = useRef(pendingOut);
 
-  const { tally, recordScan, resetTally } = useScanTally();
+  const { tally, recordScan, recordStockIn, resetTally } = useScanTally();
   qtyPresetRef.current = qtyPreset;
   customQtyRef.current = customQty;
   transactionTypeRef.current = transactionType;
@@ -78,9 +78,12 @@ export function StockScanPanel({
     clearApproveFlash,
   } = useScanTransaction({
     onSuccess: (result) => {
-      if (result.isUnitScan !== false) {
-        recordScan(result);
+      if (result.isUnitScan === false) return;
+      if (transactionTypeRef.current === "STOCK_IN") {
+        recordStockIn(result);
+        return;
       }
+      recordScan(result);
     },
   });
 

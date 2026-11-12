@@ -197,6 +197,8 @@ export interface ScanTransactionResult {
   bagsMoved?: number;
   /** dispatch = scanned at source; receive = scanned at destination. */
   transferPhase?: "dispatch" | "receive";
+  /** Bale was already counted on this screen. Stock and tally stay as they are. */
+  alreadyOnScreen?: boolean;
 }
 
 export type StockUnitStatus =

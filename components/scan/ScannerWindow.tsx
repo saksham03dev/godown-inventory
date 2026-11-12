@@ -281,6 +281,13 @@ export function ScanResultStrip({
         <div className="rounded-xl border border-dashed border-surface-border px-4 py-3 text-center text-xs text-zinc-600">
           Scan results appear here — camera and 2D scanner both work
         </div>
+      ) : lastResult?.alreadyOnScreen ? (
+        <div className="rounded-xl border border-surface-border bg-surface-overlay px-4 py-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+            Already counted
+          </p>
+          <p className="mt-0.5 text-sm text-zinc-200">{lastResult.message}</p>
+        </div>
       ) : lastResult?.success ? (
         <>
           <div className="rounded-xl border border-success/30 bg-success/5 px-4 py-3">

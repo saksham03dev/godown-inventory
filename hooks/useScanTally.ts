@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import type { ScanTallyState } from "@/lib/types/scan";
 import type { ScanTransactionResult } from "@/lib/types/database";
@@ -9,6 +9,7 @@ const emptyTally: ScanTallyState = { sessionTotal: 0, sessionBales: 0, byProduct
 
 export function useScanTally() {
   const [tally, setTally] = useState<ScanTallyState>(emptyTally);
+  const countedStockInRef = useRef(new Set<string>());
 
   const recordBags = useCallback(
     (input: {
@@ -75,7 +76,27 @@ export function useScanTally() {
     [recordBags]
   );
 
-  const resetTally = useCallback(() => setTally(emptyTally), []);
+  /**
+   * Count a stock-in once per page session.
+   * Returns a notice when this bale was already counted, so an accidental rescan
+   * does not move the tally. The set survives tally reset and warehouse changes.
+   */
+  const recordStockIn = useCallback(
+    (result: ScanTransactionResult): string | undefined => {
+      const barcode = result.stockUnit?.unit_barcode?.trim();
+      if (barcode && countedStockInRef.current.has(barcode)) {
+        return "Already counted on this screen. Stock was not changed and the tally was not increased.";
+      }
+      if (barcode) countedStockInRef.current.add(barcode);
+      recordScan(result);
+      return undefined;
+    },
+    [recordScan]
+  );
+
+  const resetTally = useCallback(() => {
+    setTally(emptyTally);
+  }, []);
 
   const replaceTallyFromBags = useCallback(
     (
@@ -120,7 +141,7 @@ export function useScanTally() {
     []
   );
 
-  return { tally, recordScan, recordBags, resetTally, replaceTallyFromBags };
+  return { tally, recordScan, recordStockIn, recordBags, resetTally, replaceTallyFromBags };
 }
 
 /** @deprecated Use useScanTally */
