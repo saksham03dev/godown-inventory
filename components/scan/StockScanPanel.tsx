@@ -21,15 +21,35 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import { useScanTransaction } from "@/hooks/useScanTransaction";
+import { useStockInQueue } from "@/hooks/useStockInQueue";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import { fetchStockUnitByBarcode } from "@/lib/services/batchService";
 import { formatBagCount } from "@/lib/utils/inventory";
-import type { Godown, StockUnit, TransactionType } from "@/lib/types/database";
+import { playScanOkay, playScanReject } from "@/lib/utils/scanFeedbackAudio";
+import type { AlertState, Godown, StockUnit, TransactionType } from "@/lib/types/database";
 
 interface StockScanPanelProps {
   transactionType: TransactionType;
   godowns: Godown[];
   title: string;
+}
+
+function productFromUnit(unit: StockUnit) {
+  const raw = unit.products;
+  if (raw && typeof raw === "object" && !Array.isArray(raw) && "name" in raw) {
+    return {
+      productId: unit.product_id,
+      productName: String(raw.name ?? "Product"),
+      productCode: "product_code" in raw ? String(raw.product_code ?? "") : "",
+      size: "size" in raw && raw.size ? String(raw.size) : null,
+    };
+  }
+  return {
+    productId: unit.product_id,
+    productName: "Product",
+    productCode: unit.unit_barcode,
+    size: null as string | null,
+  };
 }
 
 interface PendingCustomOut {
@@ -52,7 +72,11 @@ export function StockScanPanel({
   const [pendingOut, setPendingOut] = useState<PendingCustomOut | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [scanHint, setScanHint] = useState<string | null>(null);
+  const [queueNotice, setQueueNotice] = useState<AlertState | null>(null);
+  const [acceptFlash, setAcceptFlash] = useState<"success" | "error" | null>(null);
+  const [checkingLabel, setCheckingLabel] = useState(false);
   const isMobile = useIsMobile();
+  const stockInQueue = useStockInQueue();
 
   const processingRef = useRef(false);
   const selectedGodownIdRef = useRef(selectedGodownId);
@@ -61,7 +85,7 @@ export function StockScanPanel({
   const transactionTypeRef = useRef(transactionType);
   const pendingOutRef = useRef(pendingOut);
 
-  const { tally, recordScan, recordStockIn, resetTally } = useScanTally();
+  const { tally, recordScan, recordStockIn, resetTally, replaceTallyFromBags } = useScanTally();
   qtyPresetRef.current = qtyPreset;
   customQtyRef.current = customQty;
   transactionTypeRef.current = transactionType;
@@ -92,11 +116,12 @@ export function StockScanPanel({
   }, [selectedGodownId]);
 
   useEffect(() => {
+    if (isStockIn) return;
     resetTally();
     dismissAlert();
     clearApproveFlash();
     setPendingOut(null);
-  }, [selectedGodownId, transactionType, resetTally, dismissAlert, clearApproveFlash]);
+  }, [isStockIn, selectedGodownId, transactionType, resetTally, dismissAlert, clearApproveFlash]);
 
   const runScan = useCallback(
     async (barcode: string, bagsQty: number | null) => {
@@ -143,6 +168,69 @@ export function StockScanPanel({
         customQtyRef.current
       );
 
+      if (transactionTypeRef.current === "STOCK_IN") {
+        processingRef.current = true;
+        setCheckingLabel(true);
+        try {
+          if (stockInQueue.containsBarcode(barcode)) {
+            setQueueNotice({
+              type: "error",
+              message: "This label is already in the list on this phone.",
+            });
+            setAcceptFlash("error");
+            playScanReject();
+            return;
+          }
+          const unit = await fetchStockUnitByBarcode(barcode);
+          if (!unit) {
+            setQueueNotice({ type: "error", message: "Unknown barcode." });
+            setAcceptFlash("error");
+            playScanReject();
+            return;
+          }
+          if (unit.status !== "LABELLED") {
+            const state = unit.status.toLowerCase().replace(/_/g, " ");
+            setQueueNotice({ type: "error", message: `Unit already ${state}.` });
+            setAcceptFlash("error");
+            playScanReject();
+            return;
+          }
+          const meta = productFromUnit(unit);
+          const added = stockInQueue.enqueue(godownId, {
+            barcode: unit.unit_barcode,
+            bagsQty: bagsQty ?? BAGS_PER_BALE,
+            ...meta,
+            unitNumber: unit.unit_number,
+          });
+          if (!added) {
+            setQueueNotice({
+              type: "error",
+              message: "This label is already in the list on this phone.",
+            });
+            setAcceptFlash("error");
+            playScanReject();
+            return;
+          }
+          setQueueNotice({
+            type: "success",
+            message: `Accepted on this phone · bale #${unit.unit_number}. Sending to the warehouse.`,
+          });
+          setAcceptFlash("success");
+          playScanOkay();
+        } catch (err) {
+          setQueueNotice({
+            type: "error",
+            message: err instanceof Error ? err.message : "Could not check this label.",
+          });
+          setAcceptFlash("error");
+          playScanReject();
+        } finally {
+          processingRef.current = false;
+          setCheckingLabel(false);
+        }
+        return;
+      }
+
       // Custom stock-out: show remaining / out / left popup before mutating
       if (
         transactionTypeRef.current === "STOCK_OUT" &&
@@ -180,7 +268,7 @@ export function StockScanPanel({
 
       await runScan(barcode, bagsQty);
     },
-    [runScan]
+    [runScan, stockInQueue]
   );
 
   const cancelPendingOut = useCallback(() => {
@@ -205,6 +293,30 @@ export function StockScanPanel({
       setConfirmLoading(false);
     }
   }, [pendingOut, confirmLoading, handleScan]);
+
+  useEffect(() => {
+    if (!acceptFlash) return;
+    const timer = window.setTimeout(() => setAcceptFlash(null), 900);
+    return () => window.clearTimeout(timer);
+  }, [acceptFlash, queueNotice]);
+
+  const stockInItems = isStockIn ? stockInQueue.itemsFor(selectedGodownId) : [];
+  const stockInProgress = isStockIn ? stockInQueue.countsFor(selectedGodownId) : null;
+
+  useEffect(() => {
+    if (!isStockIn) return;
+    replaceTallyFromBags(
+      stockInItems
+        .filter((item) => item.status !== "failed")
+        .map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          productCode: item.productCode,
+          size: item.size,
+          bags: item.bagsQty,
+        }))
+    );
+  }, [isStockIn, stockInItems, replaceTallyFromBags]);
 
   const scannerEnabled =
     (!isStockIn || Boolean(selectedGodownId)) && !pendingOut;
@@ -306,22 +418,74 @@ export function StockScanPanel({
           hardwareListening={hardwareListening && scannerEnabled}
           onManualSubmit={onBarcodeDetected}
           overlay={{
-            processing: processing || confirmLoading,
-            flash: approveFlash ? "success" : errorFlash ? "error" : null,
-            message: alert?.message ?? lastResult?.message ?? null,
-            detail: overlayDetail,
+            processing: isStockIn ? checkingLabel : processing || confirmLoading,
+            flash: isStockIn
+              ? acceptFlash
+              : approveFlash
+                ? "success"
+                : errorFlash
+                  ? "error"
+                  : null,
+            message: isStockIn
+              ? queueNotice?.message ?? null
+              : alert?.message ?? lastResult?.message ?? null,
+            detail: isStockIn ? null : overlayDetail,
           }}
         />
       </div>
 
-      <ScanResultStrip
-        alert={alert}
-        lastResult={lastResult}
+      {isStockIn ? (
+        queueNotice && (
+          <div
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              queueNotice.type === "error"
+                ? "border-danger/30 bg-danger/5 text-zinc-200"
+                : "border-success/30 bg-success/5 text-zinc-100"
+            }`}
+          >
+            {queueNotice.message}
+          </div>
+        )
+      ) : (
+        <ScanResultStrip
+          alert={alert}
+          lastResult={lastResult}
+          mode={transactionType}
+          onDismissAlert={dismissAlert}
+        />
+      )}
+
+      <ScanTallyPanel
+        tally={tally}
         mode={transactionType}
-        onDismissAlert={dismissAlert}
+        progressLabel={
+          stockInProgress
+            ? `${stockInProgress.scanned} scanned · ${stockInProgress.inWarehouse} in warehouse · ${stockInProgress.sending} sending`
+            : null
+        }
+        onReset={() => {
+          if (isStockIn) {
+            stockInQueue.clearSaved(selectedGodownId);
+            return;
+          }
+          resetTally();
+        }}
       />
 
-      <ScanTallyPanel tally={tally} mode={transactionType} onReset={resetTally} />
+      {isStockIn && stockInItems.some((item) => item.status === "failed") && (
+        <ul className="space-y-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
+          {stockInItems
+            .filter((item) => item.status === "failed")
+            .map((item) => (
+              <li key={item.barcode} className="text-zinc-200">
+                <span className="font-mono text-xs">{item.barcode}</span>
+                <span className="mt-0.5 block text-xs text-danger">
+                  {item.error ?? "Could not stock in this label."}
+                </span>
+              </li>
+            ))}
+        </ul>
+      )}
 
       <p className="text-center text-xs text-zinc-600">
         Scan unit barcodes (87…) — camera, 2D scanner, or typed entry. Default{" "}

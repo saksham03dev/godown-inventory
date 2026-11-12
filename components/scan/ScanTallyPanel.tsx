@@ -19,6 +19,8 @@ interface ScanTallyPanelProps {
   mode: TransactionType;
   onReset: () => void;
   stockOutSaleMode?: StockOutSaleMode;
+  /** Separate scanned / in-warehouse / still-sending counts for live stock in. */
+  progressLabel?: string | null;
 }
 
 const STOCK_IN_ACCENT = {
@@ -62,6 +64,7 @@ export function ScanTallyPanel({
   mode,
   onReset,
   stockOutSaleMode,
+  progressLabel,
 }: ScanTallyPanelProps) {
   const accent =
     mode === "STOCK_IN"
@@ -88,8 +91,8 @@ export function ScanTallyPanel({
             <span className="ml-2 text-sm font-normal text-zinc-500">bags</span>
           </p>
           <p className="text-xs text-zinc-500">
-            {tally.sessionBales} label{tally.sessionBales === 1 ? "" : "s"} this
-            session
+            {progressLabel ??
+              `${tally.sessionBales} label${tally.sessionBales === 1 ? "" : "s"} this session`}
           </p>
         </div>
         <button
