@@ -172,18 +172,18 @@ export function StockScanPanel({
         processingRef.current = true;
         setCheckingLabel(true);
         try {
-          if (stockInQueue.containsBarcode(barcode)) {
-            setQueueNotice({
-              type: "error",
-              message: "This label is already in the list on this phone.",
-            });
+          const unit = await fetchStockUnitByBarcode(barcode);
+          if (!unit) {
+            setQueueNotice({ type: "error", message: "Unknown barcode." });
             setAcceptFlash("error");
             playScanReject();
             return;
           }
-          const unit = await fetchStockUnitByBarcode(barcode);
-          if (!unit) {
-            setQueueNotice({ type: "error", message: "Unknown barcode." });
+          if (stockInQueue.containsBarcode(unit.unit_barcode)) {
+            setQueueNotice({
+              type: "error",
+              message: "This label is already in the list on this phone.",
+            });
             setAcceptFlash("error");
             playScanReject();
             return;
