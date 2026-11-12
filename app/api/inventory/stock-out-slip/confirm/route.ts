@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       createdBy: auth.session.sub,
       createdByLabel,
       existingSlipId: body.existingSlipId ? String(body.existingSlipId) : null,
+      submissionId: String(body.submissionId ?? ""),
     });
 
     return NextResponse.json(result, {

@@ -12,6 +12,8 @@ export async function confirmStockOutSlip(input: {
   saleChannel: StockOutSlipChannel;
   items: StockOutSlipConfirmItem[];
   existingSlipId?: string | null;
+  /** Stable for the staged session. A repeat Confirm sends the same id. */
+  submissionId: string;
 }): Promise<MutationResult<StockOutSlipWithDetails>> {
   return apiMutation<StockOutSlipWithDetails>(
     "/api/inventory/stock-out-slip/confirm",

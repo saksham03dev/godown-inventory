@@ -36,10 +36,18 @@ function readStoredMode(): StockOutSaleMode {
   return stored === "retail" ? "retail" : "wholesale";
 }
 
+function newUploadSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 function readStagedSnapshot(): {
   mode: StockOutSaleMode;
   items: StagedStockOutItem[];
   slipId: string | null;
+  submissionId: string | null;
 } | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(STOCK_OUT_STAGED_STORAGE_KEY);
@@ -49,13 +57,19 @@ function readStagedSnapshot(): {
       mode?: StockOutSaleMode;
       items?: StagedStockOutItem[];
       slipId?: string | null;
+      submissionId?: string | null;
     };
+    const submissionId =
+      typeof parsed.submissionId === "string" && parsed.submissionId.trim()
+        ? parsed.submissionId.trim()
+        : null;
     if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
       return parsed.slipId
         ? {
             mode: parsed.mode === "retail" ? "retail" : "wholesale",
             items: [],
             slipId: parsed.slipId,
+            submissionId,
           }
         : null;
     }
@@ -66,6 +80,7 @@ function readStagedSnapshot(): {
       mode: parsed.mode === "retail" ? "retail" : "wholesale",
       items,
       slipId: parsed.slipId ? String(parsed.slipId) : null,
+      submissionId: submissionId ?? (items.length > 0 ? newUploadSessionId() : null),
     };
   } catch {
     return null;
@@ -117,6 +132,8 @@ export function StockOutScanPanel() {
   const [confirming, setConfirming] = useState(false);
   const [confirmedSlipId, setConfirmedSlipId] = useState<string | null>(null);
   const [openSlipId, setOpenSlipId] = useState<string | null>(null);
+  /** Stable upload id for idempotent confirm (persisted with staged list). */
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [offline, setOffline] = useState(false);
   const [confirmProgress, setConfirmProgress] = useState<string | null>(null);
@@ -168,6 +185,7 @@ export function StockOutScanPanel() {
         );
       }
       if (snapshot.slipId) setOpenSlipId(snapshot.slipId);
+      if (snapshot.submissionId) setSubmissionId(snapshot.submissionId);
       if (snapshot.items.length > 0) {
         setAlert({
           type: "info",
@@ -202,6 +220,7 @@ export function StockOutScanPanel() {
     setBillerName("");
     setBillNo("");
     setOpenSlipId(null);
+    setSubmissionId(null);
     setConfirmProgress(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem(STOCK_OUT_STAGED_STORAGE_KEY);
@@ -224,9 +243,10 @@ export function StockOutScanPanel() {
         mode: saleMode,
         items: staged,
         slipId: openSlipId,
+        submissionId,
       })
     );
-  }, [staged, saleMode, openSlipId, sessionHydrated]);
+  }, [staged, saleMode, openSlipId, submissionId, sessionHydrated]);
 
   useEffect(() => {
     if (staged.length === 0 && !confirmOpen) return;
@@ -265,6 +285,12 @@ export function StockOutScanPanel() {
         flashError("This bale is already in the session.");
         return false;
       }
+      if (stagedRef.current.length >= STOCK_OUT_CONFIRM_CHUNK_SIZE) {
+        flashError(
+          `Scan at most ${STOCK_OUT_CONFIRM_CHUNK_SIZE} bales, then confirm before adding more.`
+        );
+        return false;
+      }
       if (unit.status !== "STOCKED_IN" || unit.remaining_bags < 1) {
         flashError("Bale is not available for stock out.");
         return false;
@@ -287,6 +313,9 @@ export function StockOutScanPanel() {
         unitNumber: unit.unit_number,
         stockUnitId: unit.id,
       };
+      if (stagedRef.current.length === 0) {
+        setSubmissionId((current) => current ?? newUploadSessionId());
+      }
       setStaged((prev) => [...prev, item]);
       recordBags({
         productId: meta.productId,
@@ -455,41 +484,53 @@ export function StockOutScanPanel() {
         return;
       }
 
-      let remaining = [...staged];
-      let slipId = openSlipId;
-      const channel = saleMode === "retail" ? "RETAIL" : "WHOLESALE";
-
-      while (remaining.length > 0) {
-        const chunk = remaining.slice(0, STOCK_OUT_CONFIRM_CHUNK_SIZE);
-        setConfirmProgress(
-          `Registering ${chunk.length} of ${remaining.length} remaining…`
+      if (staged.length > STOCK_OUT_CONFIRM_CHUNK_SIZE) {
+        flashError(
+          `Confirm at most ${STOCK_OUT_CONFIRM_CHUNK_SIZE} bales at a time. Remove extras or split into another session.`
         );
-        const result = await confirmStockOutSlip({
-          billerName,
-          billNo,
-          saleChannel: channel,
-          items: chunk.map((s) => ({
-            barcode: s.barcode,
-            bagsQty: s.bagsQty,
-          })),
-          existingSlipId: slipId,
-        });
+        return;
+      }
 
-        if (result.data?.id) {
-          slipId = result.data.id;
-          setOpenSlipId(result.data.id);
-        }
+      const uploadId = submissionId ?? newUploadSessionId();
+      if (!submissionId) setSubmissionId(uploadId);
 
-        const done = new Set(result.processedBarcodes ?? []);
-        remaining = remaining.filter((item) => !done.has(item.barcode));
+      const channel = saleMode === "retail" ? "RETAIL" : "WHOLESALE";
+      setConfirmProgress(`Registering ${staged.length} bale(s)…`);
 
-        if (!result.success) {
-          applyRemaining(remaining);
-          flashError(result.message);
-          return;
-        }
+      const result = await confirmStockOutSlip({
+        billerName,
+        billNo,
+        saleChannel: channel,
+        items: staged.map((s) => ({
+          barcode: s.barcode,
+          bagsQty: s.bagsQty,
+        })),
+        existingSlipId: openSlipId,
+        submissionId: uploadId,
+      });
 
+      const slipId = result.data?.id ?? result.slipId ?? openSlipId;
+      if (slipId) {
+        setOpenSlipId(slipId);
+      }
+
+      const done = new Set(result.processedBarcodes ?? []);
+      const remaining = staged.filter((item) => !done.has(item.barcode));
+      if (done.size > 0) {
         applyRemaining(remaining);
+      }
+
+      if (!result.success) {
+        flashError(result.message);
+        return;
+      }
+
+      if (remaining.length > 0) {
+        flashError(
+          result.message ||
+            "Some bales were not registered. Confirm again to retry the rest."
+        );
+        return;
       }
 
       setConfirmedSlipId(slipId);
@@ -515,6 +556,7 @@ export function StockOutScanPanel() {
     billNo,
     saleMode,
     openSlipId,
+    submissionId,
     flashError,
     clearSession,
     focusScanner,

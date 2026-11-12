@@ -385,6 +385,8 @@ export interface MutationResult<T = void> {
   success: boolean;
   message: string;
   data?: T;
+  /** Slip created or resumed by an idempotent stock-out upload. */
+  slipId?: string;
   /** Barcodes that were actually registered on this request (partial confirms). */
   processedBarcodes?: string[];
 }
