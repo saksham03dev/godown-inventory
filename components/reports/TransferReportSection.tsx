@@ -8,15 +8,6 @@ function formatTime(ts: string): string {
   }).format(new Date(ts));
 }
 
-function formatDateTime(ts: string): string {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(ts));
-}
-
 function baleLabel(record: TransferReportRecord): string {
   return record.unit_number != null ? `Bale #${record.unit_number}` : "Bale —";
 }
@@ -36,32 +27,88 @@ function statusText(status: TransferReportRecord["unit_status"]): string {
   }
 }
 
-function ResultBadge({ record }: { record: TransferReportRecord }) {
-  if (record.not_stocked_in_destination) {
+interface TransferSummaryGroup {
+  id: string;
+  product_name: string;
+  product_code: string | null;
+  product_quality: string | null;
+  from_godown_name: string | null;
+  to_godown_name: string | null;
+  bale_count: number;
+  bag_count: number;
+  received_count: number;
+  missing_receive_count: number;
+  not_stocked_count: number;
+}
+
+function clubTransferRecords(
+  records: TransferReportRecord[]
+): TransferSummaryGroup[] {
+  const groups = new Map<string, TransferSummaryGroup>();
+
+  for (const record of records) {
+    const key = [
+      record.product_id,
+      record.product_quality ?? "",
+      record.from_godown_name ?? "",
+      record.to_godown_name ?? "",
+    ].join(":");
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.bale_count += 1;
+      existing.bag_count += record.bags;
+      existing.received_count += record.scanned_in ? 1 : 0;
+      existing.missing_receive_count += record.missing_receive_scan ? 1 : 0;
+      existing.not_stocked_count += record.not_stocked_in_destination ? 1 : 0;
+      continue;
+    }
+
+    groups.set(key, {
+      id: key,
+      product_name: record.product_name,
+      product_code: record.product_code,
+      product_quality: record.product_quality,
+      from_godown_name: record.from_godown_name,
+      to_godown_name: record.to_godown_name,
+      bale_count: 1,
+      bag_count: record.bags,
+      received_count: record.scanned_in ? 1 : 0,
+      missing_receive_count: record.missing_receive_scan ? 1 : 0,
+      not_stocked_count: record.not_stocked_in_destination ? 1 : 0,
+    });
+  }
+
+  return [...groups.values()].sort((a, b) => {
+    if (a.not_stocked_count !== b.not_stocked_count) {
+      return b.not_stocked_count - a.not_stocked_count;
+    }
+    return [a.product_code, a.product_name].join(" ").localeCompare(
+      [b.product_code, b.product_name].join(" ")
+    );
+  });
+}
+
+function GroupResultBadge({ group }: { group: TransferSummaryGroup }) {
+  if (group.not_stocked_count > 0) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger print:text-red-700">
         <Flag className="h-3 w-3" />
-        Not stocked in
+        {group.not_stocked_count} not stocked in
       </span>
     );
   }
-  if (record.missing_receive_scan) {
+  if (group.missing_receive_count > 0) {
     return (
       <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-400 print:text-amber-700">
-        Receive scan missing
-      </span>
-    );
-  }
-  if (record.scanned_in) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success print:text-green-700">
-        Received
+        {group.missing_receive_count} receive scan
+        {group.missing_receive_count === 1 ? "" : "s"} missing
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full bg-zinc-500/15 px-2 py-0.5 text-xs font-medium text-zinc-400">
-      Dispatched
+    <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success print:text-green-700">
+      All received
     </span>
   );
 }
@@ -71,6 +118,7 @@ export function TransferReportSection({
 }: {
   records: TransferReportRecord[];
 }) {
+  const transferGroups = clubTransferRecords(records);
   const checklist = records.filter((row) => row.missing_receive_scan);
   const flagged = records.filter((row) => row.not_stocked_in_destination);
   const barcodes = [
@@ -86,12 +134,11 @@ export function TransferReportSection({
       <section className="rounded-2xl border border-surface-border bg-surface-raised print:border-zinc-300 print:bg-white">
         <div className="border-b border-surface-border px-5 py-4 print:border-zinc-300">
           <h2 className="font-medium text-zinc-100 print:text-black">
-            Transfer records
+            Transfer records by product quality
           </h2>
           <p className="text-xs text-zinc-500 print:text-zinc-600">
-            Bales dispatched from one godown and received at another on this
-            business day. A receive that lands the next day still closes the
-            dispatch.
+            Clubbed by product, quality, and godown route. Use the stock-out
+            checklist below for the individual bale and barcode follow-up.
           </p>
         </div>
         {records.length === 0 ? (
@@ -100,52 +147,34 @@ export function TransferReportSection({
           </p>
         ) : (
           <ul className="divide-y divide-surface-border print:divide-zinc-200">
-            {records.map((row) => (
-              <li key={row.id} className="px-5 py-4">
+            {transferGroups.map((group) => (
+              <li key={group.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-zinc-100 print:text-black">
-                      {baleLabel(row)}
-                      {row.unit_barcode ? (
-                        <span className="ml-2 font-mono text-xs font-medium text-zinc-400 print:text-zinc-700">
-                          {row.unit_barcode}
-                        </span>
-                      ) : null}
+                      {group.product_code || group.product_name}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-zinc-500 print:text-zinc-600">
                       {[
-                        row.product_code,
-                        row.product_name,
-                        row.bags
-                          ? `${row.bags.toLocaleString("en-IN")} bags`
-                          : null,
+                        group.product_code ? group.product_name : null,
+                        group.product_quality
+                          ? `Quality: ${group.product_quality}`
+                          : "Quality not set",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
                   </div>
-                  <ResultBadge record={row} />
+                  <GroupResultBadge group={group} />
                 </div>
                 <p className="mt-2 text-sm text-zinc-300 print:text-black">
-                  {row.from_godown_name ?? "Source godown"}
+                  {group.from_godown_name ?? "Source godown"}
                   <span className="mx-1.5 text-zinc-600">→</span>
-                  {row.to_godown_name ?? "Destination godown"}
+                  {group.to_godown_name ?? "Destination godown"}
                 </p>
                 <p className="mt-1 text-xs text-zinc-500 print:text-zinc-600">
-                  {[
-                    row.dispatched_at
-                      ? `Out ${formatDateTime(row.dispatched_at)}${
-                          row.dispatched_by ? ` · ${row.dispatched_by}` : ""
-                        }`
-                      : null,
-                    row.received_at
-                      ? `In ${formatDateTime(row.received_at)}${
-                          row.received_by ? ` · ${row.received_by}` : ""
-                        }`
-                      : "Not scanned in",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  {group.bale_count.toLocaleString("en-IN")} bale
+                  {group.bale_count === 1 ? "" : "s"} · {group.bag_count.toLocaleString("en-IN")} bags · {group.received_count.toLocaleString("en-IN")} received
                 </p>
               </li>
             ))}

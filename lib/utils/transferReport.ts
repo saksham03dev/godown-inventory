@@ -99,10 +99,12 @@ export function buildTransferReport(
     records.push({
       id: out?.id ?? inn?.id ?? anchor.stock_unit_id,
       stock_unit_id: anchor.stock_unit_id,
+      product_id: anchor.product_id,
       unit_number: unit?.unit_number ?? null,
       unit_barcode: unit?.unit_barcode ?? null,
       product_name: product?.name ?? "Product",
       product_code: product?.product_code?.trim() || null,
+      product_quality: product?.quality?.trim() || null,
       from_godown_name: godownName(
         out?.godown_id ?? unit?.transfer_from_godown_id,
         godownNames,

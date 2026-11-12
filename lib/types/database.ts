@@ -90,7 +90,10 @@ export interface InventoryLog {
 }
 
 export interface InventoryLogWithRelations extends InventoryLog {
-  products: Pick<Product, "id" | "name" | "barcode_id" | "product_code" | "size"> | null;
+  products: Pick<
+    Product,
+    "id" | "name" | "barcode_id" | "product_code" | "size" | "quality"
+  > | null;
   godowns: Pick<Godown, "id" | "location_name"> | null;
   stock_units?: (Pick<
     StockUnit,
@@ -490,10 +493,12 @@ export interface DailyReportSummary {
 export interface TransferReportRecord {
   id: string;
   stock_unit_id: string;
+  product_id: string;
   unit_number: number | null;
   unit_barcode: string | null;
   product_name: string;
   product_code: string | null;
+  product_quality: string | null;
   from_godown_name: string | null;
   to_godown_name: string | null;
   bags: number;

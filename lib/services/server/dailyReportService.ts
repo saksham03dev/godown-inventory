@@ -20,7 +20,7 @@ const UNIT_CHUNK = 200;
 
 const LOG_SELECT = `
   *,
-  products ( id, name, barcode_id, product_code, size ),
+  products ( id, name, barcode_id, product_code, size, quality ),
   godowns!godown_id ( id, location_name ),
   stock_units (
     id,
