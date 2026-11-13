@@ -32,6 +32,8 @@ export interface StockOutSession {
   billerName: string;
   billNo: string;
   slipId: string | null;
+  /** Channel sent to the warehouse. Frozen on the first upload so a later mode switch stays on this bill. */
+  uploadChannel: StockOutSaleMode | null;
   openedAt: string;
   closed: boolean;
   items: StockOutQueueItem[];
@@ -57,7 +59,7 @@ function newId(prefix: string): string {
 }
 
 function sessionReady(session: StockOutSession | null | undefined): session is StockOutSession {
-  return Boolean(session && session.billerName.trim() && session.billNo.trim());
+  return Boolean(session && session.billNo.trim());
 }
 
 function normalizeItem(value: unknown): StockOutQueueItem | null {
@@ -97,6 +99,7 @@ function normalizeSession(value: unknown): StockOutSession | null {
     billerName: typeof row.billerName === "string" ? row.billerName : "",
     billNo: typeof row.billNo === "string" ? row.billNo : "",
     slipId: typeof row.slipId === "string" && row.slipId ? row.slipId : null,
+    uploadChannel: row.uploadChannel === "retail" || row.uploadChannel === "wholesale" ? row.uploadChannel : null,
     openedAt: typeof row.openedAt === "string" && row.openedAt ? row.openedAt : new Date().toISOString(),
     closed: Boolean(row.closed),
     items,
@@ -123,6 +126,7 @@ function readLegacySession(): StockOutSession | null {
       billerName: "",
       billNo: "",
       slipId: parsed.slipId ? String(parsed.slipId) : null,
+      uploadChannel: null,
       openedAt: new Date().toISOString(),
       closed: false,
       items,
@@ -206,7 +210,7 @@ function pickBatch(store: Store, allowPartial: boolean): UploadBatch | null {
       slipId: session.slipId,
       billerName: session.billerName,
       billNo: session.billNo,
-      saleMode: session.saleMode,
+      saleMode: session.uploadChannel ?? session.saleMode,
       items: retry.filter((item) => item.uploadId === uploadId).slice(0, STOCK_OUT_UPLOAD_BATCH_SIZE),
     };
   }
@@ -222,7 +226,7 @@ function pickBatch(store: Store, allowPartial: boolean): UploadBatch | null {
       slipId: session.slipId,
       billerName: session.billerName,
       billNo: session.billNo,
-      saleMode: session.saleMode,
+      saleMode: session.uploadChannel ?? session.saleMode,
       items: fresh.slice(0, STOCK_OUT_UPLOAD_BATCH_SIZE),
     };
   }
@@ -241,9 +245,10 @@ function applyUploadResult(
 ): StockOutSession {
   const saved = new Set(result.processedBarcodes ?? []);
   const retry = !result.success && isRetryable(result.message);
-  return {
+    return {
     ...session,
     slipId: result.slipId ?? session.slipId,
+    uploadChannel: session.uploadChannel ?? (result.slipId ? batch.saleMode : null),
     items: session.items.map((item) => {
       if (!batch.items.some((row) => row.barcode === item.barcode)) return item;
       if (saved.has(item.barcode)) {
@@ -328,11 +333,11 @@ export function useStockOutQueue() {
     commit(
       replaceSession(storeRef.current, batch.sessionId, {
         ...current,
-        items: current.items.map((item) =>
-          barcodes.has(item.barcode)
+        items: current.items.map((item) => {
+          return barcodes.has(item.barcode)
             ? { ...item, status: "uploading", uploadId: batch.uploadId, error: null }
-            : item
-        ),
+            : item;
+        }),
       })
     );
 
@@ -446,7 +451,7 @@ export function useStockOutQueue() {
     (input: { billerName: string; billNo: string; saleMode: StockOutSaleMode }) => {
       const billerName = input.billerName.trim();
       const billNo = input.billNo.trim();
-      if (!billerName || !billNo) return false;
+      if (!billNo) return false;
       const open = storeRef.current.sessions.find((session) => !session.closed);
       if (open) {
         commit(
@@ -467,6 +472,7 @@ export function useStockOutQueue() {
               billerName,
               billNo,
               slipId: null,
+              uploadChannel: null,
               openedAt: new Date().toISOString(),
               closed: false,
               items: [],
@@ -503,6 +509,15 @@ export function useStockOutQueue() {
     [commit, containsBarcode, flush]
   );
 
+  const setScanMode = useCallback(
+    (saleMode: StockOutSaleMode) => {
+      const open = storeRef.current.sessions.find((session) => !session.closed);
+      if (!open || open.saleMode === saleMode) return;
+      commit(replaceSession(storeRef.current, open.id, { ...open, saleMode }));
+    },
+    [commit]
+  );
+
   const closeActive = useCallback(() => {
     const open = storeRef.current.sessions.find((session) => !session.closed);
     if (!open) return;
@@ -525,6 +540,7 @@ export function useStockOutQueue() {
     containsBarcode,
     startSession,
     enqueue,
+    setScanMode,
     closeActive,
     discardActive,
   };

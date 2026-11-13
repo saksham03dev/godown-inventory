@@ -80,7 +80,8 @@ export function StockOutScanPanel() {
   const [errorFlash, setErrorFlash] = useState(false);
   const [billerName, setBillerName] = useState("");
   const [billNo, setBillNo] = useState("");
-  const [padTarget, setPadTarget] = useState<"biller" | "billNo">("biller");
+  const [padTarget, setPadTarget] = useState<"biller" | "billNo">("billNo");
+  const [billPromptOpen, setBillPromptOpen] = useState(true);
   const [billOpen, setBillOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -234,7 +235,8 @@ export function StockOutScanPanel() {
     async (barcode: string) => {
       if (processingRef.current || retailOpenRef.current || billOpenRef.current) return;
       if (!queueRef.current.ready) {
-        flashError("Enter the biller and bill number before scanning.");
+        setBillPromptOpen(true);
+        flashError("Enter the bill number before scanning.");
         return;
       }
 
@@ -302,12 +304,16 @@ export function StockOutScanPanel() {
   const startBill = useCallback(() => {
     const ok = queue.startSession({ billerName, billNo, saleMode });
     if (!ok) {
-      flashError("Biller name and bill number are both required.");
+      flashError("Bill number is required.");
       return;
     }
+    setBillPromptOpen(false);
+    const biller = billerName.trim();
     setNotice({
       type: "info",
-      message: `Bill ${billNo.trim()} · ${billerName.trim()}. Scans upload while you continue.`,
+      message: biller
+        ? `Bill ${billNo.trim()} · ${biller}. Scans upload while you continue.`
+        : `Bill ${billNo.trim()}. Scans upload while you continue.`,
     });
     focusScanner();
   }, [queue, billerName, billNo, saleMode, flashError, focusScanner]);
@@ -317,6 +323,7 @@ export function StockOutScanPanel() {
     setBillOpen(false);
     setBillerName("");
     setBillNo("");
+    setBillPromptOpen(true);
     setLastMessage(null);
     setNotice(null);
     setRetailApproval(null);
@@ -344,33 +351,35 @@ export function StockOutScanPanel() {
 
   return (
     <div className="space-y-4">
-      <StockOutModeSwitch
-        mode={saleMode}
-        onChange={setSaleMode}
-        disabled={ready || waitingForBill}
-      />
-
-      {!ready ? (
-        <BillStartForm
-          billerName={billerName}
-          billNo={billNo}
-          padTarget={padTarget}
-          waitingCount={waitingForBill ? session?.items.length ?? 0 : 0}
-          onPadTarget={setPadTarget}
-          onBiller={setBillerName}
-          onBillNo={setBillNo}
-          onStart={startBill}
-        />
-      ) : (
+      {queue.hydrated && ready ? (
         <div className="rounded-2xl border border-surface-border bg-surface-raised px-4 py-3 text-sm">
           <p className="text-[10px] uppercase tracking-wider text-zinc-500">Current bill</p>
           <p className="mt-1 font-medium text-zinc-100">
-            {session?.billNo} · {session?.billerName}
+            {session?.billNo}
+            {session?.billerName ? ` · ${session.billerName}` : ""}
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            {session?.saleMode === "retail" ? "Retail" : "Wholesale"} · scans send in the background
+            One bill. Switch wholesale or retail while scanning; both stay on this bill.
           </p>
         </div>
+      ) : queue.hydrated && !billPromptOpen ? (
+        <button
+          type="button"
+          onClick={() => setBillPromptOpen(true)}
+          className="w-full rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3 text-left text-sm text-zinc-100"
+        >
+          Enter bill number to start scanning
+        </button>
+      ) : null}
+
+      {ready && (
+        <StockOutModeSwitch
+          mode={saleMode}
+          onChange={(mode) => {
+            setSaleMode(mode);
+            queue.setScanMode(mode);
+          }}
+        />
       )}
 
       {offline && (
@@ -454,7 +463,14 @@ export function StockOutScanPanel() {
           type="button"
           onClick={() => {
             if (items.length > 0) setResetOpen(true);
-            else queue.discardActive();
+            else {
+              queue.discardActive();
+              setNotice(null);
+              setLastMessage(null);
+              setBillerName("");
+              setBillNo("");
+              setBillPromptOpen(true);
+            }
           }}
           disabled={!ready}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border px-4 py-3 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
@@ -476,8 +492,27 @@ export function StockOutScanPanel() {
       <p className="text-center text-xs text-zinc-600">
         {ready
           ? "Each scan is accepted on this phone and sent to the slip in the background. Confirm shows the bill."
-          : "Enter the biller and bill number first. Scanning stays off until this bill is open."}
+          : "Enter the bill number first. Scanning stays off until this bill is open."}
       </p>
+
+      <Modal
+        open={queue.hydrated && !ready && billPromptOpen}
+        onClose={() => setBillPromptOpen(false)}
+        title="Start stock out"
+        description="Bill number is required. Biller name is optional."
+        size="md"
+      >
+        <BillStartForm
+          billerName={billerName}
+          billNo={billNo}
+          padTarget={padTarget}
+          waitingCount={waitingForBill ? session?.items.length ?? 0 : 0}
+          onPadTarget={setPadTarget}
+          onBiller={setBillerName}
+          onBillNo={setBillNo}
+          onStart={startBill}
+        />
+      </Modal>
 
       <RetailCutDialog
         open={Boolean(retailUnit)}
@@ -519,6 +554,7 @@ export function StockOutScanPanel() {
           setRetailApproval(null);
           setBillerName("");
           setBillNo("");
+          setBillPromptOpen(true);
           resetTally();
           setResetOpen(false);
         }}
@@ -559,22 +595,14 @@ function BillStartForm({
   onBillNo: (value: string) => void;
   onStart: () => void;
 }) {
-  const canStart = Boolean(billerName.trim() && billNo.trim());
+  const canStart = Boolean(billNo.trim());
   return (
-    <div className="space-y-4 rounded-2xl border border-surface-border bg-surface-raised p-4">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Start stock out
+    <div className="space-y-4">
+      {waitingCount > 0 && (
+        <p className="text-sm text-amber-300">
+          {waitingCount} bale{waitingCount === 1 ? "" : "s"} stayed on this phone. Enter the bill number to send them.
         </p>
-        <p className="mt-1 text-sm text-zinc-300">
-          Biller and bill number are required before the first scan.
-        </p>
-        {waitingCount > 0 && (
-          <p className="mt-2 text-sm text-amber-300">
-            {waitingCount} bale{waitingCount === 1 ? "" : "s"} stayed on this phone. Enter the same bill to send them.
-          </p>
-        )}
-      </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
@@ -587,7 +615,7 @@ function BillStartForm({
         >
           <p className="text-[10px] uppercase tracking-wider text-zinc-500">Biller</p>
           <p className="mt-0.5 truncate text-sm text-zinc-100">
-            {billerName || <span className="text-zinc-600">Required</span>}
+            {billerName || <span className="text-zinc-600">Optional</span>}
           </p>
         </button>
         <button
@@ -607,7 +635,7 @@ function BillStartForm({
       </div>
       <OnScreenTextPad
         key={padTarget}
-        label={padTarget === "biller" ? "Biller name" : "Bill No"}
+        label={padTarget === "biller" ? "Biller name (optional)" : "Bill No"}
         value={padTarget === "biller" ? billerName : billNo}
         onChange={padTarget === "biller" ? onBiller : onBillNo}
         placeholder={padTarget === "biller" ? "Person billed" : "Bill / purchase no"}
@@ -652,7 +680,7 @@ function BillPreview({
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-xs uppercase tracking-wider text-zinc-500">Biller</p>
-            <p className="font-medium">{session.billerName}</p>
+            <p className="font-medium">{session.billerName.trim() || "—"}</p>
             <p className="mt-2 text-xs uppercase tracking-wider text-zinc-500">Bill No</p>
             <p className="font-medium">{session.billNo}</p>
           </div>
