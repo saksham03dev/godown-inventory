@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Printer, RefreshCw, Save, Trash2, X } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { AddSlipGoodsDialog } from "@/components/slips/AddSlipGoodsDialog";
+import { SlipBaleEditRow } from "@/components/slips/SlipBaleEditRow";
+import { StockOutSlipListRow } from "@/components/slips/StockOutSlipListRow";
 import { StockOutSlipPrintView } from "@/components/slips/StockOutSlipPrintView";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -54,43 +56,16 @@ function SlipSection({
         <p className="px-4 py-6 text-sm text-zinc-500">{empty}</p>
       ) : (
         <ul className="divide-y divide-surface-border">
-          {slips.map((slip) => {
-            const active = slip.id === selectedId;
-            return (
-              <li key={slip.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(slip.id)}
-                  className={`w-full px-4 py-3 text-left transition hover:bg-white/[0.03] ${
-                    active ? "bg-accent/10" : ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-100">
-                        {slip.biller_name?.trim() || "No biller"}
-                        {slip.bill_no?.trim() ? ` · ${slip.bill_no.trim()}` : ""}
-                      </p>
-                      <p className="mt-0.5 text-xs text-zinc-500">
-                        {slip.sale_channel} · {formatWhen(slip.confirmed_at)}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-lg bg-white/5 px-2 py-1 text-xs font-semibold tabular-nums text-zinc-200">
-                      {Math.round(slip.total_bags)} bags
-                    </span>
-                  </div>
-                  <p className="mt-1 truncate text-xs text-zinc-600">
-                    {slip.stock_out_slip_lines
-                      .map(
-                        (l) =>
-                          l.products?.product_code ?? l.products?.name ?? "SKU"
-                      )
-                      .join(", ")}
-                  </p>
-                </button>
-              </li>
-            );
-          })}
+          {slips.map((slip) => (
+            <li key={slip.id}>
+              <StockOutSlipListRow
+                slip={slip}
+                active={slip.id === selectedId}
+                onSelect={() => onSelect(slip.id)}
+                formatWhen={formatWhen}
+              />
+            </li>
+          ))}
         </ul>
       )}
     </section>
@@ -114,6 +89,10 @@ export default function StockOutSlipsPage() {
   const [printOpen, setPrintOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [removeProductId, setRemoveProductId] = useState<string | null>(null);
+  const [removeUnit, setRemoveUnit] = useState<{
+    id: string;
+    unitNumber: number;
+  } | null>(null);
   const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
@@ -198,6 +177,27 @@ export default function StockOutSlipsPage() {
     setRecentSlips(swap);
   };
 
+  const handleRemoveUnit = async () => {
+    if (!selected || !removeUnit || !canEdit) return;
+    setRemoving(true);
+    setSaveMessage(null);
+    try {
+      const result = await updateStockOutSlip({
+        id: selected.id,
+        removeSlipUnitIds: [removeUnit.id],
+      });
+      if (!result.success || !result.data) {
+        setSaveMessage(result.message);
+        return;
+      }
+      replaceSlip(result.data);
+      setSaveMessage(`Bale #${removeUnit.unitNumber} returned to stock.`);
+      setRemoveUnit(null);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const handleRemoveProduct = async () => {
     if (!selected || !removeProductId || !canEdit) return;
     setRemoving(true);
@@ -240,7 +240,7 @@ export default function StockOutSlipsPage() {
   return (
     <DashboardLayout
       title="Stock Out Slips"
-      subtitle="Session stock-outs with optional biller and bill no"
+      subtitle="Session stock-outs by bill no and name"
       actions={
         <button
           type="button"
@@ -329,9 +329,7 @@ export default function StockOutSlipsPage() {
                     <div className="space-y-3 rounded-xl border border-surface-border bg-surface-overlay/40 p-4">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <label className="block space-y-1">
-                          <span className="text-xs text-zinc-400">
-                            Biller name
-                          </span>
+                          <span className="text-xs text-zinc-400">Name</span>
                           <input
                             className={inputClass}
                             value={editBiller}
@@ -340,9 +338,11 @@ export default function StockOutSlipsPage() {
                           />
                         </label>
                         <label className="block space-y-1">
-                          <span className="text-xs text-zinc-400">Bill No</span>
+                          <span className="text-xs font-medium text-accent">
+                            Bill No
+                          </span>
                           <input
-                            className={inputClass}
+                            className={`${inputClass} border-l-[3px] border-l-accent`}
                             value={editBillNo}
                             onChange={(e) => setEditBillNo(e.target.value)}
                             disabled={saving}
@@ -350,7 +350,7 @@ export default function StockOutSlipsPage() {
                         </label>
                       </div>
                       <p className="text-[11px] text-zinc-500">
-                        Fix a bag qty on a bale, or remove a whole product. Bags taken off the bill go back to warehouse stock. Add is for a bale that was missed.
+                        Fix bag qty per bale, remove one bale with the trash icon, or remove a whole product. Add is for a bale that was missed.
                       </p>
                       <div className="flex items-center gap-3">
                         <button
@@ -372,7 +372,7 @@ export default function StockOutSlipsPage() {
                   ) : (
                     <div className="grid gap-2 text-sm sm:grid-cols-2">
                       <p>
-                        <span className="text-zinc-500">Biller: </span>
+                        <span className="text-zinc-500">Name: </span>
                         {selected.biller_name?.trim() || "—"}
                       </p>
                       <p>
@@ -427,42 +427,38 @@ export default function StockOutSlipsPage() {
                           </div>
                           {lineUnits.length > 0 && (
                             <ul className="mt-3 space-y-2 border-t border-surface-border pt-3">
-                              {lineUnits.map((u) => (
-                                <li
-                                  key={u.id}
-                                  className="flex items-center justify-between gap-3"
-                                >
-                                  <span className="text-xs text-zinc-500">
-                                    Bale #{u.unit_number}
-                                  </span>
-                                  {canEdit ? (
-                                    <label className="flex items-center gap-2">
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        max={1000}
-                                        inputMode="numeric"
-                                        className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1.5 text-right text-sm tabular-nums text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
-                                        value={editBags[u.id] ?? ""}
-                                        onChange={(e) =>
-                                          setEditBags((prev) => ({
-                                            ...prev,
-                                            [u.id]: e.target.value,
-                                          }))
-                                        }
-                                        disabled={saving}
-                                      />
-                                      <span className="text-xs text-zinc-500">
-                                        bags
-                                      </span>
-                                    </label>
-                                  ) : (
+                              {lineUnits.map((u) =>
+                                canEdit ? (
+                                  <SlipBaleEditRow
+                                    key={u.id}
+                                    slipUnitId={u.id}
+                                    unitNumber={u.unit_number}
+                                    bagsValue={editBags[u.id] ?? ""}
+                                    onBagsChange={(id, value) =>
+                                      setEditBags((prev) => ({
+                                        ...prev,
+                                        [id]: value,
+                                      }))
+                                    }
+                                    onRemove={(id, unitNumber) =>
+                                      setRemoveUnit({ id, unitNumber })
+                                    }
+                                    disabled={saving || removing}
+                                  />
+                                ) : (
+                                  <li
+                                    key={u.id}
+                                    className="flex items-center justify-between gap-3"
+                                  >
+                                    <span className="text-xs text-zinc-500">
+                                      Bale #{u.unit_number}
+                                    </span>
                                     <span className="text-sm tabular-nums text-zinc-200">
                                       {Math.round(u.bags_moved)} bags
                                     </span>
-                                  )}
-                                </li>
-                              ))}
+                                  </li>
+                                )
+                              )}
                             </ul>
                           )}
                         </li>
@@ -484,6 +480,21 @@ export default function StockOutSlipsPage() {
           onAdded={replaceSlip}
         />
       )}
+
+      <ConfirmDialog
+        open={Boolean(removeUnit)}
+        onClose={() => {
+          if (!removing) setRemoveUnit(null);
+        }}
+        onConfirm={() => void handleRemoveUnit()}
+        title={
+          removeUnit ? `Remove bale #${removeUnit.unitNumber}?` : "Remove bale?"
+        }
+        message="This bale leaves the slip and its bags return to warehouse stock."
+        confirmLabel="Remove bale"
+        loading={removing}
+        destructive
+      />
 
       <ConfirmDialog
         open={Boolean(removeProductId)}

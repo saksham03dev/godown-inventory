@@ -52,7 +52,7 @@ export function ActivityFeed({ items, onSelect }: ActivityFeedProps) {
             isStockIn ? "Stock In" : "Stock Out",
             channel,
             item.godown_name,
-            item.biller_name?.trim() ? `Biller ${item.biller_name.trim()}` : null,
+            item.biller_name?.trim() ? `Name ${item.biller_name.trim()}` : null,
             item.bale_count > 1 ? `${item.bale_count} labels` : null,
           ]
             .filter(Boolean)

@@ -54,6 +54,7 @@ export async function updateStockOutSlip(input: {
   billNo?: string;
   units?: { id: string; bagsMoved: number }[];
   removeProductId?: string;
+  removeSlipUnitIds?: string[];
   addItems?: { barcode: string; bagsQty: number }[];
 }): Promise<MutationResult<StockOutSlipWithDetails>> {
   return apiMutation<StockOutSlipWithDetails>("/api/inventory/stock-out-slip", {

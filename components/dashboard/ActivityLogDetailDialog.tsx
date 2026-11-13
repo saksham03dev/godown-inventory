@@ -76,7 +76,7 @@ export function ActivityLogDetailDialog({
             {item.biller_name?.trim() ? (
               <div>
                 <dt className="text-xs uppercase tracking-wider text-zinc-500">
-                  Biller
+                  Name
                 </dt>
                 <dd className="text-zinc-200">{item.biller_name.trim()}</dd>
               </div>

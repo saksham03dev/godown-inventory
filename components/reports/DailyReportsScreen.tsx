@@ -18,6 +18,7 @@ import { ActivityLogDetailDialog } from "@/components/dashboard/ActivityLogDetai
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { TransferReportSection } from "@/components/reports/TransferReportSection";
+import { StockOutSlipListRow } from "@/components/slips/StockOutSlipListRow";
 import { StockOutSlipManageDialog } from "@/components/slips/StockOutSlipManageDialog";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -443,49 +444,21 @@ export function DailyReportsScreen() {
                     No stock-out slips this day.
                   </p>
                 ) : (
-                  <ul>
-                    {report.slips.flatMap((slip) => {
-                      if (slip.stock_out_slip_lines.length === 0) {
-                        return [];
-                      }
-                      const billNo = slip.bill_no?.trim();
-                      const biller = slip.biller_name?.trim();
-                      const when = formatSlipWhen(slip.confirmed_at);
-                      return slip.stock_out_slip_lines.map((line) => {
-                        const code =
-                          line.products?.product_code?.trim() ||
-                          line.products?.name ||
-                          "Product";
-                        return (
-                          <li
-                            key={line.id}
-                            className="border-b border-amber-500/10 last:border-b-0"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setSlipDialogId(slip.id)}
-                              className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-amber-500/10 sm:px-5 print:pointer-events-none"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-zinc-100 print:text-black">
-                                  {code}
-                                </p>
-                                <p className="text-xs text-zinc-500 print:text-zinc-600">
-                                  {[when, biller, billNo]
-                                    .filter(Boolean)
-                                    .join(" · ")}
-                                </p>
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <p className="text-sm font-semibold tabular-nums text-zinc-100 print:text-black">
-                                  {line.bag_count.toLocaleString("en-IN")} bags
-                                </p>
-                              </div>
-                            </button>
-                          </li>
-                        );
-                      });
-                    })}
+                  <ul className="divide-y divide-amber-500/10">
+                    {report.slips.map((slip) => (
+                      <li
+                        key={slip.id}
+                        className="print:pointer-events-none"
+                      >
+                        <StockOutSlipListRow
+                          slip={slip}
+                          active={slipDialogId === slip.id}
+                          onSelect={() => setSlipDialogId(slip.id)}
+                          formatWhen={formatSlipWhen}
+                          tone="amber"
+                        />
+                      </li>
+                    ))}
                   </ul>
                 )}
               </section>

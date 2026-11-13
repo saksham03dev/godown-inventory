@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Printer, Save, Trash2, X } from "lucide-react";
 import { AddSlipGoodsDialog } from "@/components/slips/AddSlipGoodsDialog";
+import { SlipBaleEditRow } from "@/components/slips/SlipBaleEditRow";
 import { StockOutSlipPrintView } from "@/components/slips/StockOutSlipPrintView";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -45,6 +46,10 @@ export function StockOutSlipManageDialog({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [removeProductId, setRemoveProductId] = useState<string | null>(null);
+  const [removeUnit, setRemoveUnit] = useState<{
+    id: string;
+    unitNumber: number;
+  } | null>(null);
   const [removing, setRemoving] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
 
@@ -112,6 +117,28 @@ export function StockOutSlipManageDialog({
       setSaveMessage("Saved.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRemoveUnit = async () => {
+    if (!slip || !removeUnit || !canEdit) return;
+    setRemoving(true);
+    setSaveMessage(null);
+    try {
+      const result = await updateStockOutSlip({
+        id: slip.id,
+        removeSlipUnitIds: [removeUnit.id],
+      });
+      if (!result.success || !result.data) {
+        setSaveMessage(result.message);
+        return;
+      }
+      applySlip(result.data);
+      onUpdated(result.data);
+      setSaveMessage(`Bale #${removeUnit.unitNumber} returned to stock.`);
+      setRemoveUnit(null);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -195,7 +222,7 @@ export function StockOutSlipManageDialog({
               <div className="space-y-3 rounded-xl border border-surface-border bg-surface-overlay/40 p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block space-y-1">
-                    <span className="text-xs text-zinc-400">Biller name</span>
+                    <span className="text-xs text-zinc-400">Name</span>
                     <input
                       className={inputClass}
                       value={editBiller}
@@ -204,9 +231,9 @@ export function StockOutSlipManageDialog({
                     />
                   </label>
                   <label className="block space-y-1">
-                    <span className="text-xs text-zinc-400">Bill No</span>
+                    <span className="text-xs font-medium text-accent">Bill No</span>
                     <input
-                      className={inputClass}
+                      className={`${inputClass} border-l-[3px] border-l-accent`}
                       value={editBillNo}
                       onChange={(e) => setEditBillNo(e.target.value)}
                       disabled={saving}
@@ -275,40 +302,35 @@ export function StockOutSlipManageDialog({
                     </div>
                     {lineUnits.length > 0 ? (
                       <ul className="mt-3 space-y-2 border-t border-surface-border pt-3">
-                        {lineUnits.map((u) => (
-                          <li
-                            key={u.id}
-                            className="flex items-center justify-between gap-3"
-                          >
-                            <span className="text-xs text-zinc-500">
-                              Bale #{u.unit_number}
-                            </span>
-                            {canEdit ? (
-                              <label className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={1000}
-                                  inputMode="numeric"
-                                  className="w-24 rounded-lg border border-surface-border bg-surface-overlay px-2 py-1.5 text-right text-sm tabular-nums text-zinc-100 outline-none focus:border-accent disabled:opacity-60"
-                                  value={editBags[u.id] ?? ""}
-                                  onChange={(e) =>
-                                    setEditBags((prev) => ({
-                                      ...prev,
-                                      [u.id]: e.target.value,
-                                    }))
-                                  }
-                                  disabled={saving}
-                                />
-                                <span className="text-xs text-zinc-500">bags</span>
-                              </label>
-                            ) : (
+                        {lineUnits.map((u) =>
+                          canEdit ? (
+                            <SlipBaleEditRow
+                              key={u.id}
+                              slipUnitId={u.id}
+                              unitNumber={u.unit_number}
+                              bagsValue={editBags[u.id] ?? ""}
+                              onBagsChange={(id, value) =>
+                                setEditBags((prev) => ({ ...prev, [id]: value }))
+                              }
+                              onRemove={(id, unitNumber) =>
+                                setRemoveUnit({ id, unitNumber })
+                              }
+                              disabled={saving || removing}
+                            />
+                          ) : (
+                            <li
+                              key={u.id}
+                              className="flex items-center justify-between gap-3"
+                            >
+                              <span className="text-xs text-zinc-500">
+                                Bale #{u.unit_number}
+                              </span>
                               <span className="text-sm tabular-nums text-zinc-200">
                                 {Math.round(u.bags_moved)} bags
                               </span>
-                            )}
-                          </li>
-                        ))}
+                            </li>
+                          )
+                        )}
                       </ul>
                     ) : null}
                   </li>
@@ -331,6 +353,21 @@ export function StockOutSlipManageDialog({
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(removeUnit)}
+        onClose={() => {
+          if (!removing) setRemoveUnit(null);
+        }}
+        onConfirm={() => void handleRemoveUnit()}
+        title={
+          removeUnit ? `Remove bale #${removeUnit.unitNumber}?` : "Remove bale?"
+        }
+        message="This bale leaves the slip and its bags return to warehouse stock."
+        confirmLabel="Remove bale"
+        loading={removing}
+        destructive
+      />
 
       <ConfirmDialog
         open={Boolean(removeProductId)}

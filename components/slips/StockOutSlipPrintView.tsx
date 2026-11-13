@@ -34,7 +34,7 @@ export function StockOutSlipPrintView({ slip }: StockOutSlipPrintViewProps) {
 
       <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="font-semibold">Biller</p>
+          <p className="font-semibold">Name</p>
           <p>{slip.biller_name?.trim() || "—"}</p>
           <p className="mt-2 font-semibold">Bill No</p>
           <p>{slip.bill_no?.trim() || "—"}</p>

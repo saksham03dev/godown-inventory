@@ -57,6 +57,9 @@ export async function PATCH(request: Request) {
       billNo: body.billNo,
       units: Array.isArray(body.units) ? body.units : undefined,
       removeProductId: body.removeProductId ? String(body.removeProductId) : undefined,
+      removeSlipUnitIds: Array.isArray(body.removeSlipUnitIds)
+        ? body.removeSlipUnitIds.map((id: unknown) => String(id))
+        : undefined,
       addItems: Array.isArray(body.addItems) ? body.addItems : undefined,
       actor: {
         id: auth.session.sub,

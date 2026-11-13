@@ -392,6 +392,7 @@ export async function updateStockOutSlipServer(
     billNo?: string | null;
     units?: SlipUnitQtyEdit[];
     removeProductId?: string | null;
+    removeSlipUnitIds?: string[];
     addItems?: StockOutSlipConfirmItem[];
     actor?: { id: string; label: string };
   }
@@ -417,6 +418,11 @@ export async function updateStockOutSlipServer(
     if (!qtyResult.success) {
       return { success: false, message: qtyResult.message };
     }
+  }
+
+  if (input.removeSlipUnitIds && input.removeSlipUnitIds.length > 0) {
+    const removed = await removeSlipUnits(supabase, id, input.removeSlipUnitIds);
+    if (!removed.success) return { success: false, message: removed.message };
   }
 
   if (input.removeProductId) {
@@ -618,6 +624,141 @@ async function applySlipUnitQtyEdits(
   }
 
   return { success: true, message: "Quantities updated." };
+}
+
+async function refreshSlipProductLine(
+  supabase: ConfirmServiceClient,
+  slipId: string,
+  productId: string
+): Promise<{ success: boolean; message: string }> {
+  const { data: slipUnits, error: listErr } = await supabase
+    .from("stock_out_slip_units")
+    .select("product_id, bags_moved")
+    .eq("slip_id", slipId)
+    .eq("product_id", productId);
+  if (listErr) return { success: false, message: listErr.message };
+
+  if (!slipUnits?.length) {
+    const { error: lineErr } = await supabase
+      .from("stock_out_slip_lines")
+      .delete()
+      .eq("slip_id", slipId)
+      .eq("product_id", productId);
+    if (lineErr) return { success: false, message: lineErr.message };
+    return { success: true, message: "" };
+  }
+
+  let bag_count = 0;
+  let bale_count = 0;
+  for (const row of slipUnits) {
+    bag_count += Math.round(Number(row.bags_moved));
+    bale_count += 1;
+  }
+
+  const { error: lineErr } = await supabase
+    .from("stock_out_slip_lines")
+    .update({ bag_count, bale_count })
+    .eq("slip_id", slipId)
+    .eq("product_id", productId);
+  if (lineErr) return { success: false, message: lineErr.message };
+
+  return { success: true, message: "" };
+}
+
+async function removeSlipUnits(
+  supabase: ConfirmServiceClient,
+  slipId: string,
+  slipUnitIds: string[]
+): Promise<{ success: boolean; message: string }> {
+  const seen = new Set<string>();
+  const productIds = new Set<string>();
+
+  for (const rawId of slipUnitIds) {
+    const slipUnitId = String(rawId ?? "").trim();
+    if (!slipUnitId || seen.has(slipUnitId)) continue;
+    seen.add(slipUnitId);
+
+    const { data: row, error: rowErr } = await supabase
+      .from("stock_out_slip_units")
+      .select("id, slip_id, stock_unit_id, product_id, bags_moved")
+      .eq("id", slipUnitId)
+      .eq("slip_id", slipId)
+      .maybeSingle();
+
+    if (rowErr) return { success: false, message: rowErr.message };
+    if (!row) {
+      return { success: false, message: "That bale is not on this slip." };
+    }
+
+    const { data: unit, error: unitErr } = await supabase
+      .from("stock_units")
+      .select("id, remaining_bags, status, bill_id, opened_at")
+      .eq("id", row.stock_unit_id)
+      .maybeSingle();
+
+    if (unitErr) return { success: false, message: unitErr.message };
+    if (!unit) {
+      return { success: false, message: "Stock unit for this bale was not found." };
+    }
+    if (unit.bill_id) {
+      return {
+        success: false,
+        message:
+          "Cannot remove a bale that is already attached to a customer bill.",
+      };
+    }
+
+    const moved = Math.round(Number(row.bags_moved));
+    const next = Math.round(Number(unit.remaining_bags ?? 0)) + moved;
+    if (next < 1 || next > BAGS_PER_BALE) {
+      return {
+        success: false,
+        message: "Putting this bale back would put it out of bag range.",
+      };
+    }
+
+    const { error: restoreErr } = await supabase
+      .from("stock_units")
+      .update({
+        remaining_bags: next,
+        status: "STOCKED_IN",
+        stocked_out_at: null,
+        opened_at: next === BAGS_PER_BALE ? null : unit.opened_at,
+        sold_to_customer_name: null,
+        sold_bill_number: null,
+        sold_at: null,
+      })
+      .eq("id", unit.id);
+    if (restoreErr) return { success: false, message: restoreErr.message };
+
+    const { error: logErr } = await supabase
+      .from("inventory_logs")
+      .delete()
+      .eq("stock_out_slip_id", slipId)
+      .eq("transaction_type", "STOCK_OUT")
+      .eq("stock_unit_id", unit.id);
+    if (logErr) return { success: false, message: logErr.message };
+
+    const { error: delErr } = await supabase
+      .from("stock_out_slip_units")
+      .delete()
+      .eq("id", slipUnitId);
+    if (delErr) return { success: false, message: delErr.message };
+
+    productIds.add(String(row.product_id));
+  }
+
+  if (seen.size === 0) {
+    return { success: false, message: "Choose at least one bale to remove." };
+  }
+
+  for (const productId of productIds) {
+    const line = await refreshSlipProductLine(supabase, slipId, productId);
+    if (!line.success) return line;
+    await supabase.rpc("sync_product_total_stock", { p_product_id: productId });
+  }
+
+  return { success: true, message: "Bale removed from slip." };
 }
 
 async function removeSlipProduct(

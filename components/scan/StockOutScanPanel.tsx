@@ -513,7 +513,7 @@ export function StockOutScanPanel() {
         open={queue.hydrated && !ready && billPromptOpen}
         onClose={() => setBillPromptOpen(false)}
         title="Start stock out"
-        description="Bill number is required. Biller name is optional. You can still use the menu to open Stock In, labels, and other pages."
+        description="Enter the bill no to start scanning. The sidebar still opens other pages."
         size="md"
         preserveNav
       >
@@ -629,34 +629,44 @@ function BillStartForm({
               : "border-surface-border bg-surface-overlay"
           }`}
         >
-          <p className="text-[10px] uppercase tracking-wider text-zinc-500">Biller</p>
+          <p className="text-[10px] uppercase tracking-wider text-zinc-500">Name</p>
           <p className="mt-0.5 truncate text-sm text-zinc-100">
-            {billerName || <span className="text-zinc-600">Optional</span>}
+            {billerName || <span className="text-zinc-600">—</span>}
           </p>
         </button>
         <button
           type="button"
           onClick={() => onPadTarget("billNo")}
-          className={`rounded-xl border px-3 py-2.5 text-left transition ${
+          className={`rounded-xl border border-l-[3px] border-l-accent px-3 py-2.5 text-left transition ${
             padTarget === "billNo"
               ? "border-accent/50 bg-accent/10"
               : "border-surface-border bg-surface-overlay"
-          }`}
+          } ${!billNo.trim() ? "ring-1 ring-accent/25" : ""}`}
         >
-          <p className="text-[10px] uppercase tracking-wider text-zinc-500">Bill No</p>
-          <p className="mt-0.5 truncate text-sm text-zinc-100">
-            {billNo || <span className="text-zinc-600">Required</span>}
+          <p className="text-[10px] font-medium uppercase tracking-wider text-accent">
+            Bill No
+          </p>
+          <p className="mt-0.5 truncate text-sm font-medium text-zinc-100">
+            {billNo || <span className="font-normal text-zinc-600">—</span>}
           </p>
         </button>
       </div>
-      <OnScreenTextPad
-        key={padTarget}
-        label={padTarget === "biller" ? "Biller name (optional)" : "Bill No"}
-        value={padTarget === "biller" ? billerName : billNo}
-        onChange={padTarget === "biller" ? onBiller : onBillNo}
-        placeholder={padTarget === "biller" ? "Person billed" : "Bill / purchase no"}
-        defaultMode={padTarget === "billNo" ? "digits" : "letters"}
-      />
+      <div
+        className={
+          padTarget === "billNo" && !billNo.trim()
+            ? "rounded-2xl ring-1 ring-accent/30"
+            : ""
+        }
+      >
+        <OnScreenTextPad
+          key={padTarget}
+          label={padTarget === "biller" ? "Name" : "Bill No"}
+          value={padTarget === "biller" ? billerName : billNo}
+          onChange={padTarget === "biller" ? onBiller : onBillNo}
+          placeholder={padTarget === "biller" ? "Customer or party" : "Bill / purchase no"}
+          defaultMode={padTarget === "billNo" ? "digits" : "letters"}
+        />
+      </div>
       <button
         type="button"
         onClick={onStart}
@@ -693,7 +703,7 @@ function BillPreview({
         <p className="text-lg font-bold">STOCK OUT BILL</p>
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-xs uppercase tracking-wider text-zinc-500">Biller</p>
+            <p className="text-xs uppercase tracking-wider text-zinc-500">Name</p>
             <p className="font-medium">{session.billerName.trim() || "—"}</p>
             <p className="mt-2 text-xs uppercase tracking-wider text-zinc-500">Bill No</p>
             <p className="font-medium">{session.billNo}</p>
@@ -773,7 +783,7 @@ function RecoveryList({ sessions }: { sessions: StockOutSession[] }) {
         return (
           <div key={session.id} className="rounded-xl border border-surface-border bg-surface-overlay/40 px-3 py-3 text-sm">
             <p className="font-medium text-zinc-100">
-              {session.billNo || "No bill no"} · {session.billerName || "No biller"}
+              {session.billNo || "No bill no"} · {session.billerName || "No name"}
             </p>
             <p className="mt-0.5 text-xs text-zinc-500">
               {pending.length} sending · {failed.length} not accepted
