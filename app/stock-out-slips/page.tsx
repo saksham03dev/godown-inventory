@@ -29,12 +29,80 @@ function formatWhen(ts: string): string {
   }).format(new Date(ts));
 }
 
+function SlipSection({
+  title,
+  slips,
+  empty,
+  selectedId,
+  onSelect,
+}: {
+  title: string;
+  slips: StockOutSlipWithDetails[];
+  empty: string;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-surface-border bg-surface-raised">
+      <h2 className="border-b border-surface-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+        {title}
+        <span className="ml-2 font-medium tabular-nums text-zinc-500">
+          {slips.length}
+        </span>
+      </h2>
+      {slips.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-zinc-500">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-surface-border">
+          {slips.map((slip) => {
+            const active = slip.id === selectedId;
+            return (
+              <li key={slip.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(slip.id)}
+                  className={`w-full px-4 py-3 text-left transition hover:bg-white/[0.03] ${
+                    active ? "bg-accent/10" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-zinc-100">
+                        {slip.biller_name?.trim() || "No biller"}
+                        {slip.bill_no?.trim() ? ` · ${slip.bill_no.trim()}` : ""}
+                      </p>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        {slip.sale_channel} · {formatWhen(slip.confirmed_at)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-lg bg-white/5 px-2 py-1 text-xs font-semibold tabular-nums text-zinc-200">
+                      {Math.round(slip.total_bags)} bags
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-zinc-600">
+                    {slip.stock_out_slip_lines
+                      .map(
+                        (l) =>
+                          l.products?.product_code ?? l.products?.name ?? "SKU"
+                      )
+                      .join(", ")}
+                  </p>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function StockOutSlipsPage() {
   const { can } = useAuth();
   const canEdit = can("slips.edit");
 
-  const [scope, setScope] = useState<"today" | "recent">("today");
-  const [slips, setSlips] = useState<StockOutSlipWithDetails[]>([]);
+  const [todaySlips, setTodaySlips] = useState<StockOutSlipWithDetails[]>([]);
+  const [recentSlips, setRecentSlips] = useState<StockOutSlipWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,21 +120,26 @@ export default function StockOutSlipsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchStockOutSlips(scope);
-      setSlips(data);
-      setSelectedId((current) =>
-        current && data.some((slip) => slip.id === current) ? current : null
-      );
+      const data = await fetchStockOutSlips();
+      setTodaySlips(data.today);
+      setRecentSlips(data.recent);
+      const ids = new Set([...data.today, ...data.recent].map((slip) => slip.id));
+      setSelectedId((current) => (current && ids.has(current) ? current : null));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load slips.");
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const slips = useMemo(
+    () => [...todaySlips, ...recentSlips],
+    [todaySlips, recentSlips]
+  );
 
   const selected = useMemo(
     () => slips.find((s) => s.id === selectedId) ?? null,
@@ -111,9 +184,7 @@ export default function StockOutSlipsPage() {
         setSaveMessage(result.message);
         return;
       }
-      setSlips((prev) =>
-        prev.map((s) => (s.id === result.data!.id ? result.data! : s))
-      );
+      replaceSlip(result.data);
       setSaveMessage("Saved.");
     } finally {
       setSaving(false);
@@ -121,7 +192,10 @@ export default function StockOutSlipsPage() {
   };
 
   const replaceSlip = (next: StockOutSlipWithDetails) => {
-    setSlips((prev) => prev.map((slip) => (slip.id === next.id ? next : slip)));
+    const swap = (prev: StockOutSlipWithDetails[]) =>
+      prev.map((slip) => (slip.id === next.id ? next : slip));
+    setTodaySlips(swap);
+    setRecentSlips(swap);
   };
 
   const handleRemoveProduct = async () => {
@@ -179,27 +253,6 @@ export default function StockOutSlipsPage() {
       }
     >
       <div className="mx-auto max-w-6xl space-y-6 animate-fade-in">
-        <div className="flex gap-2">
-          {(
-            [
-              ["today", "Today"],
-              ["recent", "Last 20"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setScope(value)}
-              className={`rounded-xl px-4 py-2 text-sm ${
-                scope === value
-                  ? "bg-accent text-white"
-                  : "border border-surface-border text-zinc-400"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
         {error && (
           <AlertBanner
             alert={{ type: "error", message: error }}
@@ -209,57 +262,24 @@ export default function StockOutSlipsPage() {
 
         {loading ? (
           <LoadingSpinner label="Loading slips…" />
-        ) : slips.length === 0 ? (
-          <div className="rounded-2xl border border-surface-border bg-surface-raised p-8 text-center text-sm text-zinc-500">
-            {scope === "today"
-              ? "No stock-out slips for today."
-              : "No stock-out slips yet."}
-          </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-            <ul className="divide-y divide-surface-border overflow-hidden rounded-2xl border border-surface-border bg-surface-raised">
-              {slips.map((slip) => {
-                const active = slip.id === selectedId;
-                return (
-                  <li key={slip.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(slip.id)}
-                      className={`w-full px-4 py-3 text-left transition hover:bg-white/[0.03] ${
-                        active ? "bg-accent/10" : ""
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-zinc-100">
-                            {slip.biller_name?.trim() || "No biller"}
-                            {slip.bill_no?.trim()
-                              ? ` · ${slip.bill_no.trim()}`
-                              : ""}
-                          </p>
-                          <p className="mt-0.5 text-xs text-zinc-500">
-                            {slip.sale_channel} · {formatWhen(slip.confirmed_at)}
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-lg bg-white/5 px-2 py-1 text-xs font-semibold tabular-nums text-zinc-200">
-                          {Math.round(slip.total_bags)} bags
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-xs text-zinc-600">
-                        {slip.stock_out_slip_lines
-                          .map(
-                            (l) =>
-                              l.products?.product_code ??
-                              l.products?.name ??
-                              "SKU"
-                          )
-                          .join(", ")}
-                      </p>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="space-y-4">
+              <SlipSection
+                title="Today"
+                slips={todaySlips}
+                empty="No slips today."
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+              <SlipSection
+                title="Last 20"
+                slips={recentSlips}
+                empty="No earlier slips."
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            </div>
 
             <div className="rounded-2xl border border-surface-border bg-surface-raised p-5">
               {!selected ? (

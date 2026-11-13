@@ -24,8 +24,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, message: "OK", data: slip });
     }
 
-    const scope = searchParams.get("scope") === "recent" ? "recent" : "today";
-    const slips = await fetchStockOutSlipsServer(scope);
+    const slips = await fetchStockOutSlipsServer();
     return NextResponse.json({ success: true, message: "OK", data: slips });
   } catch (err) {
     console.error("Stock-out slips list error:", err);

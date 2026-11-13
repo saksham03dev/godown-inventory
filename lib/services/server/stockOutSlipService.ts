@@ -311,34 +311,54 @@ export async function confirmStockOutSlipServer(input: {
   };
 }
 
-export async function fetchStockOutSlipsServer(
-  scope: "today" | "recent" = "today"
+const SLIP_SELECT = `
+  *,
+  stock_out_slip_lines (
+    *,
+    products ( id, name, product_code, size )
+  ),
+  stock_out_slip_units ( * )
+`;
+
+async function fetchSlipsInRange(
+  supabase: ReturnType<typeof createServiceClient>,
+  startIso: string,
+  endIso: string
 ): Promise<StockOutSlipWithDetails[]> {
-  const supabase = createServiceClient({ requireServiceRole: true });
-  let query = supabase
+  const { data, error } = await supabase
     .from("stock_out_slips")
-    .select(
-      `
-      *,
-      stock_out_slip_lines (
-        *,
-        products ( id, name, product_code, size )
-      ),
-      stock_out_slip_units ( * )
-    `
-    )
-    .order("confirmed_at", { ascending: false });
-
-  if (scope === "recent") {
-    query = query.limit(20);
-  } else {
-    const { startIso, endIso } = businessDayUtcRange(getTodayBusinessDate());
-    query = query.gte("confirmed_at", startIso).lt("confirmed_at", endIso);
-  }
-
-  const { data, error } = await query;
+    .select(SLIP_SELECT)
+    .gte("confirmed_at", startIso)
+    .lt("confirmed_at", endIso)
+    .order("confirmed_at", { ascending: false })
+    .limit(1000);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => mapSlipWithDetails(row as Record<string, unknown>));
+}
+
+export type StockOutSlipList = {
+  today: StockOutSlipWithDetails[];
+  recent: StockOutSlipWithDetails[];
+};
+
+/** Every slip from the current business day, then the 20 newest slips from earlier days. */
+export async function fetchStockOutSlipsServer(): Promise<StockOutSlipList> {
+  const supabase = createServiceClient({ requireServiceRole: true });
+  const { startIso, endIso } = businessDayUtcRange(getTodayBusinessDate());
+  const today = await fetchSlipsInRange(supabase, startIso, endIso);
+
+  const { data, error } = await supabase
+    .from("stock_out_slips")
+    .select(SLIP_SELECT)
+    .lt("confirmed_at", startIso)
+    .order("confirmed_at", { ascending: false })
+    .limit(20);
+  if (error) throw new Error(error.message);
+
+  const recent = (data ?? []).map((row) =>
+    mapSlipWithDetails(row as Record<string, unknown>)
+  );
+  return { today, recent };
 }
 
 export async function fetchStockOutSlipByIdServer(

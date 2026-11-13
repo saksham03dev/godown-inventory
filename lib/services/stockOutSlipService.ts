@@ -21,13 +21,14 @@ export async function confirmStockOutSlip(input: {
   );
 }
 
-export async function fetchStockOutSlips(
-  scope: "today" | "recent" = "today"
-): Promise<StockOutSlipWithDetails[]> {
-  const res = await fetch(
-    `/api/inventory/stock-out-slip?scope=${encodeURIComponent(scope)}`
-  );
-  const data = (await res.json()) as MutationResult<StockOutSlipWithDetails[]>;
+export type StockOutSlipList = {
+  today: StockOutSlipWithDetails[];
+  recent: StockOutSlipWithDetails[];
+};
+
+export async function fetchStockOutSlips(): Promise<StockOutSlipList> {
+  const res = await fetch("/api/inventory/stock-out-slip");
+  const data = (await res.json()) as MutationResult<StockOutSlipList>;
   if (!data.success || !data.data) {
     throw new Error(data.message || "Failed to load slips.");
   }
