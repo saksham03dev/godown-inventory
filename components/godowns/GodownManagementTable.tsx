@@ -32,9 +32,6 @@ export function GodownManagementTable({
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Location
               </th>
-              <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Capacity (bags)
-              </th>
               <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 Address
               </th>
@@ -61,9 +58,6 @@ export function GodownManagementTable({
                       {godown.location_name}
                     </span>
                   </div>
-                </td>
-                <td className="px-5 py-4 text-right font-semibold text-zinc-200">
-                  {godown.capacity.toLocaleString()}
                 </td>
                 <td className="max-w-[180px] truncate px-5 py-4 text-zinc-400">
                   {godown.address || "—"}

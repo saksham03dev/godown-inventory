@@ -63,7 +63,8 @@ export interface Godown {
 
 export interface GodownInput {
   location_name: string;
-  capacity: number;
+  /** Legacy DB column; stock levels are derived from units, not this value. */
+  capacity?: number;
   address?: string | null;
   notes?: string | null;
 }
@@ -128,6 +129,8 @@ export interface ActivityFeedItem {
   biller_name?: string | null;
   timestamp: string;
   stock_out_slip_id?: string | null;
+  /** inventory_logs ids represented by this feed row */
+  log_ids: string[];
 }
 
 export interface GodownStockLocation {

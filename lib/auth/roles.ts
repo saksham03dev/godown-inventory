@@ -7,7 +7,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
-  admin: "Full access — products, godowns, pricing, billing, and all operations",
+  admin: "Full access — products, pricing, billing, and all operations",
   manager:
     "Floor ops like employee (stock in/out, slips, returns, transfers) plus daily reports, pending bills, open bales, and view label — no inventory or product admin",
   employee: "Stock in/out scanning and view stock-out slips",
@@ -89,31 +89,12 @@ export interface NavItem {
 }
 
 export const ALL_NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", permission: "dashboard" },
+  { href: "/", label: "Dashboard", permission: "godowns.view" },
   { href: "/daily-reports", label: "Daily Reports", permission: "reports.view" },
-  { href: "/products", label: "Products", permission: "products.view" },
   {
     href: "/labels",
-    label: "Labels",
+    label: "Create Labels",
     permission: "labels",
-    saleMode: "wholesale",
-  },
-  {
-    href: "/godowns",
-    label: "Warehouses",
-    permission: "godowns.manage",
-    saleMode: "wholesale",
-  },
-  { href: "/inventory", label: "Inventory", permission: "godowns.view" },
-  {
-    href: "/view-label",
-    label: "View Label",
-    permission: "scan.viewLabel",
-  },
-  {
-    href: "/scan",
-    label: "Scan Station",
-    permission: "scan",
     saleMode: "wholesale",
   },
   {
@@ -125,6 +106,18 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     href: "/stock-out",
     label: "Stock Out",
     permission: "scan",
+  },
+  { href: "/products", label: "Products", permission: "products.view" },
+  {
+    href: "/view-label",
+    label: "View Label",
+    permission: "scan.viewLabel",
+  },
+  {
+    href: "/scan",
+    label: "Scan Station",
+    permission: "scan",
+    saleMode: "wholesale",
   },
   {
     href: "/stock-out-slips",
@@ -217,9 +210,9 @@ export function getNavItemsForRole(
     return items.filter((item) =>
       [
         "/daily-reports",
-        "/view-label",
         "/stock-in",
         "/stock-out",
+        "/view-label",
         "/stock-out-slips",
         "/stock-return",
         "/stock-transfer",
@@ -242,7 +235,7 @@ export function getDefaultRouteForRole(
 }
 
 const ROUTE_PERMISSIONS: Record<string, Permission> = {
-  "/": "dashboard",
+  "/": "godowns.view",
   "/daily-reports": "reports.view",
   "/products": "products.view",
   "/labels": "labels",

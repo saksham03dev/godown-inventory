@@ -50,6 +50,7 @@ export function groupInventoryLogsForActivity(
         biller_name: newest.stock_out_slips?.biller_name ?? null,
         timestamp: newest.timestamp,
         stock_out_slip_id: newest.stock_out_slip_id,
+        log_ids: group.map((row) => row.id),
       });
     } else {
       items.push({
@@ -63,6 +64,7 @@ export function groupInventoryLogsForActivity(
         sale_channel: log.sale_channel,
         timestamp: log.timestamp,
         stock_out_slip_id: log.stock_out_slip_id ?? null,
+        log_ids: [log.id],
       });
     }
 

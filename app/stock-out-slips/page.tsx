@@ -273,7 +273,7 @@ export default function StockOutSlipsPage() {
                 onSelect={setSelectedId}
               />
               <SlipSection
-                title="Last 20"
+                title="Last 10"
                 slips={recentSlips}
                 empty="No earlier slips."
                 selectedId={selectedId}

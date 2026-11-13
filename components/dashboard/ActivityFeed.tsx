@@ -3,6 +3,7 @@ import type { ActivityFeedItem } from "@/lib/types/database";
 
 interface ActivityFeedProps {
   items: ActivityFeedItem[];
+  onSelect?: (item: ActivityFeedItem) => void;
 }
 
 function formatTimestamp(ts: string): string {
@@ -21,7 +22,7 @@ function channelLabel(channel: ActivityFeedItem["sale_channel"]): string | null 
   return null;
 }
 
-export function ActivityFeed({ items }: ActivityFeedProps) {
+export function ActivityFeed({ items, onSelect }: ActivityFeedProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-surface-border bg-surface-raised p-6 text-center text-sm text-zinc-500">
@@ -33,9 +34,9 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
   return (
     <div className="rounded-2xl border border-surface-border bg-surface-raised">
       <div className="border-b border-surface-border px-5 py-4">
-        <h3 className="font-medium text-zinc-100">Live Activity Feed</h3>
+        <h3 className="font-medium text-zinc-100">Recent logs</h3>
         <p className="text-xs text-zinc-500">
-          Last {items.length} inventory events (stock-outs clubbed by slip)
+          Latest inventory events (stock-outs clubbed by slip). Tap a row for details.
         </p>
       </div>
 
@@ -57,11 +58,8 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
             .filter(Boolean)
             .join(" · ");
 
-          return (
-            <li
-              key={item.id}
-              className="flex items-center gap-4 px-5 py-4 transition hover:bg-white/[0.02]"
-            >
+          const body = (
+            <>
               <div
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                   isStockIn ? "bg-success/10" : "bg-danger/10"
@@ -72,7 +70,7 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                 />
               </div>
 
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-medium text-zinc-200">
                   {title}
                 </p>
@@ -89,6 +87,22 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                 <Clock className="h-3 w-3" />
                 {formatTimestamp(item.timestamp)}
               </div>
+            </>
+          );
+
+          return (
+            <li key={item.id}>
+              {onSelect ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-white/[0.04]"
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className="flex items-center gap-4 px-5 py-4">{body}</div>
+              )}
             </li>
           );
         })}

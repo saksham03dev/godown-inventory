@@ -15,6 +15,11 @@ interface StockQtyPresetProps {
   disabled?: boolean;
 }
 
+const PRESET_OPTIONS: { id: QtyPresetMode; label: string }[] = [
+  { id: "full", label: "Full" },
+  { id: "custom", label: "Custom" },
+];
+
 export function StockQtyPreset({
   transactionType,
   preset,
@@ -24,49 +29,45 @@ export function StockQtyPreset({
   disabled,
 }: StockQtyPresetProps) {
   const isIn = transactionType === "STOCK_IN";
-  const activeLabel =
-    preset === "full"
-      ? isIn
-        ? `Receiving ${BAGS_PER_BALE.toLocaleString()} bags per scan`
-        : "Removing all remaining bags per scan"
-      : isIn
-        ? `Receiving ${customQty || "—"} bags per scan`
-        : `Removing ${customQty || "—"} bags per scan`;
+  const fullHint = isIn
+    ? `${BAGS_PER_BALE.toLocaleString()} bags per scan`
+    : "All remaining per scan";
 
   return (
     <div className="rounded-2xl border border-surface-border bg-surface-raised p-4">
       <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
         Quantity preset
       </p>
-      <p className="mt-1 text-sm text-zinc-300">{activeLabel}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onPresetChange("full")}
-          className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
-            preset === "full"
-              ? "bg-accent/15 text-accent"
-              : "border border-surface-border text-zinc-400 hover:bg-white/5"
-          } disabled:opacity-50`}
-        >
-          Full
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onPresetChange("custom")}
-          className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
-            preset === "custom"
-              ? "bg-accent/15 text-accent"
-              : "border border-surface-border text-zinc-400 hover:bg-white/5"
-          } disabled:opacity-50`}
-        >
-          Custom
-        </button>
+      <div
+        className="mt-3 grid grid-cols-2 gap-2"
+        role="group"
+        aria-label="Quantity preset"
+      >
+        {PRESET_OPTIONS.map(({ id, label }) => {
+          const active = preset === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              disabled={disabled}
+              aria-pressed={active}
+              onClick={() => onPresetChange(id)}
+              className={`rounded-xl border px-4 py-3.5 text-center text-sm font-semibold transition disabled:opacity-50 ${
+                active
+                  ? "border-accent/50 bg-accent/15 text-accent"
+                  : "border-surface-border text-zinc-300 hover:bg-white/5"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
+      {preset === "full" && (
+        <p className="mt-2 text-center text-xs text-zinc-500">{fullHint}</p>
+      )}
       {preset === "custom" && (
-        <div className="mt-4">
+        <div className="mt-3">
           <BagCountNumpad
             value={customQty}
             onChange={onCustomQtyChange}

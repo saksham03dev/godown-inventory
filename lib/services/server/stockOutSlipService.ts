@@ -341,7 +341,7 @@ export type StockOutSlipList = {
   recent: StockOutSlipWithDetails[];
 };
 
-/** Every slip from the current business day, then the 20 newest slips from earlier days. */
+/** Every slip from the current business day, then the 10 newest slips from earlier days. */
 export async function fetchStockOutSlipsServer(): Promise<StockOutSlipList> {
   const supabase = createServiceClient({ requireServiceRole: true });
   const { startIso, endIso } = businessDayUtcRange(getTodayBusinessDate());
@@ -352,7 +352,7 @@ export async function fetchStockOutSlipsServer(): Promise<StockOutSlipList> {
     .select(SLIP_SELECT)
     .lt("confirmed_at", startIso)
     .order("confirmed_at", { ascending: false })
-    .limit(20);
+    .limit(10);
   if (error) throw new Error(error.message);
 
   const recent = (data ?? []).map((row) =>

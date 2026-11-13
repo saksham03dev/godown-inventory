@@ -22,7 +22,6 @@ interface InventoryBarChartProps {
 export function InventoryBarChart({ items }: InventoryBarChartProps) {
   const groups = useMemo(() => groupGodownStockByName(items), [items]);
   const totalBags = groups.reduce((sum, g) => sum + g.quantity, 0);
-  const sorted = [...groups].sort((a, b) => b.quantity - a.quantity);
 
   if (items.length === 0) {
     return null;
@@ -34,7 +33,7 @@ export function InventoryBarChart({ items }: InventoryBarChartProps) {
         Stock by Product Name
       </h3>
       <div className="space-y-4">
-        {sorted.map((group, index) => {
+        {groups.map((group, index) => {
           const pct = totalBags > 0 ? (group.quantity / totalBags) * 100 : 0;
           const color = BAR_COLORS[index % BAR_COLORS.length];
           const skuLabel = `${group.variants.length} SKU${group.variants.length === 1 ? "" : "s"}`;

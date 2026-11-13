@@ -14,7 +14,6 @@ interface GodownFormModalProps {
 
 const emptyForm: GodownInput = {
   location_name: "",
-  capacity: 0,
   address: "",
   notes: "",
 };
@@ -33,7 +32,6 @@ export function GodownFormModal({
     if (godown) {
       setForm({
         location_name: godown.location_name,
-        capacity: godown.capacity,
         address: godown.address ?? "",
         notes: godown.notes ?? "",
       });
@@ -56,7 +54,7 @@ export function GodownFormModal({
       open={open}
       onClose={onClose}
       title={isEdit ? "Edit Godown" : "Add Godown"}
-      description="Manage warehouse location details and capacity in bags."
+      description="Warehouse names and addresses are set up once; stock counts come from scans."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -70,20 +68,6 @@ export function GodownFormModal({
             onChange={(e) => update("location_name", e.target.value)}
             className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
             placeholder="e.g. Godown A"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Capacity (bags) *
-          </label>
-          <input
-            type="number"
-            required
-            min={0}
-            value={form.capacity}
-            onChange={(e) => update("capacity", Number(e.target.value))}
-            className="w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-accent"
           />
         </div>
 

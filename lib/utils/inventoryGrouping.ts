@@ -55,9 +55,13 @@ export function groupGodownStockByName(
   return Array.from(map.values())
     .map((group) => ({
       ...group,
-      variants: group.variants.sort((a, b) =>
-        a.product_code.localeCompare(b.product_code)
-      ),
+      variants: group.variants.sort((a, b) => {
+        if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+        return a.product_code.localeCompare(b.product_code);
+      }),
     }))
-    .sort((a, b) => a.product_name.localeCompare(b.product_name));
+    .sort((a, b) => {
+      if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+      return a.product_name.localeCompare(b.product_name);
+    });
 }

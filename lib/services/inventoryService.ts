@@ -372,7 +372,8 @@ export async function fetchRecentLogs(
       *,
       products ( id, name, barcode_id, product_code, size ),
       godowns!godown_id ( id, location_name ),
-      stock_out_slips ( biller_name )
+      stock_out_slips ( biller_name ),
+      stock_units ( id, unit_number, unit_barcode, status )
     `
     )
     .order("timestamp", { ascending: false })
@@ -385,7 +386,8 @@ export async function fetchRecentLogs(
         `
       *,
       products ( id, name, barcode_id, product_code, size ),
-      godowns!godown_id ( id, location_name )
+      godowns!godown_id ( id, location_name ),
+      stock_units ( id, unit_number, unit_barcode, status )
     `
       )
       .order("timestamp", { ascending: false })
@@ -399,11 +401,20 @@ export async function fetchRecentLogs(
 export async function fetchRecentActivity(
   limit = 5
 ): Promise<ActivityFeedItem[]> {
+  const { activity } = await fetchRecentActivityFeed(limit);
+  return activity;
+}
+
+export async function fetchRecentActivityFeed(limit = 10): Promise<{
+  activity: ActivityFeedItem[];
+  logs: InventoryLogWithRelations[];
+}> {
   const logs = await fetchRecentLogs(limit);
-  return groupInventoryLogsForActivity(
+  const activity = groupInventoryLogsForActivity(
     logs as Parameters<typeof groupInventoryLogsForActivity>[0],
     limit
   );
+  return { activity, logs };
 }
 
 /**

@@ -13,15 +13,13 @@ export async function createGodownServer(
     if (!location_name) {
       return { success: false, message: "Godown name is required." };
     }
-    if (input.capacity < 0) {
-      return { success: false, message: "Capacity cannot be negative." };
-    }
+    const capacity = input.capacity ?? 0;
 
     const { data, error } = await db()
       .from("godowns")
       .insert({
         location_name,
-        capacity: input.capacity,
+        capacity,
         address: input.address?.trim() || null,
         notes: input.notes?.trim() || null,
       })
@@ -60,15 +58,13 @@ export async function updateGodownServer(
     if (!location_name) {
       return { success: false, message: "Godown name is required." };
     }
-    if (input.capacity < 0) {
-      return { success: false, message: "Capacity cannot be negative." };
-    }
+    const capacity = input.capacity ?? 0;
 
     const { data, error } = await db()
       .from("godowns")
       .update({
         location_name,
-        capacity: input.capacity,
+        capacity,
         address: input.address?.trim() || null,
         notes: input.notes?.trim() || null,
       })
