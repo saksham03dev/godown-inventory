@@ -22,10 +22,10 @@ export async function confirmStockOutSlip(input: {
 }
 
 export async function fetchStockOutSlips(
-  limit = 50
+  scope: "today" | "recent" = "today"
 ): Promise<StockOutSlipWithDetails[]> {
   const res = await fetch(
-    `/api/inventory/stock-out-slip?limit=${encodeURIComponent(String(limit))}`
+    `/api/inventory/stock-out-slip?scope=${encodeURIComponent(scope)}`
   );
   const data = (await res.json()) as MutationResult<StockOutSlipWithDetails[]>;
   if (!data.success || !data.data) {
@@ -49,9 +49,11 @@ export async function fetchStockOutSlip(
 
 export async function updateStockOutSlip(input: {
   id: string;
-  billerName: string;
-  billNo: string;
+  billerName?: string;
+  billNo?: string;
   units?: { id: string; bagsMoved: number }[];
+  removeProductId?: string;
+  addItems?: { barcode: string; bagsQty: number }[];
 }): Promise<MutationResult<StockOutSlipWithDetails>> {
   return apiMutation<StockOutSlipWithDetails>("/api/inventory/stock-out-slip", {
     method: "PATCH",

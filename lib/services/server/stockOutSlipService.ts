@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
+import { businessDayUtcRange, getTodayBusinessDate } from "@/lib/utils/businessDay";
 import type {
   MutationResult,
   StockOutSlip,
@@ -311,11 +312,10 @@ export async function confirmStockOutSlipServer(input: {
 }
 
 export async function fetchStockOutSlipsServer(
-  limit = 50
+  scope: "today" | "recent" = "today"
 ): Promise<StockOutSlipWithDetails[]> {
   const supabase = createServiceClient({ requireServiceRole: true });
-  const safeLimit = Math.min(Math.max(limit, 1), 100);
-  const { data, error } = await supabase
+  let query = supabase
     .from("stock_out_slips")
     .select(
       `
@@ -327,9 +327,16 @@ export async function fetchStockOutSlipsServer(
       stock_out_slip_units ( * )
     `
     )
-    .order("confirmed_at", { ascending: false })
-    .limit(safeLimit);
+    .order("confirmed_at", { ascending: false });
 
+  if (scope === "recent") {
+    query = query.limit(20);
+  } else {
+    const { startIso, endIso } = businessDayUtcRange(getTodayBusinessDate());
+    query = query.gte("confirmed_at", startIso).lt("confirmed_at", endIso);
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => mapSlipWithDetails(row as Record<string, unknown>));
 }
@@ -364,6 +371,9 @@ export async function updateStockOutSlipServer(
     billerName?: string | null;
     billNo?: string | null;
     units?: SlipUnitQtyEdit[];
+    removeProductId?: string | null;
+    addItems?: StockOutSlipConfirmItem[];
+    actor?: { id: string; label: string };
   }
 ): Promise<MutationResult<StockOutSlipWithDetails>> {
   const supabase = createServiceClient({ requireServiceRole: true });
@@ -387,6 +397,19 @@ export async function updateStockOutSlipServer(
     if (!qtyResult.success) {
       return { success: false, message: qtyResult.message };
     }
+  }
+
+  if (input.removeProductId) {
+    const removed = await removeSlipProduct(supabase, id, input.removeProductId);
+    if (!removed.success) return { success: false, message: removed.message };
+  }
+
+  if (input.addItems && input.addItems.length > 0) {
+    if (!input.actor?.id) {
+      return { success: false, message: "Missing the person adding these bales." };
+    }
+    const added = await addSlipItems(supabase, id, input.addItems, input.actor);
+    if (!added.success) return added;
   }
 
   // Keep sold-to stamps in sync when metadata changes
@@ -575,4 +598,117 @@ async function applySlipUnitQtyEdits(
   }
 
   return { success: true, message: "Quantities updated." };
+}
+
+async function removeSlipProduct(
+  supabase: ConfirmServiceClient,
+  slipId: string,
+  productId: string
+): Promise<{ success: boolean; message: string }> {
+  const product = productId.trim();
+  if (!product) return { success: false, message: "Choose a product to remove." };
+
+  const { data: slipUnits, error: listErr } = await supabase
+    .from("stock_out_slip_units")
+    .select("id, stock_unit_id, bags_moved")
+    .eq("slip_id", slipId)
+    .eq("product_id", product);
+  if (listErr) return { success: false, message: listErr.message };
+  if (!slipUnits?.length) {
+    return { success: false, message: "That product is not on this bill." };
+  }
+
+  const unitIds = slipUnits.map((row) => row.stock_unit_id);
+  const { data: units, error: unitErr } = await supabase
+    .from("stock_units")
+    .select("id, remaining_bags, status, bill_id, opened_at")
+    .in("id", unitIds);
+  if (unitErr) return { success: false, message: unitErr.message };
+
+  const byId = new Map((units ?? []).map((unit) => [unit.id, unit]));
+  for (const row of slipUnits) {
+    const unit = byId.get(row.stock_unit_id);
+    if (!unit) return { success: false, message: "A bale on this product was not found." };
+    if (unit.bill_id) {
+      return {
+        success: false,
+        message: "Cannot remove a product while one of its bales is attached to a customer bill.",
+      };
+    }
+    const next = Math.round(Number(unit.remaining_bags ?? 0)) + Math.round(Number(row.bags_moved));
+    if (next < 1 || next > BAGS_PER_BALE) {
+      return { success: false, message: "Putting this product back would put a bale out of range." };
+    }
+  }
+
+  for (const row of slipUnits) {
+    const unit = byId.get(row.stock_unit_id);
+    if (!unit) continue;
+    const next = Math.round(Number(unit.remaining_bags ?? 0)) + Math.round(Number(row.bags_moved));
+    const { error: restoreErr } = await supabase
+      .from("stock_units")
+      .update({
+        remaining_bags: next,
+        status: "STOCKED_IN",
+        stocked_out_at: null,
+        opened_at: next === BAGS_PER_BALE ? null : unit.opened_at,
+        sold_to_customer_name: null,
+        sold_bill_number: null,
+        sold_at: null,
+      })
+      .eq("id", unit.id);
+    if (restoreErr) return { success: false, message: restoreErr.message };
+  }
+
+  const { error: logErr } = await supabase
+    .from("inventory_logs")
+    .delete()
+    .eq("stock_out_slip_id", slipId)
+    .eq("transaction_type", "STOCK_OUT")
+    .in("stock_unit_id", unitIds);
+  if (logErr) return { success: false, message: logErr.message };
+
+  const { error: unitRowErr } = await supabase
+    .from("stock_out_slip_units")
+    .delete()
+    .eq("slip_id", slipId)
+    .eq("product_id", product);
+  if (unitRowErr) return { success: false, message: unitRowErr.message };
+
+  const { error: lineErr } = await supabase
+    .from("stock_out_slip_lines")
+    .delete()
+    .eq("slip_id", slipId)
+    .eq("product_id", product);
+  if (lineErr) return { success: false, message: lineErr.message };
+
+  await supabase.rpc("sync_product_total_stock", { p_product_id: product });
+  return { success: true, message: "Product returned to stock." };
+}
+
+async function addSlipItems(
+  supabase: ConfirmServiceClient,
+  slipId: string,
+  items: StockOutSlipConfirmItem[],
+  actor: { id: string; label: string }
+): Promise<MutationResult<StockOutSlipWithDetails>> {
+  const { data: slip, error } = await supabase
+    .from("stock_out_slips")
+    .select("id, biller_name, bill_no, sale_channel")
+    .eq("id", slipId)
+    .maybeSingle();
+  if (error) return { success: false, message: error.message };
+  if (!slip) return { success: false, message: "Slip not found." };
+
+  const channel = slip.sale_channel === "RETAIL" ? "RETAIL" : "WHOLESALE";
+  return confirmStockOutSlipServer({
+    billerName: slip.biller_name,
+    billNo: slip.bill_no,
+    saleChannel: channel,
+    items,
+    createdBy: actor.id,
+    createdByLabel: actor.label,
+    existingSlipId: slipId,
+    submissionId: crypto.randomUUID(),
+  });
 }

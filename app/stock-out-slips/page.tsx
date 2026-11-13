@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Printer, RefreshCw, Save, X } from "lucide-react";
+import { Plus, Printer, RefreshCw, Save, Trash2, X } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { AddSlipGoodsDialog } from "@/components/slips/AddSlipGoodsDialog";
 import { StockOutSlipPrintView } from "@/components/slips/StockOutSlipPrintView";
 import { AlertBanner } from "@/components/ui/AlertBanner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -31,6 +33,7 @@ export default function StockOutSlipsPage() {
   const { can } = useAuth();
   const canEdit = can("slips.edit");
 
+  const [scope, setScope] = useState<"today" | "recent">("today");
   const [slips, setSlips] = useState<StockOutSlipWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,19 +44,25 @@ export default function StockOutSlipsPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [removeProductId, setRemoveProductId] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchStockOutSlips(80);
+      const data = await fetchStockOutSlips(scope);
       setSlips(data);
+      setSelectedId((current) =>
+        current && data.some((slip) => slip.id === current) ? current : null
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load slips.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     void load();
@@ -111,6 +120,31 @@ export default function StockOutSlipsPage() {
     }
   };
 
+  const replaceSlip = (next: StockOutSlipWithDetails) => {
+    setSlips((prev) => prev.map((slip) => (slip.id === next.id ? next : slip)));
+  };
+
+  const handleRemoveProduct = async () => {
+    if (!selected || !removeProductId || !canEdit) return;
+    setRemoving(true);
+    setSaveMessage(null);
+    try {
+      const result = await updateStockOutSlip({
+        id: selected.id,
+        removeProductId,
+      });
+      if (!result.success || !result.data) {
+        setSaveMessage(result.message);
+        return;
+      }
+      replaceSlip(result.data);
+      setSaveMessage("Product returned to stock.");
+      setRemoveProductId(null);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const handlePrint = () => {
     setPrintOpen(true);
     setTimeout(() => window.print(), 200);
@@ -145,6 +179,27 @@ export default function StockOutSlipsPage() {
       }
     >
       <div className="mx-auto max-w-6xl space-y-6 animate-fade-in">
+        <div className="flex gap-2">
+          {(
+            [
+              ["today", "Today"],
+              ["recent", "Last 20"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setScope(value)}
+              className={`rounded-xl px-4 py-2 text-sm ${
+                scope === value
+                  ? "bg-accent text-white"
+                  : "border border-surface-border text-zinc-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {error && (
           <AlertBanner
             alert={{ type: "error", message: error }}
@@ -156,7 +211,9 @@ export default function StockOutSlipsPage() {
           <LoadingSpinner label="Loading slips…" />
         ) : slips.length === 0 ? (
           <div className="rounded-2xl border border-surface-border bg-surface-raised p-8 text-center text-sm text-zinc-500">
-            No stock-out slips yet. Confirm a stock-out session to create one.
+            {scope === "today"
+              ? "No stock-out slips for today."
+              : "No stock-out slips yet."}
           </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -227,14 +284,24 @@ export default function StockOutSlipsPage() {
                       </p>
                     </div>
                     {canEdit && (
-                      <button
-                        type="button"
-                        onClick={handlePrint}
-                        className="inline-flex items-center gap-2 rounded-xl border border-surface-border px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/5"
-                      >
-                        <Printer className="h-4 w-4" />
-                        Print
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAddOpen(true)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-muted"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePrint}
+                          className="inline-flex items-center gap-2 rounded-xl border border-surface-border px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/5"
+                        >
+                          <Printer className="h-4 w-4" />
+                          Print
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -263,8 +330,7 @@ export default function StockOutSlipsPage() {
                         </label>
                       </div>
                       <p className="text-[11px] text-zinc-500">
-                        Fix a wrong bag qty on a bale below (e.g. 1000 → 500). Extra
-                        bags go back to warehouse stock.
+                        Fix a bag qty on a bale, or remove a whole product. Bags taken off the bill go back to warehouse stock. Add is for a bale that was missed.
                       </p>
                       <div className="flex items-center gap-3">
                         <button
@@ -322,9 +388,22 @@ export default function StockOutSlipsPage() {
                                   .join(" · ")}
                               </p>
                             </div>
-                            <span className="shrink-0 rounded-lg bg-danger/15 px-2.5 py-1 text-sm font-semibold tabular-nums text-danger">
-                              {Math.round(line.bag_count)}
-                            </span>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="rounded-lg bg-danger/15 px-2.5 py-1 text-sm font-semibold tabular-nums text-danger">
+                                {Math.round(line.bag_count)}
+                              </span>
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRemoveProductId(line.product_id)}
+                                  disabled={saving || removing}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-danger/40 px-2 py-1 text-xs text-danger hover:bg-danger/10 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Remove
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {lineUnits.length > 0 && (
                             <ul className="mt-3 space-y-2 border-t border-surface-border pt-3">
@@ -376,6 +455,28 @@ export default function StockOutSlipsPage() {
           </div>
         )}
       </div>
+
+      {selected && (
+        <AddSlipGoodsDialog
+          open={addOpen}
+          slipId={selected.id}
+          onClose={() => setAddOpen(false)}
+          onAdded={replaceSlip}
+        />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(removeProductId)}
+        onClose={() => {
+          if (!removing) setRemoveProductId(null);
+        }}
+        onConfirm={() => void handleRemoveProduct()}
+        title="Remove this product?"
+        message="Every bale of this product leaves the bill and returns to warehouse stock."
+        confirmLabel="Remove and restock"
+        loading={removing}
+        destructive
+      />
 
       {printOpen && selected && (
         <div className="fixed inset-0 z-[60] overflow-auto bg-white print:static print:z-auto">

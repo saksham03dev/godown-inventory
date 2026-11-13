@@ -24,8 +24,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, message: "OK", data: slip });
     }
 
-    const limit = Number(searchParams.get("limit") ?? 50);
-    const slips = await fetchStockOutSlipsServer(limit);
+    const scope = searchParams.get("scope") === "recent" ? "recent" : "today";
+    const slips = await fetchStockOutSlipsServer(scope);
     return NextResponse.json({ success: true, message: "OK", data: slips });
   } catch (err) {
     console.error("Stock-out slips list error:", err);
@@ -57,6 +57,12 @@ export async function PATCH(request: Request) {
       billerName: body.billerName,
       billNo: body.billNo,
       units: Array.isArray(body.units) ? body.units : undefined,
+      removeProductId: body.removeProductId ? String(body.removeProductId) : undefined,
+      addItems: Array.isArray(body.addItems) ? body.addItems : undefined,
+      actor: {
+        id: auth.session.sub,
+        label: auth.session.username || auth.session.full_name || auth.session.sub,
+      },
     });
 
     return NextResponse.json(result, {
