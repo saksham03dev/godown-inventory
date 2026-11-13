@@ -321,7 +321,7 @@ export default function ScanPage() {
             />
           )}
 
-          {mode === "STOCK_IN" && <ScanSoundToggle />}
+          {mode === "STOCK_IN" && <ScanSoundToggle variant="full" />}
 
           {!isViewLabel && !selectedGodownId && (
             <AlertBanner

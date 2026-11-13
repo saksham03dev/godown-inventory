@@ -7,12 +7,47 @@ import {
   setScanSoundEnabled,
 } from "@/lib/utils/scanFeedbackAudio";
 
-export function ScanSoundToggle() {
+interface ScanSoundToggleProps {
+  /** Compact icon for the page header; full row for settings-style layouts. */
+  variant?: "icon" | "full";
+}
+
+export function ScanSoundToggle({ variant = "icon" }: ScanSoundToggleProps) {
   const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
     setEnabled(isScanSoundEnabled());
   }, []);
+
+  const toggle = () => {
+    const next = !enabled;
+    setScanSoundEnabled(next);
+    setEnabled(next);
+  };
+
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={enabled ? "Scan sound on" : "Scan sound off"}
+        title={enabled ? "Scan sound on" : "Scan sound off"}
+        onClick={toggle}
+        className={`rounded-xl border p-2 transition ${
+          enabled
+            ? "border-success/40 bg-success/10 text-success hover:bg-success/15"
+            : "border-surface-border bg-surface-overlay text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+        }`}
+      >
+        {enabled ? (
+          <Volume2 className="h-5 w-5" aria-hidden />
+        ) : (
+          <VolumeX className="h-5 w-5" aria-hidden />
+        )}
+      </button>
+    );
+  }
 
   return (
     <button
@@ -20,11 +55,7 @@ export function ScanSoundToggle() {
       role="switch"
       aria-checked={enabled}
       aria-label="Scan sound"
-      onClick={() => {
-        const next = !enabled;
-        setScanSoundEnabled(next);
-        setEnabled(next);
-      }}
+      onClick={toggle}
       className="flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-border bg-surface-raised px-4 py-3 text-left transition hover:border-zinc-600"
     >
       <span className="flex min-w-0 items-center gap-2.5">

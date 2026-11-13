@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { ScanSoundToggle } from "@/components/scan/ScanSoundToggle";
 import { StockScanPanel } from "@/components/scan/StockScanPanel";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -25,7 +26,11 @@ export default function StockInPage() {
   }
 
   return (
-    <DashboardLayout title="Stock In" subtitle="Scan bundle labels into a warehouse">
+    <DashboardLayout
+      title="Stock In"
+      subtitle="Scan bundle labels into a warehouse"
+      actions={<ScanSoundToggle />}
+    >
       {loading ? (
         <LoadingSpinner label="Loading warehouses…" />
       ) : error ? (

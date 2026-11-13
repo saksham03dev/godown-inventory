@@ -17,7 +17,8 @@ function secondaryLabel(size: string | null, productName: string): string {
 interface ScanTallyPanelProps {
   tally: ScanTallyState;
   mode: TransactionType;
-  onReset: () => void;
+  /** Omit on stock out — tally mirrors the bill and is not cleared on its own. */
+  onReset?: () => void;
   stockOutSaleMode?: StockOutSaleMode;
   /** Separate scanned / in-warehouse / still-sending counts for live stock in. */
   progressLabel?: string | null;
@@ -95,14 +96,16 @@ export function ScanTallyPanel({
               `${tally.sessionBales} label${tally.sessionBales === 1 ? "" : "s"} this session`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-surface-border px-3 py-2 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          Reset
-        </button>
+        {onReset ? (
+          <button
+            type="button"
+            onClick={onReset}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-surface-border px-3 py-2 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        ) : null}
       </div>
 
       {tally.byProduct.length > 0 && (

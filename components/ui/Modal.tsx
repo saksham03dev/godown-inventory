@@ -10,6 +10,10 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  /** Keep the sidebar and header menu usable (overlay covers main content only). */
+  preserveNav?: boolean;
+  /** When false, hide close control and ignore backdrop / Escape. */
+  dismissible?: boolean;
 }
 
 const sizeClasses = {
@@ -26,27 +30,33 @@ export function Modal({
   description,
   children,
   size = "md",
+  preserveNav = false,
+  dismissible = true,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (dismissible && e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", handler);
-    document.body.style.overflow = "hidden";
+    if (!preserveNav) document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handler);
-      document.body.style.overflow = "";
+      if (!preserveNav) document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible, preserveNav]);
 
   if (!open) return null;
 
+  const shellClass = preserveNav
+    ? "fixed inset-y-0 right-0 left-0 top-[4.25rem] z-40 flex items-end justify-center p-4 sm:items-center lg:left-64 lg:top-0"
+    : "fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+    <div className={shellClass}>
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={dismissible ? onClose : undefined}
         aria-hidden
       />
       <div
@@ -64,13 +74,15 @@ export function Modal({
               <p className="mt-0.5 text-sm text-zinc-500">{description}</p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {dismissible ? (
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
         <div className="p-5">{children}</div>
       </div>

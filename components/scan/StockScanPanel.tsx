@@ -14,7 +14,6 @@ import {
 } from "@/components/scan/StockQtyPreset";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ScanSoundToggle } from "@/components/scan/ScanSoundToggle";
 import { WarehouseSelectModal } from "@/components/scan/WarehouseSelectModal";
 import { WarehouseSelectPrompt } from "@/components/scan/WarehouseSelectPrompt";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -382,8 +381,6 @@ export function StockScanPanel({
           disabled={processing || confirmLoading}
         />
       )}
-
-      {isStockIn && <ScanSoundToggle />}
 
       {scanHint && (
         <AlertBanner

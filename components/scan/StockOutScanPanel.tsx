@@ -83,6 +83,7 @@ export function StockOutScanPanel() {
   const [padTarget, setPadTarget] = useState<"biller" | "billNo">("billNo");
   const [billPromptOpen, setBillPromptOpen] = useState(true);
   const [billOpen, setBillOpen] = useState(false);
+  const [finalBill, setFinalBill] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [offline, setOffline] = useState(false);
 
@@ -321,6 +322,7 @@ export function StockOutScanPanel() {
   const finishBill = useCallback(() => {
     queue.closeActive();
     setBillOpen(false);
+    setFinalBill(false);
     setBillerName("");
     setBillNo("");
     setBillPromptOpen(true);
@@ -329,6 +331,17 @@ export function StockOutScanPanel() {
     setRetailApproval(null);
     resetTally();
   }, [queue, resetTally]);
+
+  const confirmBill = useCallback(() => {
+    setFinalBill(true);
+    setBillOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!billOpen || !finalBill) return;
+    const timer = window.setTimeout(() => finishBill(), 3200);
+    return () => window.clearTimeout(timer);
+  }, [billOpen, finalBill, finishBill]);
 
   const scannerEnabled = ready && !retailUnit && !retailLoading && !billOpen;
   const failed = items.filter((item) => item.status === "failed");
@@ -436,9 +449,6 @@ export function StockOutScanPanel() {
             ? `${queue.counts.scanned} scanned · ${queue.counts.stockedOut} stocked out · ${queue.counts.sending} sending`
             : null
         }
-        onReset={() => {
-          if (items.length > 0) setResetOpen(true);
-        }}
       />
 
       {failed.length > 0 && (
@@ -476,22 +486,26 @@ export function StockOutScanPanel() {
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border px-4 py-3 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
         >
           <RotateCcw className="h-4 w-4" />
-          Reset
+          Cancel bill
         </button>
         <button
           type="button"
-          onClick={() => setBillOpen(true)}
+          onClick={confirmBill}
           disabled={!ready || items.length === 0}
-          className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-white transition hover:bg-accent-muted disabled:opacity-50"
+          className="flex flex-[2] items-center justify-center gap-2 rounded-2xl border-2 border-accent/80 bg-accent px-5 py-4 text-base font-bold uppercase tracking-wide text-white shadow-lg shadow-accent/25 transition hover:bg-accent-muted disabled:border-surface-border disabled:bg-surface-overlay disabled:text-zinc-500 disabled:shadow-none"
         >
-          <Check className="h-4 w-4" />
-          {`Confirm bill · ${queue.counts.scanned}`}
+          CONFIRM
+          {queue.counts.scanned > 0 ? (
+            <span className="rounded-lg bg-white/20 px-2 py-0.5 text-sm tabular-nums">
+              {queue.counts.scanned}
+            </span>
+          ) : null}
         </button>
       </div>
 
       <p className="text-center text-xs text-zinc-600">
         {ready
-          ? "Each scan is accepted on this phone and sent to the slip in the background. Confirm shows the bill."
+          ? "Scans upload in the background. Press CONFIRM when done — the bill summary appears, then the next bill starts automatically."
           : "Enter the bill number first. Scanning stays off until this bill is open."}
       </p>
 
@@ -499,8 +513,9 @@ export function StockOutScanPanel() {
         open={queue.hydrated && !ready && billPromptOpen}
         onClose={() => setBillPromptOpen(false)}
         title="Start stock out"
-        description="Bill number is required. Biller name is optional."
+        description="Bill number is required. Biller name is optional. You can still use the menu to open Stock In, labels, and other pages."
         size="md"
+        preserveNav
       >
         <BillStartForm
           billerName={billerName}
@@ -525,10 +540,12 @@ export function StockOutScanPanel() {
 
       <Modal
         open={billOpen && Boolean(session)}
-        onClose={() => setBillOpen(false)}
-        title="Bill"
-        description="Demo of this stock-out bill. Lines are clubbed by product code."
+        onClose={() => {}}
+        title="Bill confirmed"
+        description="Final summary for this stock-out bill. Starting the next bill shortly."
         size="lg"
+        preserveNav
+        dismissible={false}
       >
         {session && (
           <BillPreview
@@ -538,8 +555,7 @@ export function StockOutScanPanel() {
             totalBales={totalBales}
             sending={queue.counts.sending}
             failedCount={failed.length}
-            onBack={() => setBillOpen(false)}
-            onDone={finishBill}
+            finalizing={finalBill}
           />
         )}
       </Modal>
@@ -558,9 +574,9 @@ export function StockOutScanPanel() {
           resetTally();
           setResetOpen(false);
         }}
-        title="Reset this bill?"
+        title="Cancel this bill?"
         message="Clear this bill on the phone. Bales already sent stay stocked out. Scans still waiting are not sent."
-        confirmLabel="Reset"
+        confirmLabel="Cancel bill"
         destructive
       />
 
@@ -661,8 +677,7 @@ function BillPreview({
   totalBales,
   sending,
   failedCount,
-  onBack,
-  onDone,
+  finalizing,
 }: {
   session: StockOutSession;
   lines: ReturnType<typeof clubStockOutByCode>;
@@ -670,8 +685,7 @@ function BillPreview({
   totalBales: number;
   sending: number;
   failedCount: number;
-  onBack: () => void;
-  onDone: () => void;
+  finalizing: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -733,23 +747,11 @@ function BillPreview({
           {failedCount} label{failedCount === 1 ? "" : "s"} could not be added and are not on this bill.
         </p>
       )}
-      <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-xl border border-surface-border px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
-        >
-          Back to scanning
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-muted"
-        >
-          <Check className="h-4 w-4" />
-          Done
-        </button>
-      </div>
+      {finalizing ? (
+        <p className="text-center text-sm text-zinc-400">
+          Bill saved on this phone. Next bill opens automatically…
+        </p>
+      ) : null}
     </div>
   );
 }

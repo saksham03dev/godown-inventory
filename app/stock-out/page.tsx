@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { ScanSoundToggle } from "@/components/scan/ScanSoundToggle";
 import { StockOutScanPanel } from "@/components/scan/StockOutScanPanel";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
@@ -24,6 +25,7 @@ export default function StockOutPage() {
     <DashboardLayout
       title="Stock Out"
       subtitle="Wholesale bundles or retail by bags"
+      actions={<ScanSoundToggle />}
     >
       <StockOutScanPanel />
     </DashboardLayout>
