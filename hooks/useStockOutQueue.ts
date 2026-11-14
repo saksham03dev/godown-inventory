@@ -8,7 +8,10 @@ import {
   STOCK_OUT_UPLOAD_INTERVAL_MS,
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
-import { confirmStockOutSlip } from "@/lib/services/stockOutSlipService";
+import {
+  cancelStockOutSlip,
+  confirmStockOutSlip,
+} from "@/lib/services/stockOutSlipService";
 import type { MutationResult } from "@/lib/types/database";
 
 export type StockOutQueueStatus = "pending" | "uploading" | "saved" | "failed";
@@ -198,8 +201,25 @@ interface UploadBatch {
   items: StockOutQueueItem[];
 }
 
-function pickBatch(store: Store, allowPartial: boolean): UploadBatch | null {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function sessionStillSending(session: StockOutSession): boolean {
+  return session.items.some(
+    (item) => item.status === "pending" || item.status === "uploading"
+  );
+}
+
+function pickBatch(
+  store: Store,
+  allowPartial: boolean,
+  blockedSessionId?: string | null
+): UploadBatch | null {
   for (const session of store.sessions) {
+    if (blockedSessionId && session.id === blockedSessionId) continue;
     if (!sessionReady(session)) continue;
     const retry = session.items.filter((item) => item.status === "pending" && item.uploadId);
     if (!retry.length) continue;
@@ -216,6 +236,7 @@ function pickBatch(store: Store, allowPartial: boolean): UploadBatch | null {
   }
 
   for (const session of store.sessions) {
+    if (blockedSessionId && session.id === blockedSessionId) continue;
     if (!sessionReady(session)) continue;
     const fresh = session.items.filter((item) => item.status === "pending" && !item.uploadId);
     if (!fresh.length) continue;
@@ -310,6 +331,7 @@ export function useStockOutQueue() {
   const storeRef = useRef<Store>({ sessions: [] });
   const flushingRef = useRef(false);
   const hydratedRef = useRef(false);
+  const cancellingSessionIdRef = useRef<string | null>(null);
 
   const commit = useCallback((next: Store) => {
     const pruned = pruneStore(next);
@@ -318,9 +340,15 @@ export function useStockOutQueue() {
     writeStore(pruned);
   }, []);
 
+  const waitForFlushIdle = useCallback(async () => {
+    while (flushingRef.current) {
+      await sleep(50);
+    }
+  }, []);
+
   const flush = useCallback(async (allowPartial: boolean) => {
     if (flushingRef.current) return;
-    const batch = pickBatch(storeRef.current, allowPartial);
+    const batch = pickBatch(storeRef.current, allowPartial, cancellingSessionIdRef.current);
     if (!batch) return;
 
     flushingRef.current = true;
@@ -372,8 +400,14 @@ export function useStockOutQueue() {
       revertToPending();
     } finally {
       flushingRef.current = false;
-      const more = pickBatch(storeRef.current, false);
-      if (more && more.uploadId !== batch.uploadId) void flush(false);
+      const more = pickBatch(storeRef.current, false, cancellingSessionIdRef.current);
+      if (
+        more &&
+        more.uploadId !== batch.uploadId &&
+        more.sessionId !== cancellingSessionIdRef.current
+      ) {
+        void flush(false);
+      }
     }
   }, [commit]);
 
@@ -393,7 +427,7 @@ export function useStockOutQueue() {
 
     const sendCurrentBatch = () => {
       if (flushingRef.current) return;
-      const batch = pickBatch(storeRef.current, true);
+      const batch = pickBatch(storeRef.current, true, cancellingSessionIdRef.current);
       if (!batch) return;
       const session = storeRef.current.sessions.find((row) => row.id === batch.sessionId);
       if (!session) return;
@@ -530,6 +564,121 @@ export function useStockOutQueue() {
     commit(replaceSession(storeRef.current, open.id, null));
   }, [commit]);
 
+  const discardEmptyActive = useCallback(() => {
+    const open = storeRef.current.sessions.find((session) => !session.closed);
+    if (!open || open.items.length > 0) return false;
+    commit(replaceSession(storeRef.current, open.id, null));
+    return true;
+  }, [commit]);
+
+  const removeFailedItem = useCallback(
+    (barcode: string) => {
+      const open = storeRef.current.sessions.find((session) => !session.closed);
+      if (!open) return;
+      const needle = barcode.trim();
+      if (!needle) return;
+      commit(
+        replaceSession(storeRef.current, open.id, {
+          ...open,
+          items: open.items.filter(
+            (item) => !(item.barcode === needle && item.status === "failed")
+          ),
+        })
+      );
+    },
+    [commit]
+  );
+
+  const finalizeActiveBill = useCallback(async (): Promise<MutationResult<{ failed: number }>> => {
+    const open = storeRef.current.sessions.find((session) => !session.closed);
+    if (!open || !sessionReady(open)) {
+      return { success: false, message: "No open bill." };
+    }
+    const activeCount = open.items.filter((item) => item.status !== "failed").length;
+    if (activeCount === 0) {
+      return { success: false, message: "Scan at least one bale before confirming." };
+    }
+
+    const sessionId = open.id;
+    const maxRounds = 24;
+    let backoffMs = 300;
+    for (let round = 0; round < maxRounds; round++) {
+      while (pickBatch(storeRef.current, true, cancellingSessionIdRef.current)?.sessionId === sessionId) {
+        await waitForFlushIdle();
+        await flush(true);
+        await waitForFlushIdle();
+      }
+      const latest = storeRef.current.sessions.find((session) => session.id === sessionId);
+      if (!latest || !sessionStillSending(latest)) {
+        break;
+      }
+      if (round < maxRounds - 1) {
+        await sleep(backoffMs);
+        backoffMs = Math.min(Math.round(backoffMs * 1.45), 2000);
+      }
+    }
+
+    const latest = storeRef.current.sessions.find((session) => session.id === sessionId);
+    if (!latest) {
+      return { success: false, message: "Bill was closed." };
+    }
+
+    const failed = latest.items.filter((item) => item.status === "failed").length;
+    if (failed > 0) {
+      return {
+        success: false,
+        message: `${failed} label${failed === 1 ? "" : "s"} could not be stocked out. This bill is still open — remove or fix the failed rows below, then tap CONFIRM again.`,
+      };
+    }
+    if (sessionStillSending(latest)) {
+      return {
+        success: false,
+        message:
+          "Some labels are still sending. This bill is still open — check the network and tap CONFIRM again.",
+      };
+    }
+
+    return { success: true, message: "Bill confirmed.", data: { failed: 0 } };
+  }, [flush, waitForFlushIdle]);
+
+  const cancelActiveBill = useCallback(async (): Promise<MutationResult<null>> => {
+    const open = storeRef.current.sessions.find((session) => !session.closed);
+    if (!open) {
+      return { success: false, message: "No open bill." };
+    }
+
+    cancellingSessionIdRef.current = open.id;
+    await waitForFlushIdle();
+
+    const slipId =
+      storeRef.current.sessions.find((session) => session.id === open.id)?.slipId ?? null;
+    if (slipId) {
+      const result = await cancelStockOutSlip({ slipId });
+      if (!result.success) {
+        cancellingSessionIdRef.current = null;
+        return result;
+      }
+      await waitForFlushIdle();
+      const slipAfter = storeRef.current.sessions.find((session) => session.id === open.id)?.slipId;
+      if (slipAfter) {
+        const retry = await cancelStockOutSlip({ slipId: slipAfter });
+        if (!retry.success) {
+          cancellingSessionIdRef.current = null;
+          return retry;
+        }
+      }
+    }
+
+    commit(replaceSession(storeRef.current, open.id, null));
+    cancellingSessionIdRef.current = null;
+    return {
+      success: true,
+      message: slipId
+        ? "Bill cancelled. Bales already sent were returned to stock."
+        : "Bill cancelled on this phone.",
+    };
+  }, [commit, waitForFlushIdle]);
+
   return {
     hydrated: hydratedRef.current || store.sessions.length > 0,
     active,
@@ -543,5 +692,9 @@ export function useStockOutQueue() {
     setScanMode,
     closeActive,
     discardActive,
+    discardEmptyActive,
+    finalizeActiveBill,
+    cancelActiveBill,
+    removeFailedItem,
   };
 }

@@ -311,6 +311,52 @@ export async function confirmStockOutSlipServer(input: {
   };
 }
 
+/** Remove every bale on a staged slip and delete the slip (scan cancel bill). */
+export async function cancelStockOutSlipServer(
+  slipId: string
+): Promise<MutationResult<null>> {
+  const id = slipId.trim();
+  if (!id) return { success: false, message: "Missing slip id." };
+
+  const supabase = createServiceClient({ requireServiceRole: true });
+  const { data: slipUnits, error: listErr } = await supabase
+    .from("stock_out_slip_units")
+    .select("id")
+    .eq("slip_id", id);
+  if (listErr) return { success: false, message: listErr.message };
+
+  const ids = (slipUnits ?? []).map((row) => String(row.id));
+  if (ids.length > 0) {
+    const removed = await removeSlipUnits(supabase, id, ids);
+    if (!removed.success) return { success: false, message: removed.message };
+  }
+
+  const { data: remaining, error: remainErr } = await supabase
+    .from("stock_out_slip_units")
+    .select("id")
+    .eq("slip_id", id)
+    .limit(1);
+  if (remainErr) return { success: false, message: remainErr.message };
+  if (remaining?.length) {
+    return { success: false, message: "Could not clear every bale from this bill." };
+  }
+
+  const { error: lineErr } = await supabase
+    .from("stock_out_slip_lines")
+    .delete()
+    .eq("slip_id", id);
+  if (lineErr) return { success: false, message: lineErr.message };
+
+  const { error: delErr } = await supabase.from("stock_out_slips").delete().eq("id", id);
+  if (delErr) return { success: false, message: delErr.message };
+
+  return {
+    success: true,
+    message: "Bill cancelled. Bales returned to stock.",
+    data: null,
+  };
+}
+
 const SLIP_SELECT = `
   *,
   stock_out_slip_lines (

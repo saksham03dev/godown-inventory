@@ -25,6 +25,7 @@ import {
 } from "@/hooks/useStockOutQueue";
 import { BAGS_PER_BALE } from "@/lib/constants/inventory";
 import {
+  STOCK_OUT_EMPTY_BILL_INACTIVITY_MS,
   STOCK_OUT_MODE_STORAGE_KEY,
   type StockOutSaleMode,
 } from "@/lib/constants/stockOut";
@@ -86,6 +87,8 @@ export function StockOutScanPanel() {
   const [billOpen, setBillOpen] = useState(false);
   const [finalBill, setFinalBill] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [offline, setOffline] = useState(false);
 
   const [retailUnit, setRetailUnit] = useState<StockUnit | null>(null);
@@ -106,6 +109,8 @@ export function StockOutScanPanel() {
   const manualInputRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef(queue);
   queueRef.current = queue;
+  const lastStockOutActivityRef = useRef(Date.now());
+  const autoAbandonBusyRef = useRef(false);
 
   const session = queue.active;
   const ready = queue.ready;
@@ -235,7 +240,14 @@ export function StockOutScanPanel() {
 
   const onBarcodeDetected = useCallback(
     async (barcode: string) => {
-      if (processingRef.current || retailOpenRef.current || billOpenRef.current) return;
+      if (
+        processingRef.current ||
+        retailOpenRef.current ||
+        billOpenRef.current ||
+        confirmLoading
+      ) {
+        return;
+      }
       if (!queueRef.current.ready) {
         setBillPromptOpen(true);
         flashError("Enter the bill number before scanning.");
@@ -275,7 +287,7 @@ export function StockOutScanPanel() {
         focusScanner();
       }
     },
-    [acceptItem, flashError, focusScanner]
+    [acceptItem, confirmLoading, flashError, focusScanner]
   );
 
   const closeRetailDialog = useCallback(() => {
@@ -303,12 +315,31 @@ export function StockOutScanPanel() {
     [retailUnit, retailLoading, acceptItem, focusScanner]
   );
 
+  const bumpStockOutActivity = useCallback(() => {
+    lastStockOutActivityRef.current = Date.now();
+  }, []);
+
+  const resetStockOutEntry = useCallback(() => {
+    setSaleMode("wholesale");
+    localStorage.setItem(STOCK_OUT_MODE_STORAGE_KEY, "wholesale");
+    setBillerName("");
+    setBillNo("");
+    setBillPromptOpen(true);
+    setBillOpen(false);
+    setFinalBill(false);
+    setRetailUnit(null);
+    setRetailApproval(null);
+    setLastMessage(null);
+    resetTally();
+  }, [resetTally]);
+
   const startBill = useCallback(() => {
     const ok = queue.startSession({ billerName, billNo, saleMode });
     if (!ok) {
       flashError("Bill number is required.");
       return;
     }
+    bumpStockOutActivity();
     setBillPromptOpen(false);
     const biller = billerName.trim();
     setNotice({
@@ -318,7 +349,7 @@ export function StockOutScanPanel() {
         : `Bill ${billNo.trim()}. Scans upload while you continue.`,
     });
     focusScanner();
-  }, [queue, billerName, billNo, saleMode, flashError, focusScanner]);
+  }, [queue, billerName, billNo, saleMode, flashError, focusScanner, bumpStockOutActivity]);
 
   const finishBill = useCallback(() => {
     queue.closeActive();
@@ -333,10 +364,25 @@ export function StockOutScanPanel() {
     resetTally();
   }, [queue, resetTally]);
 
-  const confirmBill = useCallback(() => {
-    setFinalBill(true);
-    setBillOpen(true);
-  }, []);
+  const confirmBill = useCallback(async () => {
+    if (confirmLoading || !ready) return;
+    setConfirmLoading(true);
+    setNotice(null);
+    try {
+      const result = await queue.finalizeActiveBill();
+      if (!result.success) {
+        setBillOpen(false);
+        setFinalBill(false);
+        flashError(result.message);
+        return;
+      }
+      setFinalBill(true);
+      setBillOpen(true);
+      setNotice({ type: "success", message: result.message });
+    } finally {
+      setConfirmLoading(false);
+    }
+  }, [confirmLoading, ready, queue, flashError]);
 
   useEffect(() => {
     if (!billOpen || !finalBill) return;
@@ -344,7 +390,105 @@ export function StockOutScanPanel() {
     return () => window.clearTimeout(timer);
   }, [billOpen, finalBill, finishBill]);
 
-  const scannerEnabled = ready && !retailUnit && !retailLoading && !billOpen;
+  const runCancelBill = useCallback(async () => {
+    if (cancelLoading) return;
+    setCancelLoading(true);
+    setNotice(null);
+    try {
+      const result = await queue.cancelActiveBill();
+      if (!result.success) {
+        flashError(result.message);
+        return;
+      }
+      setNotice({ type: "info", message: result.message });
+      resetStockOutEntry();
+      setResetOpen(false);
+    } finally {
+      setCancelLoading(false);
+    }
+  }, [cancelLoading, queue, flashError, resetStockOutEntry]);
+
+  const abandonIdleEmptyBill = useCallback(async () => {
+    if (autoAbandonBusyRef.current) return;
+    const live = queueRef.current;
+    if (!live.ready || live.items.length > 0) return;
+    autoAbandonBusyRef.current = true;
+    try {
+      if (live.active?.slipId) {
+        await live.cancelActiveBill();
+      } else {
+        live.discardEmptyActive();
+      }
+      resetStockOutEntry();
+      setNotice({
+        type: "info",
+        message: "Empty bill cleared after no scans. Enter bill number to start again.",
+      });
+    } finally {
+      autoAbandonBusyRef.current = false;
+    }
+  }, [resetStockOutEntry]);
+
+  useEffect(() => {
+    if (!ready || items.length > 0 || !session?.openedAt) return;
+    const openedAt = Date.parse(session.openedAt);
+    if (!Number.isNaN(openedAt)) {
+      lastStockOutActivityRef.current = Math.max(
+        lastStockOutActivityRef.current,
+        openedAt
+      );
+    }
+  }, [ready, items.length, session?.id, session?.openedAt]);
+
+  useEffect(() => {
+    const markActive = () => {
+      lastStockOutActivityRef.current = Date.now();
+    };
+    window.addEventListener("pointerdown", markActive);
+    window.addEventListener("keydown", markActive);
+    return () => {
+      window.removeEventListener("pointerdown", markActive);
+      window.removeEventListener("keydown", markActive);
+    };
+  }, []);
+
+  useEffect(() => {
+    const idleEmptyBill =
+      queue.hydrated &&
+      ready &&
+      items.length === 0 &&
+      !confirmLoading &&
+      !cancelLoading &&
+      !billOpen &&
+      !retailUnit &&
+      !resetOpen;
+
+    if (!idleEmptyBill) return;
+
+    const check = () => {
+      const idleFor = Date.now() - lastStockOutActivityRef.current;
+      if (idleFor >= STOCK_OUT_EMPTY_BILL_INACTIVITY_MS) {
+        void abandonIdleEmptyBill();
+      }
+    };
+
+    check();
+    const timer = window.setInterval(check, 15_000);
+    return () => window.clearInterval(timer);
+  }, [
+    queue.hydrated,
+    ready,
+    items.length,
+    confirmLoading,
+    cancelLoading,
+    billOpen,
+    retailUnit,
+    resetOpen,
+    abandonIdleEmptyBill,
+  ]);
+
+  const scannerEnabled =
+    ready && !retailUnit && !retailLoading && !billOpen && !confirmLoading && !cancelLoading;
   const failed = items.filter((item) => item.status === "failed");
   const lines = clubStockOutByCode(items);
   const totalBags = lines.reduce((sum, line) => sum + line.bags, 0);
@@ -390,6 +534,7 @@ export function StockOutScanPanel() {
         <StockOutModeSwitch
           mode={saleMode}
           onChange={(mode) => {
+            bumpStockOutActivity();
             setSaleMode(mode);
             queue.setScanMode(mode);
           }}
@@ -416,7 +561,7 @@ export function StockOutScanPanel() {
           cameraError={cameraError}
           onStart={startScanning}
           onStop={stopScanning}
-          disabled={!scannerEnabled}
+          disabled={!scannerEnabled || confirmLoading || cancelLoading}
           contextLabel={saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale"}
           hardwareListening={hardwareListening && scannerEnabled}
           onManualSubmit={onBarcodeDetected}
@@ -453,16 +598,33 @@ export function StockOutScanPanel() {
       />
 
       {failed.length > 0 && (
-        <ul className="space-y-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
-          {failed.map((item) => (
-            <li key={item.barcode} className="text-zinc-200">
-              <span className="font-mono text-xs">{item.barcode}</span>
-              <span className="mt-0.5 block text-xs text-danger">
-                {item.error ?? "Could not stock out this label."}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
+          <p className="text-xs font-medium text-danger">
+            This bill is still open. Fix these labels or remove them, then tap CONFIRM again.
+          </p>
+          <ul className="space-y-2">
+            {failed.map((item) => (
+              <li
+                key={item.barcode}
+                className="flex items-start justify-between gap-3 text-zinc-200"
+              >
+                <div className="min-w-0">
+                  <span className="font-mono text-xs">{item.barcode}</span>
+                  <span className="mt-0.5 block text-xs text-danger">
+                    {item.error ?? "Could not stock out this label."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => queue.removeFailedItem(item.barcode)}
+                  className="shrink-0 rounded-lg border border-surface-border px-2.5 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {queue.recovery.length > 0 && (
@@ -474,31 +636,25 @@ export function StockOutScanPanel() {
           type="button"
           onClick={() => {
             if (items.length > 0) setResetOpen(true);
-            else {
-              queue.discardActive();
-              setNotice(null);
-              setLastMessage(null);
-              setBillerName("");
-              setBillNo("");
-              setBillPromptOpen(true);
-            }
+            else void runCancelBill();
           }}
-          disabled={!ready}
+          disabled={!ready || cancelLoading || confirmLoading}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border px-4 py-3 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
         >
           <RotateCcw className="h-4 w-4" />
-          Cancel bill
+          {cancelLoading ? "Cancelling…" : "Cancel bill"}
         </button>
         <button
           type="button"
-          onClick={confirmBill}
-          disabled={!ready || items.length === 0}
+          onClick={() => void confirmBill()}
+          disabled={!ready || items.length === 0 || confirmLoading || cancelLoading}
           className="flex flex-[2] items-center justify-center gap-2 rounded-2xl border-2 border-accent/80 bg-accent px-5 py-4 text-base font-bold uppercase tracking-wide text-white shadow-lg shadow-accent/25 transition hover:bg-accent-muted disabled:border-surface-border disabled:bg-surface-overlay disabled:text-zinc-500 disabled:shadow-none"
         >
-          CONFIRM
-          {queue.counts.scanned > 0 ? (
+          {confirmLoading ? "Finishing…" : "CONFIRM"}
+          {queue.counts.scanned > 0 && !confirmLoading ? (
             <span className="rounded-lg bg-white/20 px-2 py-0.5 text-sm tabular-nums">
               {queue.counts.scanned}
+              {queue.counts.sending > 0 ? ` · ${queue.counts.sending} sending` : ""}
             </span>
           ) : null}
         </button>
@@ -506,7 +662,7 @@ export function StockOutScanPanel() {
 
       <p className="text-center text-xs text-zinc-600">
         {ready
-          ? "Scans upload in the background. Press CONFIRM when done — the bill summary appears, then the next bill starts automatically."
+          ? "Scans upload in the background. CONFIRM waits for pending uploads, shows the summary, then starts the next bill."
           : "Enter the bill number first. Scanning stays off until this bill is open."}
       </p>
 
@@ -554,8 +710,8 @@ export function StockOutScanPanel() {
             lines={lines}
             totalBags={totalBags}
             totalBales={totalBales}
-            sending={queue.counts.sending}
-            failedCount={failed.length}
+            sending={0}
+            failedCount={0}
             finalizing={finalBill}
           />
         )}
@@ -564,20 +720,11 @@ export function StockOutScanPanel() {
       <ConfirmDialog
         open={resetOpen}
         onClose={() => setResetOpen(false)}
-        onConfirm={() => {
-          queue.discardActive();
-          setNotice(null);
-          setLastMessage(null);
-          setRetailApproval(null);
-          setBillerName("");
-          setBillNo("");
-          setBillPromptOpen(true);
-          resetTally();
-          setResetOpen(false);
-        }}
+        onConfirm={() => void runCancelBill()}
         title="Cancel this bill?"
-        message="Clear this bill on the phone. Bales already sent stay stocked out. Scans still waiting are not sent."
+        message="This clears the bill on the phone. Any bales already stocked out on the slip are put back into warehouse stock."
         confirmLabel="Cancel bill"
+        loading={cancelLoading}
         destructive
       />
 

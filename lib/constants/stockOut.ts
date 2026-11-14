@@ -7,6 +7,8 @@ export const STOCK_OUT_QUEUE_STORAGE_KEY = "store-ims-stock-out-queue";
 export const STOCK_OUT_UPLOAD_BATCH_SIZE = 4;
 /** A smaller leftover list uploads on this interval so the slip moves during the session. */
 export const STOCK_OUT_UPLOAD_INTERVAL_MS = 2000;
+/** Open bill with zero scans is dropped after this idle period (mis-taps, wrong bill no). */
+export const STOCK_OUT_EMPTY_BILL_INACTIVITY_MS = 3 * 60 * 1000;
 
 export const RETURN_REASONS = [
   "Customer return",

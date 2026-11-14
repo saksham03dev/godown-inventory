@@ -438,13 +438,7 @@ export default function ScanPage() {
                   ? `${stockInProgress.scanned} scanned · ${stockInProgress.inWarehouse} in warehouse · ${stockInProgress.sending} sending`
                   : null
               }
-              onReset={() => {
-                if (mode === "STOCK_IN") {
-                  stockInQueue.clearSaved(selectedGodownId);
-                  return;
-                }
-                resetTally();
-              }}
+              onReset={mode === "STOCK_OUT" ? resetTally : undefined}
             />
           )}
 

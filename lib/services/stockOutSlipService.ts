@@ -6,6 +6,15 @@ import type {
   StockOutSlipWithDetails,
 } from "@/lib/types/database";
 
+export async function cancelStockOutSlip(input: {
+  slipId: string;
+}): Promise<MutationResult<null>> {
+  return apiMutation<null>("/api/inventory/stock-out-slip/cancel", {
+    method: "POST",
+    body: input,
+  });
+}
+
 export async function confirmStockOutSlip(input: {
   billerName: string;
   billNo: string;

@@ -130,6 +130,19 @@ function pickBatch(store: Store, allowPartial: boolean): {
   return null;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function godownStillSending(store: Store, godownId: string): boolean {
+  const list = store[godownId] ?? [];
+  return list.some(
+    (item) => item.status === "pending" || item.status === "uploading"
+  );
+}
+
 export function stockInCounts(items: StockInQueueItem[]): StockInQueueCounts {
   const active = items.filter((item) => item.status !== "failed");
   return {
@@ -323,9 +336,25 @@ export function useStockInQueue() {
         return { success: false, message: "Pick a warehouse first." };
       }
 
-      for (let attempt = 0; attempt < 30; attempt++) {
-        if (!pickBatch(storeRef.current, true)) break;
-        await flush(true);
+      const maxRounds = 24;
+      let backoffMs = 300;
+      for (let round = 0; round < maxRounds; round++) {
+        while (pickBatch(storeRef.current, true)) {
+          while (flushingRef.current) {
+            await sleep(50);
+          }
+          await flush(true);
+          while (flushingRef.current) {
+            await sleep(50);
+          }
+        }
+        if (!godownStillSending(storeRef.current, godown)) {
+          break;
+        }
+        if (round < maxRounds - 1) {
+          await sleep(backoffMs);
+          backoffMs = Math.min(Math.round(backoffMs * 1.45), 2000);
+        }
       }
 
       const list = storeRef.current[godown] ?? [];
@@ -337,14 +366,11 @@ export function useStockInQueue() {
         };
       }
 
-      const stillSending = list.some(
-        (item) => item.status === "pending" || item.status === "uploading"
-      );
-      if (stillSending) {
+      if (godownStillSending(storeRef.current, godown)) {
         return {
           success: false,
           message:
-            "Some labels are still sending to the warehouse. Wait a moment and try again.",
+            "Some labels are still sending to the warehouse. Check the network and tap TRUCK UNLOADED again.",
         };
       }
 

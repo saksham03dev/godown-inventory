@@ -489,13 +489,7 @@ export function StockScanPanel({
             ? `${stockInProgress.scanned} scanned · ${stockInProgress.inWarehouse} in warehouse · ${stockInProgress.sending} sending`
             : null
         }
-        onReset={() => {
-          if (isStockIn) {
-            stockInQueue.clearSaved(selectedGodownId);
-            return;
-          }
-          resetTally();
-        }}
+        onReset={isStockIn ? undefined : resetTally}
       />
 
       {isStockIn && (
