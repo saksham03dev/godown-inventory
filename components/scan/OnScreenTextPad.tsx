@@ -2,6 +2,7 @@
 
 import { Delete } from "lucide-react";
 import { useState } from "react";
+import { RequiredMark } from "@/components/ui/FieldLabel";
 
 type PadMode = "letters" | "digits";
 
@@ -16,6 +17,8 @@ interface OnScreenTextPadProps {
   maxLength?: number;
   /** Start on digit pad (useful for bill numbers). */
   defaultMode?: PadMode;
+  /** Shows a leading * on the label (required field). */
+  required?: boolean;
 }
 
 const LETTER_ROWS = [
@@ -57,6 +60,7 @@ export function OnScreenTextPad({
   disabled = false,
   maxLength = 64,
   defaultMode = "letters",
+  required = false,
 }: OnScreenTextPadProps) {
   const [mode, setMode] = useState<PadMode>(defaultMode);
 
@@ -79,8 +83,13 @@ export function OnScreenTextPad({
   return (
     <div className="space-y-2">
       {label ? (
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          {label}
+        <p
+          className={`flex items-baseline gap-0.5 text-xs font-medium uppercase tracking-wider ${
+            required ? "text-accent" : "text-zinc-500"
+          }`}
+        >
+          {required ? <RequiredMark /> : null}
+          <span>{label}</span>
         </p>
       ) : null}
 

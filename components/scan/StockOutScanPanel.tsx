@@ -14,6 +14,7 @@ import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { OnScreenTextPad } from "@/components/scan/OnScreenTextPad";
+import { FieldLabel } from "@/components/ui/FieldLabel";
 import { useBarcodeInput } from "@/hooks/useBarcodeInput";
 import { useScanTally } from "@/hooks/useScanTally";
 import {
@@ -644,7 +645,7 @@ function BillStartForm({
           } ${!billNo.trim() ? "ring-1 ring-accent/25" : ""}`}
         >
           <p className="text-[10px] font-medium uppercase tracking-wider text-accent">
-            Bill No
+            <FieldLabel required>Bill No</FieldLabel>
           </p>
           <p className="mt-0.5 truncate text-sm font-medium text-zinc-100">
             {billNo || <span className="font-normal text-zinc-600">—</span>}
@@ -665,6 +666,7 @@ function BillStartForm({
           onChange={padTarget === "biller" ? onBiller : onBillNo}
           placeholder={padTarget === "biller" ? "Customer or party" : "Bill / purchase no"}
           defaultMode={padTarget === "billNo" ? "digits" : "letters"}
+          required={padTarget === "billNo"}
         />
       </div>
       <button

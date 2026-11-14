@@ -10,6 +10,7 @@ import {
   ScanResultStrip,
 } from "@/components/scan/ScannerWindow";
 import { ScanTallyPanel } from "@/components/scan/ScanTallyPanel";
+import { StockInTruckUnloadButton } from "@/components/scan/StockInTruckUnloadButton";
 import { LabelDetailCard } from "@/components/scan/LabelDetailCard";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { AlertBanner } from "@/components/ui/AlertBanner";
@@ -43,6 +44,7 @@ export default function ScanPage() {
   const [queueNotice, setQueueNotice] = useState<AlertState | null>(null);
   const [acceptFlash, setAcceptFlash] = useState<"success" | "error" | null>(null);
   const [checkingLabel, setCheckingLabel] = useState(false);
+  const [truckUnloadLoading, setTruckUnloadLoading] = useState(false);
   const stockInQueue = useStockInQueue();
 
   const processingRef = useRef(false);
@@ -276,6 +278,27 @@ export default function ScanPage() {
       ? `${mode === "STOCK_IN" ? "Stock In" : "Wholesale Out"} · ${selectedGodown.location_name}`
       : undefined;
 
+  const handleTruckUnloaded = useCallback(async () => {
+    if (mode !== "STOCK_IN" || !selectedGodownId || truckUnloadLoading) return;
+    setTruckUnloadLoading(true);
+    setQueueNotice(null);
+    try {
+      const result = await stockInQueue.completeTruckUnload(selectedGodownId);
+      if (!result.success) {
+        setQueueNotice({ type: "error", message: result.message });
+        setAcceptFlash("error");
+        playScanReject();
+        return;
+      }
+      resetTally();
+      setQueueNotice({ type: "success", message: result.message });
+      setAcceptFlash("success");
+      playScanOkay();
+    } finally {
+      setTruckUnloadLoading(false);
+    }
+  }, [mode, selectedGodownId, truckUnloadLoading, stockInQueue, resetTally]);
+
   const overlayDetail = lastResult?.stockUnit
     ? `Bale #${lastResult.stockUnit.unit_number} · ${lastResult.stockUnit.unit_barcode}`
     : lastResult?.product?.name ?? null;
@@ -422,6 +445,15 @@ export default function ScanPage() {
                 }
                 resetTally();
               }}
+            />
+          )}
+
+          {mode === "STOCK_IN" && (
+            <StockInTruckUnloadButton
+              baleCount={tally.sessionBales}
+              loading={truckUnloadLoading}
+              disabled={!selectedGodownId || checkingLabel || processing}
+              onClick={() => void handleTruckUnloaded()}
             />
           )}
 

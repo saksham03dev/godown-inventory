@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Printer, Save, Trash2, X } from "lucide-react";
 import { AddSlipGoodsDialog } from "@/components/slips/AddSlipGoodsDialog";
 import { SlipBaleEditRow } from "@/components/slips/SlipBaleEditRow";
 import { StockOutSlipPrintView } from "@/components/slips/StockOutSlipPrintView";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { FieldLabel } from "@/components/ui/FieldLabel";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -14,6 +15,7 @@ import {
   updateStockOutSlip,
 } from "@/lib/services/stockOutSlipService";
 import type { StockOutSlipWithDetails } from "@/lib/types/database";
+import { isStockOutSlipEditDirty } from "@/lib/utils/stockOutSlipEdit";
 
 const inputClass =
   "w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60";
@@ -164,6 +166,14 @@ export function StockOutSlipManageDialog({
     }
   };
 
+  const hasEdits = useMemo(
+    () =>
+      slip
+        ? isStockOutSlipEditDirty(slip, editBiller, editBillNo, editBags)
+        : false,
+    [slip, editBiller, editBillNo, editBags]
+  );
+
   const title =
     slip?.bill_no?.trim() ||
     slip?.biller_name?.trim() ||
@@ -231,7 +241,9 @@ export function StockOutSlipManageDialog({
                     />
                   </label>
                   <label className="block space-y-1">
-                    <span className="text-xs font-medium text-accent">Bill No</span>
+                    <span className="text-xs font-medium text-accent">
+                      <FieldLabel required>Bill No</FieldLabel>
+                    </span>
                     <input
                       className={`${inputClass} border-l-[3px] border-l-accent`}
                       value={editBillNo}
@@ -240,20 +252,24 @@ export function StockOutSlipManageDialog({
                     />
                   </label>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleSave()}
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    {saving ? "Saving…" : "Save"}
-                  </button>
-                  {saveMessage ? (
-                    <span className="text-xs text-zinc-400">{saveMessage}</span>
-                  ) : null}
-                </div>
+                {(hasEdits || saving || saveMessage) && (
+                  <div className="flex items-center gap-3">
+                    {hasEdits || saving ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleSave()}
+                        disabled={saving || !hasEdits}
+                        className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
+                      >
+                        <Save className="h-4 w-4" />
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                    ) : null}
+                    {saveMessage ? (
+                      <span className="text-xs text-zinc-400">{saveMessage}</span>
+                    ) : null}
+                  </div>
+                )}
               </div>
             ) : null}
 

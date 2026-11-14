@@ -7,6 +7,7 @@ import {
   ScanResultStrip,
 } from "@/components/scan/ScannerWindow";
 import { ScanTallyPanel } from "@/components/scan/ScanTallyPanel";
+import { StockInTruckUnloadButton } from "@/components/scan/StockInTruckUnloadButton";
 import {
   resolvePresetBagsQty,
   StockQtyPreset,
@@ -74,6 +75,7 @@ export function StockScanPanel({
   const [queueNotice, setQueueNotice] = useState<AlertState | null>(null);
   const [acceptFlash, setAcceptFlash] = useState<"success" | "error" | null>(null);
   const [checkingLabel, setCheckingLabel] = useState(false);
+  const [truckUnloadLoading, setTruckUnloadLoading] = useState(false);
   const isMobile = useIsMobile();
   const stockInQueue = useStockInQueue();
 
@@ -349,6 +351,33 @@ export function StockScanPanel({
       ? String(pendingOut.unit.products.name)
       : "Product";
 
+  const handleTruckUnloaded = useCallback(async () => {
+    if (!isStockIn || !selectedGodownId || truckUnloadLoading) return;
+    setTruckUnloadLoading(true);
+    setQueueNotice(null);
+    try {
+      const result = await stockInQueue.completeTruckUnload(selectedGodownId);
+      if (!result.success) {
+        setQueueNotice({ type: "error", message: result.message });
+        setAcceptFlash("error");
+        playScanReject();
+        return;
+      }
+      resetTally();
+      setQueueNotice({ type: "success", message: result.message });
+      setAcceptFlash("success");
+      playScanOkay();
+    } finally {
+      setTruckUnloadLoading(false);
+    }
+  }, [
+    isStockIn,
+    selectedGodownId,
+    truckUnloadLoading,
+    stockInQueue,
+    resetTally,
+  ]);
+
   const pendingMessage = pendingOut
     ? [
         `Bale #${pendingOut.unit.unit_number} (${pendingProduct}) currently has ${formatBagCount(pendingOut.currentBags)} bags.`,
@@ -468,6 +497,20 @@ export function StockScanPanel({
           resetTally();
         }}
       />
+
+      {isStockIn && (
+        <StockInTruckUnloadButton
+          baleCount={tally.sessionBales}
+          loading={truckUnloadLoading}
+          disabled={
+            !selectedGodownId ||
+            checkingLabel ||
+            processing ||
+            confirmLoading
+          }
+          onClick={() => void handleTruckUnloaded()}
+        />
+      )}
 
       {isStockIn && stockInItems.some((item) => item.status === "failed") && (
         <ul className="space-y-2 rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">

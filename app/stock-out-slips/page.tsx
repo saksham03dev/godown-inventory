@@ -9,6 +9,7 @@ import { StockOutSlipListRow } from "@/components/slips/StockOutSlipListRow";
 import { StockOutSlipPrintView } from "@/components/slips/StockOutSlipPrintView";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FieldLabel } from "@/components/ui/FieldLabel";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/lib/services/stockOutSlipService";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import type { StockOutSlipWithDetails } from "@/lib/types/database";
+import { isStockOutSlipEditDirty } from "@/lib/utils/stockOutSlipEdit";
 
 const inputClass =
   "w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent disabled:opacity-60";
@@ -123,6 +125,14 @@ export default function StockOutSlipsPage() {
   const selected = useMemo(
     () => slips.find((s) => s.id === selectedId) ?? null,
     [slips, selectedId]
+  );
+
+  const hasEdits = useMemo(
+    () =>
+      selected
+        ? isStockOutSlipEditDirty(selected, editBiller, editBillNo, editBags)
+        : false,
+    [selected, editBiller, editBillNo, editBags]
   );
 
   useEffect(() => {
@@ -339,7 +349,7 @@ export default function StockOutSlipsPage() {
                         </label>
                         <label className="block space-y-1">
                           <span className="text-xs font-medium text-accent">
-                            Bill No
+                            <FieldLabel required>Bill No</FieldLabel>
                           </span>
                           <input
                             className={`${inputClass} border-l-[3px] border-l-accent`}
@@ -352,22 +362,26 @@ export default function StockOutSlipsPage() {
                       <p className="text-[11px] text-zinc-500">
                         Fix bag qty per bale, remove one bale with the trash icon, or remove a whole product. Add is for a bale that was missed.
                       </p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleSave()}
-                          disabled={saving}
-                          className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
-                        >
-                          <Save className="h-4 w-4" />
-                          {saving ? "Saving…" : "Save"}
-                        </button>
-                        {saveMessage && (
-                          <span className="text-xs text-zinc-400">
-                            {saveMessage}
-                          </span>
-                        )}
-                      </div>
+                      {(hasEdits || saving || saveMessage) && (
+                        <div className="flex items-center gap-3">
+                          {hasEdits || saving ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleSave()}
+                              disabled={saving || !hasEdits}
+                              className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
+                            >
+                              <Save className="h-4 w-4" />
+                              {saving ? "Saving…" : "Save"}
+                            </button>
+                          ) : null}
+                          {saveMessage ? (
+                            <span className="text-xs text-zinc-400">
+                              {saveMessage}
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="grid gap-2 text-sm sm:grid-cols-2">

@@ -7,6 +7,7 @@ import {
   STOCK_IN_UPLOAD_INTERVAL_MS,
 } from "@/lib/constants/stockIn";
 import { uploadStockInBatch } from "@/lib/services/stockInBatchService";
+import type { MutationResult } from "@/lib/types/database";
 
 export type StockInQueueStatus = "pending" | "uploading" | "saved" | "failed";
 
@@ -315,6 +316,56 @@ export function useStockInQueue() {
     [commit]
   );
 
+  const completeTruckUnload = useCallback(
+    async (godownId: string): Promise<MutationResult<{ unloaded: number }>> => {
+      const godown = godownId.trim();
+      if (!godown) {
+        return { success: false, message: "Pick a warehouse first." };
+      }
+
+      for (let attempt = 0; attempt < 30; attempt++) {
+        if (!pickBatch(storeRef.current, true)) break;
+        await flush(true);
+      }
+
+      const list = storeRef.current[godown] ?? [];
+      const active = list.filter((item) => item.status !== "failed");
+      if (active.length === 0) {
+        return {
+          success: false,
+          message: "Scan at least one bale before marking the truck unloaded.",
+        };
+      }
+
+      const stillSending = list.some(
+        (item) => item.status === "pending" || item.status === "uploading"
+      );
+      if (stillSending) {
+        return {
+          success: false,
+          message:
+            "Some labels are still sending to the warehouse. Wait a moment and try again.",
+        };
+      }
+
+      const unloaded = list.filter((item) => item.status === "saved").length;
+      commit({
+        ...storeRef.current,
+        [godown]: list.filter((item) => item.status === "failed"),
+      });
+
+      return {
+        success: true,
+        message:
+          unloaded > 0
+            ? `Truck unloaded · ${unloaded} bale${unloaded === 1 ? "" : "s"} in warehouse.`
+            : "Truck session cleared.",
+        data: { unloaded },
+      };
+    },
+    [commit, flush]
+  );
+
   return {
     hydrated: hydratedRef.current || Object.keys(store).length > 0,
     itemsFor,
@@ -322,5 +373,6 @@ export function useStockInQueue() {
     containsBarcode,
     enqueue,
     clearSaved,
+    completeTruckUnload,
   };
 }
