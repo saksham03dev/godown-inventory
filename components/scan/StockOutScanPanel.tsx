@@ -513,8 +513,8 @@ export function StockOutScanPanel() {
       <Modal
         open={queue.hydrated && !ready && billPromptOpen}
         onClose={() => setBillPromptOpen(false)}
-        title="Start stock out"
-        description="Enter the bill no to start scanning. The sidebar still opens other pages."
+        title="STOCKOUT"
+        titleClassName="text-2xl font-bold uppercase tracking-wide text-zinc-100 sm:text-3xl"
         size="md"
         preserveNav
       >

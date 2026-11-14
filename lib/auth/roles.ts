@@ -10,7 +10,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full access — products, pricing, billing, and all operations",
   manager:
     "Floor ops like employee (stock in/out, slips, returns, transfers) plus daily reports, pending bills, open bales, and view label — no inventory or product admin",
-  employee: "Stock in/out scanning and view stock-out slips",
+  employee: "Stock in/out scanning, view-only daily reports, and stock-out slips",
 };
 
 type Permission =
@@ -69,7 +69,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "billing.view",
     "slips.view",
   ],
-  employee: ["scan", "slips.view"],
+  employee: ["scan", "slips.view", "reports.view"],
 };
 
 export function hasPermission(
@@ -202,7 +202,12 @@ export function getNavItemsForRole(
 
   if (role === "employee") {
     return items.filter((item) =>
-      ["/stock-in", "/stock-out", "/stock-out-slips"].includes(item.href)
+      [
+        "/stock-in",
+        "/stock-out",
+        "/daily-reports",
+        "/stock-out-slips",
+      ].includes(item.href)
     );
   }
 

@@ -14,6 +14,8 @@ interface ModalProps {
   preserveNav?: boolean;
   /** When false, hide close control and ignore backdrop / Escape. */
   dismissible?: boolean;
+  /** Override default modal title typography. */
+  titleClassName?: string;
 }
 
 const sizeClasses = {
@@ -32,6 +34,7 @@ export function Modal({
   size = "md",
   preserveNav = false,
   dismissible = true,
+  titleClassName,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -67,7 +70,12 @@ export function Modal({
       >
         <div className="sticky top-0 z-10 flex items-start justify-between border-b border-surface-border bg-surface-raised px-5 py-4">
           <div>
-            <h2 id="modal-title" className="text-lg font-semibold text-zinc-100">
+            <h2
+              id="modal-title"
+              className={
+                titleClassName ?? "text-lg font-semibold text-zinc-100"
+              }
+            >
               {title}
             </h2>
             {description && (
