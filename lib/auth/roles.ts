@@ -9,7 +9,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full access — products, pricing, billing, and all operations",
   manager:
-    "Floor ops like employee (stock in/out, slips, returns, transfers) plus daily reports, pending bills, open bales, and view label — no inventory or product admin",
+    "Stock in/out, slips (edit), labels, returns, transfers, open bales, and daily reports — no dashboard totals, products, or user admin",
   employee: "Stock in/out scanning, view-only daily reports, and stock-out slips",
 };
 
@@ -64,10 +64,12 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "reports.view",
     "scan",
     "scan.viewLabel",
+    "labels",
     "inventory.transfer",
     "inventory.return",
     "billing.view",
     "slips.view",
+    "slips.edit",
   ],
   employee: ["scan", "slips.view", "reports.view"],
 };
@@ -89,7 +91,7 @@ export interface NavItem {
 }
 
 export const ALL_NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", permission: "godowns.view" },
+  { href: "/", label: "Dashboard", permission: "dashboard" },
   { href: "/daily-reports", label: "Daily Reports", permission: "reports.view" },
   {
     href: "/labels",
@@ -201,27 +203,28 @@ export function getNavItemsForRole(
   }
 
   if (role === "employee") {
-    return items.filter((item) =>
-      [
-        "/stock-in",
-        "/stock-out",
-        "/daily-reports",
-        "/stock-out-slips",
-      ].includes(item.href)
-    );
+    const order = [
+      "/stock-in",
+      "/stock-out",
+      "/daily-reports",
+      "/stock-out-slips",
+    ];
+    return order
+      .map((href) => items.find((item) => item.href === href))
+      .filter((item): item is NavItem => Boolean(item));
   }
 
   if (role === "manager") {
     return items.filter((item) =>
       [
         "/daily-reports",
+        "/labels",
         "/stock-in",
         "/stock-out",
         "/view-label",
         "/stock-out-slips",
         "/stock-return",
         "/stock-transfer",
-        "/pending-billing",
         "/open-bales",
       ].includes(item.href)
     );
@@ -233,14 +236,13 @@ export function getNavItemsForRole(
 export function getDefaultRouteForRole(
   role: UserRole | null | undefined
 ): string {
-  if (role === "employee" || role === "manager") {
-    return "/stock-out";
-  }
+  if (role === "manager") return "/daily-reports";
+  if (role === "employee") return "/stock-out";
   return "/";
 }
 
 const ROUTE_PERMISSIONS: Record<string, Permission> = {
-  "/": "godowns.view",
+  "/": "dashboard",
   "/daily-reports": "reports.view",
   "/products": "products.view",
   "/labels": "labels",

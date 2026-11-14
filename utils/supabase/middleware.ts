@@ -111,7 +111,7 @@ export const updateSession = async (request: NextRequest) => {
   }
 
   if (authenticated && role && !isPublicPath(pathname)) {
-    if (role === "employee" && pathname === "/") {
+    if ((role === "employee" || role === "manager") && pathname === "/") {
       const scanUrl = request.nextUrl.clone();
       scanUrl.pathname = getDefaultRouteForRole(role);
       const redirect = NextResponse.redirect(scanUrl);

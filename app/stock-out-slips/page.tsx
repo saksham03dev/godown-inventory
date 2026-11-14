@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { AddSlipGoodsDialog } from "@/components/slips/AddSlipGoodsDialog";
 import { SlipBaleEditRow } from "@/components/slips/SlipBaleEditRow";
 import { StockOutSlipListRow } from "@/components/slips/StockOutSlipListRow";
+import { StockOutSlipManageDialog } from "@/components/slips/StockOutSlipManageDialog";
 import { StockOutSlipPrintView } from "@/components/slips/StockOutSlipPrintView";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -96,6 +97,28 @@ export default function StockOutSlipsPage() {
     unitNumber: number;
   } | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [slipDialogOpen, setSlipDialogOpen] = useState(false);
+  const [useSlipDialog, setUseSlipDialog] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setUseSlipDialog(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!useSlipDialog) setSlipDialogOpen(false);
+  }, [useSlipDialog]);
+
+  const handleSelectSlip = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      if (useSlipDialog) setSlipDialogOpen(true);
+    },
+    [useSlipDialog]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -280,18 +303,18 @@ export default function StockOutSlipsPage() {
                 slips={todaySlips}
                 empty="No slips today."
                 selectedId={selectedId}
-                onSelect={setSelectedId}
+                onSelect={handleSelectSlip}
               />
               <SlipSection
                 title="Last 10"
                 slips={recentSlips}
                 empty="No earlier slips."
                 selectedId={selectedId}
-                onSelect={setSelectedId}
+                onSelect={handleSelectSlip}
               />
             </div>
 
-            <div className="rounded-2xl border border-surface-border bg-surface-raised p-5">
+            <div className="hidden rounded-2xl border border-surface-border bg-surface-raised p-5 lg:block">
               {!selected ? (
                 <p className="text-sm text-zinc-500">
                   Select a slip to view details.
@@ -485,6 +508,17 @@ export default function StockOutSlipsPage() {
           </div>
         )}
       </div>
+
+      <StockOutSlipManageDialog
+        open={slipDialogOpen && useSlipDialog && Boolean(selectedId)}
+        slipId={selectedId}
+        initialSlip={selected}
+        onClose={() => {
+          setSlipDialogOpen(false);
+          setSelectedId(null);
+        }}
+        onUpdated={replaceSlip}
+      />
 
       {selected && (
         <AddSlipGoodsDialog
