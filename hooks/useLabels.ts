@@ -7,6 +7,7 @@ import {
   fetchBatchWithUnits,
   fetchBatches,
 } from "@/lib/services/batchService";
+import { labelHistoryStartOfCurrentMonth } from "@/lib/utils/labelHistory";
 import type {
   AlertState,
   CreateBatchInput,
@@ -18,10 +19,13 @@ export function useLabels() {
   const { products, productsLoading, catalogError, refreshProducts } =
     useCatalogCache();
   const [batches, setBatches] = useState<StockBatch[]>([]);
+  const [historyBatches, setHistoryBatches] = useState<StockBatch[]>([]);
   const [activeBatch, setActiveBatch] = useState<StockBatchWithUnits | null>(
     null
   );
   const [batchesLoading, setBatchesLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
@@ -29,8 +33,8 @@ export function useLabels() {
   const refreshBatches = useCallback(async () => {
     setBatchesLoading(true);
     try {
-      const batchesData = await fetchBatches(5);
-      setBatches(batchesData);
+      const recent = await fetchBatches(5);
+      setBatches(recent);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load batches");
     } finally {
@@ -38,10 +42,30 @@ export function useLabels() {
     }
   }, []);
 
+  const loadHistoryBatches = useCallback(async () => {
+    setHistoryLoading(true);
+    const since = labelHistoryStartOfCurrentMonth();
+    try {
+      const history = await fetchBatches(0, since);
+      setHistoryBatches(history);
+      setHistoryLoaded(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load history batches"
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     setError(null);
-    await Promise.all([refreshProducts(), refreshBatches()]);
-  }, [refreshProducts, refreshBatches]);
+    const promises: Promise<unknown>[] = [refreshProducts(), refreshBatches()];
+    if (historyLoaded) {
+      promises.push(loadHistoryBatches());
+    }
+    await Promise.all(promises);
+  }, [refreshProducts, refreshBatches, historyLoaded, loadHistoryBatches]);
 
   useEffect(() => {
     if (catalogError) setError(catalogError);
@@ -88,8 +112,12 @@ export function useLabels() {
   return {
     products,
     batches,
+    historyBatches,
     activeBatch,
     loading: productsLoading || batchesLoading,
+    historyLoading,
+    historyLoaded,
+    loadHistoryBatches,
     creating,
     error,
     alert,

@@ -34,6 +34,12 @@ interface ScannerWindowProps {
     message?: string | null;
     detail?: string | null;
   };
+  /**
+   * When provided, renders a compact Wholesale / Retail pill toggle
+   * inside the camera's bottom bar — always visible while camera is live.
+   */
+  saleMode?: "wholesale" | "retail";
+  onSaleModeChange?: (mode: "wholesale" | "retail") => void;
 }
 
 export function ScannerWindow({
@@ -49,6 +55,8 @@ export function ScannerWindow({
   manualInputRef,
   manualInputMode = "numeric",
   overlay,
+  saleMode,
+  onSaleModeChange,
 }: ScannerWindowProps) {
   const internalInputRef = useRef<HTMLInputElement>(null);
   const inputRef = manualInputRef ?? internalInputRef;
@@ -162,7 +170,34 @@ export function ScannerWindow({
         )}
 
         {isScanning && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8">
+            {/* Wholesale / Retail in-camera toggle — always visible, no scroll needed */}
+            {saleMode && onSaleModeChange && (
+              <div className="pointer-events-auto mb-2 flex justify-center">
+                <div className="flex overflow-hidden rounded-full border border-white/20 bg-black/50 backdrop-blur-sm">
+                  {(["wholesale", "retail"] as const).map((opt) => {
+                    const active = saleMode === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => onSaleModeChange(opt)}
+                        className={`px-5 py-1.5 text-sm font-semibold transition disabled:opacity-50 ${
+                          active
+                            ? opt === "wholesale"
+                              ? "bg-wholesale text-zinc-900"
+                              : "bg-retail text-zinc-900"
+                            : "text-white/60 hover:text-white"
+                        }`}
+                      >
+                        {opt === "wholesale" ? "Wholesale" : "Retail"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {contextLabel && (
               <p className="mb-1 text-center text-xs font-medium text-accent">
                 {contextLabel}

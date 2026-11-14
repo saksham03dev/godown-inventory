@@ -16,30 +16,41 @@ import type {
   UpdateBatchInput,
 } from "@/lib/types/database";
 
-export async function fetchBatches(limit = 20): Promise<StockBatch[]> {
+const BATCH_LIST_SELECT = `
+  *,
+  products ( id, name, product_code, size, quality, special_note )
+`;
+
+const BATCH_LIST_SELECT_NO_QUALITY = `
+  *,
+  products ( id, name, product_code, size, special_note )
+`;
+
+export async function fetchBatches(
+  limit = 20,
+  since?: string
+): Promise<StockBatch[]> {
   const supabase = getSupabaseClient();
-  let { data, error } = await supabase
+  let query = supabase
     .from("stock_batches")
-    .select(
-      `
-      *,
-      products ( id, name, product_code, size, quality, special_note )
-    `
-    )
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .select(BATCH_LIST_SELECT)
+    .order("created_at", { ascending: false });
+  if (since) {
+    query = query.gte("created_at", since);
+  }
+  if (limit > 0) {
+    query = query.limit(limit);
+  }
+  let { data, error } = await query;
 
   if (error && isMissingColumnError(error.message, "quality")) {
-    ({ data, error } = await supabase
+    let fallback = supabase
       .from("stock_batches")
-      .select(
-        `
-      *,
-      products ( id, name, product_code, size, special_note )
-    `
-      )
-      .order("created_at", { ascending: false })
-      .limit(limit));
+      .select(BATCH_LIST_SELECT_NO_QUALITY)
+      .order("created_at", { ascending: false });
+    if (since) fallback = fallback.gte("created_at", since);
+    if (limit > 0) fallback = fallback.limit(limit);
+    ({ data, error } = await fallback);
   }
 
   if (error) throw new Error(formatSchemaError(error.message));

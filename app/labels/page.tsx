@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Printer } from "lucide-react";
+import { ChevronDown, Printer } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { BatchCreateForm } from "@/components/labels/BatchCreateForm";
+import { LabelPrintHistory } from "@/components/labels/LabelPrintHistory";
 import { LabelSheet } from "@/components/labels/LabelSheet";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -21,8 +22,12 @@ export default function LabelsPage() {
   const {
     products,
     batches,
+    historyBatches,
     activeBatch,
     loading,
+    historyLoading,
+    historyLoaded,
+    loadHistoryBatches,
     creating,
     error,
     alert,
@@ -32,6 +37,15 @@ export default function LabelsPage() {
   } = useLabels();
 
   const [labelSize, setLabelSize] = useState<LabelSize>("square");
+  const [showHistory, setShowHistory] = useState(false);
+
+  const handleToggleHistory = () => {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && !historyLoaded && !historyLoading) {
+      void loadHistoryBatches();
+    }
+  };
 
   const handlePrint = () => window.print();
 
@@ -128,6 +142,38 @@ export default function LabelsPage() {
                     ))}
                   </ul>
                 )}
+
+                <div className="mt-4 border-t border-surface-border pt-4">
+                  <button
+                    type="button"
+                    onClick={handleToggleHistory}
+                    className="flex w-full items-center justify-between rounded-xl border border-surface-border bg-surface-overlay/60 px-3.5 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-white/5 hover:text-white"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>Label Print History (This Month)</span>
+                      {historyLoaded && !historyLoading && (
+                        <span className="rounded-full bg-labels/15 px-2 py-0.5 text-xs font-normal text-labels">
+                          {historyBatches.length}
+                        </span>
+                      )}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-zinc-400 transition-transform duration-200 ${
+                        showHistory ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {showHistory && (
+                    <div className="mt-3 animate-fade-in">
+                      <LabelPrintHistory
+                        batches={historyBatches}
+                        loading={historyLoading}
+                        onOpenBatch={(id) => void loadBatch(id)}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
