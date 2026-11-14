@@ -531,16 +531,14 @@ export function StockOutScanPanel() {
       ) : null}
 
       {ready && (
-        <div className="hidden sm:block">
-          <StockOutModeSwitch
-            mode={saleMode}
-            onChange={(mode) => {
-              bumpStockOutActivity();
-              setSaleMode(mode);
-              queue.setScanMode(mode);
-            }}
-          />
-        </div>
+        <StockOutModeSwitch
+          mode={saleMode}
+          onChange={(mode) => {
+            bumpStockOutActivity();
+            setSaleMode(mode);
+            queue.setScanMode(mode);
+          }}
+        />
       )}
 
       {offline && (
@@ -564,7 +562,7 @@ export function StockOutScanPanel() {
           onStart={startScanning}
           onStop={stopScanning}
           disabled={!scannerEnabled || confirmLoading || cancelLoading}
-          contextLabel={saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale · retail"}
+          contextLabel={saleMode === "wholesale" ? "Wholesale stock out" : "Scan bale"}
           hardwareListening={hardwareListening && scannerEnabled}
           onManualSubmit={onBarcodeDetected}
           manualInputRef={manualInputRef}
@@ -575,16 +573,6 @@ export function StockOutScanPanel() {
             message: lastMessage,
             detail: null,
           }}
-          saleMode={ready ? saleMode : undefined}
-          onSaleModeChange={
-            ready
-              ? (mode) => {
-                  bumpStockOutActivity();
-                  setSaleMode(mode);
-                  queue.setScanMode(mode);
-                }
-              : undefined
-          }
         />
       </div>
 
